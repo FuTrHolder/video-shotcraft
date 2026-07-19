@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="video-shotcraft 镜头配方与动态样片画廊">
+  <link rel="icon" href="data:,">
+  <title>镜头库 | video-shotcraft</title>
+  <script>
+    try {
+      const choice = localStorage.getItem('video-shot-gallery-theme') || 'system';
+      const theme = choice === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : choice;
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.themeChoice = choice;
+      document.documentElement.style.colorScheme = theme;
+    } catch {}
+  </script>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./translations.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#library" data-i18n="skip">跳到镜头列表</a>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="回到顶部" data-i18n-aria-label="brandHome">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>VIDEO SHOTCRAFT</span>
+    </a>
+    <div class="topbar-actions">
+      <div class="theme-switch" id="themeSwitch" role="group" aria-label="页面主题">
+        <button type="button" data-theme="system" aria-pressed="true">系统</button>
+        <button type="button" data-theme="light" aria-pressed="false">浅色</button>
+        <button type="button" data-theme="dark" aria-pressed="false">深色</button>
+      </div>
+      <div class="language-switch" id="languageSwitch" role="group" aria-label="语言">
+        <button type="button" data-language="zh" aria-pressed="true">中文</button>
+        <button type="button" data-language="en" aria-pressed="false">EN</button>
+      </div>
+      <div class="sync-status" id="syncStatus" aria-live="polite">
+        <span class="sync-indicator" aria-hidden="true"></span>
+        <span>正在扫描</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="pageTitle">
+      <div class="intro-copy">
+        <h1 id="pageTitle">镜头配方与动态样片</h1>
+        <p class="intro-description" data-i18n="intro">浏览正式镜头卡，并切换查看每一种动画样片。</p>
+      </div>
+
+      <dl class="stats" aria-label="镜头库统计" data-i18n-aria-label="statsLabel">
+        <div><dt data-i18n="cards">镜头卡</dt><dd id="cardCount">-</dd></div>
+        <div><dt data-i18n="styles">式</dt><dd id="styleCount">-</dd></div>
+        <div><dt data-i18n="samples">有样片</dt><dd id="previewCount">-</dd></div>
+      </dl>
+    </section>
+
+    <section class="controls" aria-label="筛选镜头" data-i18n-aria-label="controlsLabel">
+      <label class="search-field" for="searchInput">
+        <span class="search-icon" aria-hidden="true"></span>
+        <span class="sr-only" data-i18n="searchLabel">搜索镜头卡</span>
+        <input id="searchInput" type="search" autocomplete="off" placeholder="搜索镜头名、用途、式…">
+        <kbd>⌘ K</kbd>
+      </label>
+      <div class="filter-row" id="filters" role="group" aria-label="按能量和样片筛选" data-i18n-aria-label="filtersLabel">
+        <button class="filter-button is-active" type="button" data-filter="all" data-i18n="all">全部</button>
+        <button class="filter-button" type="button" data-filter="high" data-i18n="high">高能量</button>
+        <button class="filter-button" type="button" data-filter="medium" data-i18n="medium">中能量</button>
+        <button class="filter-button" type="button" data-filter="low" data-i18n="low">低能量</button>
+        <button class="filter-button" type="button" data-filter="missing" data-i18n="missing">缺样片</button>
+      </div>
+    </section>
+
+    <section class="library" id="library" aria-live="polite" aria-busy="true"></section>
+
+    <section class="empty-state" id="emptyState" hidden>
+      <p data-i18n="empty">没有符合当前条件的镜头。</p>
+      <button type="button" id="clearFilters" data-i18n="clear">清除筛选</button>
+    </section>
+  </main>
+
+  <template id="loadingTemplate">
+    <article class="shot-card skeleton-card" aria-hidden="true">
+      <div class="skeleton-line skeleton-title"></div>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-media"></div>
+    </article>
+  </template>
+
+  <div class="selection-bar" id="selectionBar" hidden>
+    <span class="selection-count" id="selectionCount"></span>
+    <button type="button" class="selection-copy" id="copySelected">复制所选</button>
+    <button type="button" class="selection-clear" id="clearSelected">清空</button>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
