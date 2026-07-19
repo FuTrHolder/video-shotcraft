@@ -1,5 +1,7 @@
 # video-shotcraft
 
+[简体中文](README.md) | [English](README_EN.md)
+
 一套用于制作电影感产品视频的自包含能力库：镜头配方卡、动态样片、
 Remotion 参考实现、已验收成片模板、可复用组件、声音资产与完整制作流程。
 
@@ -20,58 +22,6 @@ Remotion 参考实现、已验收成片模板、可复用组件、声音资产�
 | 组件与素材 | 2.5D 页面相机、字幕、闪切、数字滚动、音效和素材采集脚本 |
 | 制作方法论 | 从素材采集、风格定调和分镜，到声音设计、节奏卡点与最终验收 |
 
-## 三种使用方式
-
-### 1. 使用完整视频模板
-
-适合需要快速得到一支结构完整、质量稳定的产品宣传片。模板已经包含：
-
-- 品牌开场、功能展示、字卡呼吸位和结尾品牌落版；
-- 真实页面截图驱动的 2.5D 运镜；
-- 转场、字幕和电影感 SFX；
-- 可替换的产品截图、文案、品牌信息与页面坐标。
-
-先阅读 [模板解构与复现指南](template/TEMPLATE.md)，再启动工程：
-
-```bash
-cd template
-npm install
-npm run dev
-```
-
-渲染完整成片：
-
-```bash
-npm run render
-```
-
-输出文件位于 `template/out/promo.mp4`。
-
-### 2. 用镜头卡自由组合
-
-先到 [在线 Gallery](https://vincentwei1021.github.io/video-shotcraft/)
-挑选想使用的动效镜头，然后按以下顺序阅读和使用：
-
-1. 打开 `references/shots/<卡名>.md`，了解镜头意图、时长、能量与参数。
-2. 打开 `demos/<卡名>/`，阅读对应的 Remotion 实现源码。
-3. 将 demo 和需要的共享组件复制到目标 Remotion 项目中。
-4. 替换为目标产品的真实素材，并根据实际构图做适配。
-
-镜头卡定义“为什么这样拍”，demo 源码保存“具体怎样实现”。使用镜头卡时，
-不要只根据卡名重新编写动画；经过调校的缓动、时值和摘罩时机都在 demo 中。
-
-### 3. 从零制作完整宣传片
-
-需要全新视觉语言时，按照 [六阶段制作流水线](references/pipeline.md) 执行：
-
-1. 阶段 0：确认音乐、模板路线和数据合规口径。
-2. 素材采集：获取真实页面截图、元素切片和 `layout.json`。
-3. 风格定调：用低成本 styleframe 锁定视觉与动效性格。
-4. 分镜设计：根据功能清单和能量曲线选择镜头卡。
-5. 逐镜头实现：每个镜头完成后立即输出静帧验收。
-6. 声音设计：为运镜、落地、转场和品牌落版配置 SFX。
-7. 最终验收：整片渲染、抽帧检查，并按审美准则逐项复核。
-
 ## 快速开始
 
 克隆仓库：
@@ -88,10 +38,19 @@ cd gallery
 python3 -m http.server 4178
 ```
 
-然后访问 `http://localhost:4178`。
+然后访问 `http://localhost:4178`。也可以直接使用
+[线上 Gallery](https://vincentwei1021.github.io/video-shotcraft/)。
 
-也可以直接使用线上版本：
-[vincentwei1021.github.io/video-shotcraft](https://vincentwei1021.github.io/video-shotcraft/)。
+启动完整成片模板：
+
+```bash
+cd template
+npm install
+npm run dev
+```
+
+运行 `npm run render` 可将成片输出到 `template/out/promo.mp4`。
+替换模板素材前，请先阅读 [模板解构与复现指南](template/TEMPLATE.md)。
 
 ## 作为 Agent Skill 使用
 
@@ -139,17 +98,8 @@ video-shotcraft/
     └── audio/               # SFX 与授权说明
 ```
 
-## 制作原则
-
-- 展示已有产品页面时优先使用真实截图，不用手绘 UI 冒充产品界面。
-- 每个镜头只让一种动效手法成为主角，避免全片重复同一种表达。
-- 先确认素材、styleframe 和分镜，再进入成本更高的逐镜头实现。
-- 关键信息落定后保留呼吸时间；品牌字标落定至少停留 1 秒。
-- 强节奏音乐中的镜头边界和关键动作必须锚定拍点。
-- 禁止使用 `Math.random()`、`Date.now()` 等非确定性数据驱动动画。
-- 每个镜头完成后输出静帧检查，交付前再进行整片抽帧验收。
-
-更多细节见 [SKILL.md](SKILL.md) 与
+完整工作流和实现要求见 [SKILL.md](SKILL.md)、
+[制作流水线](references/pipeline.md) 与
 [视觉验收准则](references/aesthetic-rules.md)。
 
 ## 音频与素材说明
