@@ -1,6 +1,6 @@
 # sound-design — 声音设计
 
-来源：模板片（`template/`）声音设计实战。准则编号 S1–S4 见 `references/aesthetic-rules.md`；判例中的 commit hash 属模板片的源仓库（本库不含），仅作追溯标记。
+来源：模板片（`template/`）声音设计实战。准则编号 S1–S4 见 `references/aesthetic-rules.md`。
 
 模板片的声音全部集中在一个文件里管理（`template/src/aifl/Main.tsx`：`SFX[]` 钉帧表），场景组件不含任何音频代码——声音是时间线级资产，不是镜头级资产。
 
@@ -15,7 +15,7 @@
 3. **SFX 逐拍钉帧、声明式表集中管理（S2）。** SFX 是 `{ from, src, volume }[]` 数组，逐条注释对应的画面动作（"hero card: whoosh up on the pop"），渲染时每条包一个 `<Sequence from={s.from}>`。杜绝凭感觉铺音效。
 4. **通用音之外留"贴画面定制"槽位。** 词汇表定稿后，有辨识度的画面动作仍会要专属拟音（打字揭示配键盘声、逐周落入配 pop）——泛用 swoosh 盖不住这些动作（S4）。
 
-时机教训：模板片 ~30 个画面 commit 之后音频 commit 才开始（最后 5 个），且由用户点名触发；把换 BGM 和画面重做塞进同一个 commit 的那次（`9dc13e5f`），画面随后继续改，SFX 全表报废重钉。**声音永远排在画面锁定之后**（S3），细节见第 4 节。
+时机教训：模板片的音频工作直到画面改了约 30 轮之后才开始（收尾最后几轮）；有一次把换 BGM 和画面重做混在同一轮改动里，画面随后继续改，SFX 全表报废重钉。**声音永远排在画面锁定之后**（S3），细节见第 4 节。
 
 ---
 
@@ -23,11 +23,11 @@
 
 ### 演进：三易其稿（34 分钟）
 
-| 稿 | 曲目 | 来源/授权 | commit | 被换原因 |
-|---|---|---|---|---|
-| v1 | Kevin MacLeod – *Inspired*（暖色 ambient 钢琴底）；同批还下了备选 *Deliberate Thought*，从未引用 | incompetech，CC-BY | `30e8c92a` | 用户："BGM换个更有节奏感，更激情欢快的"——钢琴 ambient 不够激情 |
-| v2 | Kevin MacLeod – *Life of Riley*（欢快 folk-pop） | incompetech，CC-BY | `9dc13e5f` | 用户："这个配乐和音效都太像游戏了。你帮我找那种鼓点强的，节奏感强的"——欢快≠宣传片气质 |
-| v3（定稿） | Mixkit tech-house 鼓底（`bgm-tech-house.mp3`），音量升至 0.34 | Mixkit license | `fdcae3ea` | 未再被换，沿用至成片 |
+| 稿 | 曲目 | 来源/授权 | 被换原因 |
+|---|---|---|---|
+| v1 | Kevin MacLeod – *Inspired*（暖色 ambient 钢琴底）；同批还下了备选 *Deliberate Thought*，从未引用 | incompetech，CC-BY | 用户："BGM换个更有节奏感，更激情欢快的"——钢琴 ambient 不够激情 |
+| v2 | Kevin MacLeod – *Life of Riley*（欢快 folk-pop） | incompetech，CC-BY | 用户："这个配乐和音效都太像游戏了。你帮我找那种鼓点强的，节奏感强的"——欢快≠宣传片气质 |
+| v3（定稿） | Mixkit tech-house 鼓底（`bgm-tech-house.mp3`），音量升至 0.34 | Mixkit license | 未再被换，沿用至成片 |
 
 v1→v2 只隔 22 分钟就又被否——说明选曲时根本没在成片语境里听。**候选曲必须垫进成片试听后再定**（S1 自检项）。
 
@@ -60,15 +60,15 @@ v1→v2 只隔 22 分钟就又被否——说明选曲时根本没在成片语�
 | `sparkle.mp3` | 4.55s | 光效 reveal：扫描光束、收尾闪光 | f141 hero 卡光束、f1005 结尾 rule 闪光 | Mixkit |
 | `transition-snap.mp3` | 0.57s | 短促落定/贴回原位的 snap | f204 hero 卡 impact reseat | Mixkit |
 | `swoosh-quick.mp3` | 0.78s | 字卡出场统一音、轻推镜 | f220/565/725/885 四张 title card、f455 点击后 push-in | Mixkit |
-| `keyboard.mp3` | 19.6s | 真实键盘打字拟音（长样本，按段落裁剪用） | f401 搜索框输入（截 24f）、f781 wbr 页"自己写出来"（截 44f） | Mixkit |
+| `keyboard.mp3` | 19.6s | 真实键盘打字拟音（长样本，按段落裁剪用） | f401 搜索框输入（截 24f）、f781 周报页"自己写出来"（截 44f） | Mixkit |
 | `click-camera.mp3` | 0.35s | 点击确认/快门感（全片最响 vol 0.6） | f451 点击卡片进详情、f648 papers 计数落定 | Mixkit |
 | `riser-cine.mp3` | 4.81s | 电影系上升铺垫，进 finale | f945 outro 合影组装段起 | Mixkit |
 | `impact-cine.mp3` | 4.06s | 电影系重音钉点（vol 0.55 全片 SFX 峰值） | f980 字标 stamp 落地 | Mixkit |
-| `pop.mp3` | 0.48s | 列表条目逐个落入的短促 pop | f840–865 wbr 周列表 6 连发，每 5f 一发、音量 0.40→0.25 阶梯递减 | **来源待考**（`6c928b3a` 引入，commit 无来源记录） |
-| `impact-transition.mp3` | 4.87s | **死资产：全片未被引用**（`git log -S` 全历史零命中），`fdcae3ea` 同批下载的备用 impact | 无 | Mixkit（同批），未接线 |
-| `typewriter.mp3` | 0.22s | **死资产：全片未被引用**。commit message 写 "typewriter under wbr reveals"，实际用的是 `keyboard.mp3` 截 44f，此文件下了没接线 | 无 | **来源待考**（`6c928b3a` 引入，无来源记录） |
+| `pop.mp3` | 0.48s | 列表条目逐个落入的短促 pop | f840–865 周报周列表 6 连发，每 5f 一发、音量 0.40→0.25 阶梯递减 | **来源待考** |
+| `impact-transition.mp3` | 4.87s | **死资产：全片未被引用**，与定稿 SFX 同批下载的备用 impact | 无 | Mixkit（同批），未接线 |
+| `typewriter.mp3` | 0.22s | **死资产：全片未被引用**。文档页揭示实际用的是 `keyboard.mp3` 截 44f，此文件下了没接线 | 无 | **来源待考** |
 
-小结：12/14 在片中实际发声；2 个死资产（`impact-transition.mp3`、`typewriter.mp3`）如实保留并标注；2 个来源待考（`pop.mp3`、`typewriter.mp3`）。"Mixkit" 的判定依据是 `fdcae3ea` commit message 与模板片 Main.tsx 的批量声明，无逐文件 URL——**商用前应逐个回查授权**。
+小结：12/14 在片中实际发声；2 个死资产（`impact-transition.mp3`、`typewriter.mp3`）如实保留并标注；2 个来源待考（`pop.mp3`、`typewriter.mp3`）。"Mixkit" 的判定依据是模板片 Main.tsx 的批量声明，无逐文件 URL——**商用前应逐个回查授权**。
 
 ---
 
@@ -98,19 +98,19 @@ v1→v2 只隔 22 分钟就又被否——说明选曲时根本没在成片语�
 riser-cine（组装/铺垫段起） → 约 35f 后 impact-cine（主体 stamp 落地，全片响度峰值） → 25f 后 sparkle（余韵光效）
 ```
 
-模板片 f945→f980→f1005，是 `fdcae3ea` 引入后唯一从未改动的段落句式——能量铺垫、钉点、余韵三件套一次成型。其它可复用的小句式：场景切换 = `transition-soft` 一发；字卡出场 = `swoosh-quick` 统一音；点击确认 = `click-camera`（给全片最高 SFX 响度）。
+模板片 f945→f980→f1005，是定稿声音方向确立后唯一从未改动的段落句式——能量铺垫、钉点、余韵三件套一次成型。其它可复用的小句式：场景切换 = `transition-soft` 一发；字卡出场 = `swoosh-quick` 统一音；点击确认 = `click-camera`（给全片最高 SFX 响度）。
 
 ### 4.4 返工教训：三次重钉的顺序账
 
 模板片 SFX 全表重钉了三次，其中**两次纯属画面返工的连带成本**（S3）：
 
-| 次 | commit | 起因 | 性质 |
-|---|---|---|---|
-| 1 | `fdcae3ea` | 音色方向错误（游戏音包→电影系词汇） | 声音自身的返工，难免 |
-| 2 | `3b411964` | 画面时间线变更（总长 1020→1085），全表 from 值平移 | **画面没锁就钉音的连带成本** |
-| 3 | `6c928b3a` | wbr 段画面加动画，该段 SFX 重写 | 同上（局部） |
+| 次 | 起因 | 性质 |
+|---|---|---|
+| 1 | 音色方向错误（游戏音包→电影系词汇） | 声音自身的返工，难免 |
+| 2 | 画面时间线变更（总长 1020→1085），全表 from 值平移 | **画面没锁就钉音的连带成本** |
+| 3 | 周报段画面加动画，该段 SFX 重写 | 同上（局部） |
 
-规则化：**声音在画面锁定后做；任何改变镜头时长/顺序的修改，收尾动作固定包含"全表 SFX 帧号重对"**（S3）。反面案例：`9dc13e5f` 把换 BGM 和 deck-deal 画面重做塞进同一 commit，画面随后又改，音效白钉。
+规则化：**声音在画面锁定后做；任何改变镜头时长/顺序的修改，收尾动作固定包含"全表 SFX 帧号重对"**（S3）。反面案例：有一次把换 BGM 和 deck-deal 画面重做塞进同一 commit，画面随后又改，音效白钉。
 
 ### 4.5 钉帧一律相对 shot 起点，而非绝对帧（硬规则）
 

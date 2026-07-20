@@ -23,7 +23,7 @@
 | 5 | 565–620 | 1.8s | PaperTitleCard.tsx | 字卡②"Paper Radar…"（含 DigitRoll 数字子标） | paper-title-card |
 | 6 | 620–725 | 3.5s | live/ScenePapers.tsx | 论文雷达列表堆叠压入 + 计数器落定 | list-stack-press |
 | 7 | 725–775 | 1.7s | PaperTitleCard.tsx | 字卡③"Every project, linked to your weekly report." | paper-title-card |
-| 8 | 775–885 | 3.7s | live/SceneWbr.tsx | 周报页"自己写自己"打字机揭示 + 历史周报逐条 pop 入侧栏 | wbr-typewriter-reveal |
+| 8 | 775–885 | 3.7s | live/SceneWbr.tsx | 周报页"自己写自己"打字机揭示 + 历史周报逐条 pop 入侧栏 | document-typewriter-reveal |
 | 9 | 885–940 | 1.8s | PaperTitleCard.tsx | 字卡④"The whole team, on the same page." | paper-title-card |
 | 10 | 940–1085 | 4.8s | live/SceneOutroLive.tsx | 虚焦 → 元素合影组装 → 铅印字标砸落（riser→impact→sparkle）→ 1s hold | outro-group-photo-launch |
 

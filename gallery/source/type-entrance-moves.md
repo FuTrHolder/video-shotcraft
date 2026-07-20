@@ -1,7 +1,7 @@
 ---
 name: type-entrance-moves
 一句话: 标题文字入场两式——scramble-decode 乱码解码（噪声里长出答案）与 letter-drop-physics 字符坠落（重力砸落弹跳归位），按调性二选一
-适用: 大标题/章节字卡的入场；与 split-flap-title（机械翻牌）、wbr-typewriter-reveal（打字机）同品类互斥选用
+适用: 大标题/章节字卡的入场；与 split-flap-title（机械翻牌）、document-typewriter-reveal（打字机）同品类互斥选用
 时长: 单式 4–5s（含 hold 与静止收尾；动作段 A ~66f / B ~106f）
 能量: 中高（A 偏理性推进，B 偏物理趣味）
 ---
@@ -38,7 +38,7 @@ B 是物理喜剧感——字符从天而降、砸地弹跳、歪歪扭扭站定
 - A 式字符集别混入与真字符太像的字形（如 O/0 连跳）——观众会误判已锁定
 - B 式字符间不做真实碰撞（demo 为各字符独立轨迹）——字距排开即可；
   想要"互相撞歪"需预烘焙轨迹，成本高收益薄
-- 标题入场品类已四式（本卡两式 + split-flap-title + wbr-typewriter-reveal），
+- 标题入场品类已四式（本卡两式 + split-flap-title + document-typewriter-reveal），
   同片 ≤2 种，且都自带高注意力——别和其他高能量入场同帧抢戏
 
 ## 参考实现

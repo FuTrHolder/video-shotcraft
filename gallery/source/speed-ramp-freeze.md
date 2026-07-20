@@ -19,7 +19,7 @@ name: speed-ramp-freeze
   **blur 联动速率开关**——快段包 CameraMotionBlur、慢窗裸渲，
   "快糊-慢清"反差是手法成立的一半
 - 定格款：定格段斜率 =0（瞬时切换，无缓入——定格要干脆）；
-  定格期琥珀马克笔 SVG 椭圆 8f 描边（stroke-dashoffset）圈住目标 +
+  定格期强调色马克笔 SVG 椭圆 8f 描边（stroke-dashoffset）圈住目标 +
   箭头 6f 点题，feTurbulence（scale≈7）给手绘抖动；解冻段斜率 >1
   补偿时长，圈注 8f 淡出
 - 目标卡用高清纹理并对位屏中（凝视/圈注对象必须锐利、居中）

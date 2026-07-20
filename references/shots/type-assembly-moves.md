@@ -1,7 +1,7 @@
 ---
 name: type-assembly-moves
 一句话: 文字集结四式——split-text-stagger 逐字裂升、letterform-drift-assembly 漂移合拢、tracking-expand-reveal 字距呼吸、text-on-path 沿线流入
-适用: 大标题/标语的入场；与 type-entrance-moves 两式、split-flap-title、wbr-typewriter-reveal 同属标题入场大品类，全片 ≤2 种
+适用: 大标题/标语的入场；与 type-entrance-moves 两式、split-flap-title、document-typewriter-reveal 同属标题入场大品类，全片 ≤2 种
 时长: 单式 4–5s（动作段 A ~56f / B ~104f / C ~58f / D ~99f，均含 hold）
 能量: A 中 / B 中高 / C 低中 / D 中
 ---
@@ -38,7 +38,7 @@ name: type-assembly-moves
 - demo 在灰阶/占位素材上调校通过——参数是调校起点非实战定稿，
   首次实战须以真实素材回验
 - 标题入场大品类现已八式（本卡四式 + type-entrance-moves 两式 +
-  split-flap-title + wbr-typewriter-reveal），**同片 ≤2 种**（P4）铁律不变
+  split-flap-title + document-typewriter-reveal），**同片 ≤2 种**（P4）铁律不变
 - B 式与 D 式都是高注意力入场，别再叠相机动作——字在飞的时候镜头必须稳
 - C 式幅度命门：起始叠压至少 −0.4em 级（每缝 80px+ 位移）才可感，
   −0.1em 级"微展开"正常速度读不出（可感性判例）
