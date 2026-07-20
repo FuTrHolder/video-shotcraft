@@ -126,3 +126,26 @@ See [ATTRIBUTION.md](assets/audio/ATTRIBUTION.md) for sources and license detail
 Product screenshots bundled with the template are demonstration assets. Replace them with
 screenshots from the target product before publishing, and verify whether any product,
 customer, or personal data needs to be anonymized.
+
+## 🙏 Acknowledgements
+
+Many shot recipes in this library were distilled by studying the motion language
+of outstanding official product films — including promos from **ClickUp,
+Perplexity, Slack, Notion, Figma, Framer, Bear, Raycast, Pitch, Miro, Superhuman,
+and Loom**. The cards document motion techniques (timing, easing, choreography)
+re-implemented from scratch; no footage, artwork, or brand assets from these
+films are included in this repository. All trademarks belong to their respective
+owners, and none of these companies are affiliated with or endorse this project.
+
+Special thanks to:
+
+- **[Remotion](https://www.remotion.dev/)** — the React-based video framework
+  that powers every demo and template here. Note that Remotion has its own
+  [license](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md)
+  (free for individuals and small teams; companies may need a paid license).
+- **[Mixkit](https://mixkit.co/)** — source of the SFX and music assets bundled
+  under their free commercial license.
+- The game-feel and animation communities whose published principles (e.g.
+  Vlambeer's screenshake talks, classic animation timing) inform several cards.
+- **Claude Code** — this library itself was built, iterated, and QA'd with an
+  AI coding agent, using the same workflow the skill teaches.

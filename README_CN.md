@@ -121,3 +121,25 @@ video-shotcraft/
 
 模板内的产品截图为演示素材。对外发布成片前，请替换为目标产品自己的截图，
 并确认其中的数据、客户信息和个人信息是否需要脱敏。
+
+## 🙏 致谢
+
+本库中许多镜头配方源自对优秀官方产品宣传片动效语言的研究学习——包括
+**ClickUp、Perplexity、Slack、Notion、Figma、Framer、Bear、Raycast、
+Pitch、Miro、Superhuman、Loom** 等产品的宣传片。镜头卡记录的是从零重新
+实现的动效技法（时序、缓动、编排）；仓库中不包含上述影片的任何素材、
+画面或品牌资产。所有商标归各自所有者所有，上述公司与本项目无关联、
+亦未对本项目背书。
+
+特别感谢：
+
+- **[Remotion](https://www.remotion.dev/)** —— 驱动本库全部 demo 与模板的
+  React 视频框架。请注意 Remotion 有自己的
+  [许可协议](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md)
+  （个人与小团队免费，公司可能需要付费许可）。
+- **[Mixkit](https://mixkit.co/)** —— 库内 SFX 与音乐素材的来源
+  （免费商用授权）。
+- 游戏手感与动画社区的公开方法论（如 Vlambeer 的 screenshake 演讲、
+  经典动画时序原则），多张镜头卡受其启发。
+- **Claude Code** —— 本库自身的构建、迭代与验收全程由 AI coding agent
+  完成，用的正是这个 skill 所传授的工作流。
