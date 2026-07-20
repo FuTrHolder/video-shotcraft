@@ -20,6 +20,8 @@ following the toolkit's methodology:
 
 https://github.com/user-attachments/assets/f8d17d19-7683-4361-9b8a-2cd08ba043a8
 
+▶️ [Watch in HD on YouTube](https://youtu.be/94F62hzbQ2U)
+
 > Browse every shot card and motion preview online: **[Gallery](https://vincentwei1021.github.io/video-shotcraft/)**
 > — search, filter, switch between variants, and copy selected shot-card names.
 

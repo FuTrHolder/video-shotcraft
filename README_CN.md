@@ -19,6 +19,8 @@
 
 https://github.com/user-attachments/assets/f8d17d19-7683-4361-9b8a-2cd08ba043a8
 
+▶️ [在 YouTube 观看高清版](https://youtu.be/94F62hzbQ2U)
+
 > 在线浏览全部镜头卡与动态样片：**[Gallery](https://vincentwei1021.github.io/video-shotcraft/)**
 > —— 支持搜索、筛选、切换样式和多选复制镜头卡名称。
 
