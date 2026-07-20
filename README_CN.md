@@ -58,9 +58,9 @@ skill 内置 **Ink Press（墨压）** 模板——一支已验收的完整宣�
 36.2 秒、1920×1080、30fps、10 个镜头的纸墨琥珀风，含 2.5D 真实页面运镜、
 字卡、转场和配好的电影感 SFX：
 
-[![Ink Press 模板成片 — YouTube](https://img.youtube.com/vi/iShab28B_ak/maxresdefault.jpg)](https://youtu.be/iShab28B_ak)
+https://github.com/user-attachments/assets/4cf5af51-98f3-4af2-8ab2-7267f470513d
 
-▶️ [在 YouTube 观看完整模板成片](https://youtu.be/iShab28B_ak)
+▶️ [在 YouTube 观看高清版](https://youtu.be/iShab28B_ak)
 
 使用方式：直接告诉你的 agent——
 

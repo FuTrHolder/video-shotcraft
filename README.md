@@ -61,9 +61,9 @@ The skill ships with **Ink Press** — a validated, complete promo template:
 real-page camera moves, title cards, transitions, and a fully pinned cinematic
 SFX pass:
 
-[![Ink Press template — full film on YouTube](https://img.youtube.com/vi/iShab28B_ak/maxresdefault.jpg)](https://youtu.be/iShab28B_ak)
+https://github.com/user-attachments/assets/4cf5af51-98f3-4af2-8ab2-7267f470513d
 
-▶️ [Watch the full template film on YouTube](https://youtu.be/iShab28B_ak)
+▶️ [Watch in HD on YouTube](https://youtu.be/iShab28B_ak)
 
 To use it, just tell your agent:
 
