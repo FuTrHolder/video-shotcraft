@@ -1,73 +1,48 @@
-# video-shotcraft
+# video-shotcraft 🎬
 
-[简体中文](README.md) | [English](README_EN.md)
+<div align="center">
 
-A self-contained toolkit for crafting cinematic product videos with shot recipe cards,
-motion previews, tuned Remotion implementations, a production-ready video template,
-reusable components, sound assets, and an end-to-end production workflow.
+[![GitHub stars](https://img.shields.io/github/stars/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/network/members)
+[![Gallery](https://img.shields.io/badge/Gallery-live%20previews-d3923c)](https://vincentwei1021.github.io/video-shotcraft/)
 
-> [Explore the shot gallery and motion previews](https://vincentwei1021.github.io/video-shotcraft/)
+**An agent skill for crafting cinematic product videos: 106 shot recipe cards · 162 styles · 161 motion previews · a production-ready template**
+
+[中文](README.md) | [English](README_EN.md)
+
+</div>
+
+## 🎬 Showcase
+
+The 38-second Gallery intro below was itself produced with this skill —
+storyboard, shot implementation, and sound design were all done by an agent
+following the toolkit's methodology:
+
+https://github.com/Vincentwei1021/video-shotcraft/raw/main/docs/media/skill-demo.mp4
+
+> Browse every shot card and motion preview online: **[Gallery](https://vincentwei1021.github.io/video-shotcraft/)**
 > — search, filter, switch between variants, and copy selected shot-card names.
 
-The toolkit primarily targets web and desktop product promos, while individual shot cards
-can also be used in feature demos, brand films, launch videos, and other motion projects.
+## 🚀 Quick start
 
-## What's included
+**The most direct way: hand the repo link to your agent.**
+In Claude Code / Codex or a similar agent, just say:
 
-| Content | Description |
-| --- | --- |
-| 106 shot recipe cards | Purpose, energy, suggested duration, parameters, implementation notes, and known pitfalls |
-| 161 motion previews | Searchable and filterable in the online Gallery |
-| Remotion implementations | Tuned TSX demos containing the actual easing and timing parameters for each card |
-| Complete video template | A validated 36.2-second, 1920×1080, 30fps product promo with 10 shots |
-| Components and assets | 2.5D page camera, captions, flash cuts, digit rolls, SFX, and capture scripts |
-| Production methodology | Capture, visual direction, storyboarding, sound design, beat sync, and final QA |
+```text
+Install this skill for me: https://github.com/Vincentwei1021/video-shotcraft
+```
 
-## Quick start
-
-Clone the repository:
+The agent will clone the repo and link it into your skills directory. Manual install:
 
 ```bash
 git clone https://github.com/Vincentwei1021/video-shotcraft.git
 cd video-shotcraft
+ln -s "$(pwd)" ~/.claude/skills/video-shotcraft   # Claude Code
+# or
+ln -s "$(pwd)" ~/.codex/skills/video-shotcraft    # Codex
 ```
 
-Run the Gallery locally:
-
-```bash
-cd gallery
-python3 -m http.server 4178
-```
-
-Then open `http://localhost:4178`, or use the
-[hosted Gallery](https://vincentwei1021.github.io/video-shotcraft/).
-
-Start the complete video template:
-
-```bash
-cd template
-npm install
-npm run dev
-```
-
-Run `npm run render` to export the video to `template/out/promo.mp4`.
-Before replacing its assets, read the [template breakdown and adaptation guide](template/TEMPLATE.md).
-
-## Use as an agent skill
-
-Link the repository into the Codex skills directory:
-
-```bash
-ln -s "$(pwd)" ~/.codex/skills/video-shotcraft
-```
-
-Or link it into the Claude Code skills directory:
-
-```bash
-ln -s "$(pwd)" ~/.claude/skills/video-shotcraft
-```
-
-You can then make requests such as:
+Then make requests like:
 
 ```text
 Use video-shotcraft to create a promo for my desktop product.
@@ -75,11 +50,47 @@ Use the deck-deal-flyin and row-embed shot cards to present this feature.
 Design a product close-up inspired by spotlight-hero-card.
 ```
 
-If no shot card is specified, the skill introduces the existing full-video template and asks
-whether to use it. You can also select shots in the
+If no shot card is specified, the skill introduces the built-in video template
+first and asks whether to use it; you can also pick shots in the
 [Gallery](https://vincentwei1021.github.io/video-shotcraft/) before starting.
 
-## Repository structure
+## 📼 The video template
+
+`template/` ships a **validated, complete promo project**: a 36.2-second,
+1920×1080, 30fps paper-ink-amber product promo with 10 shots, 2.5D real-page
+camera moves, title cards, transitions, and a fully pinned cinematic SFX pass:
+
+https://github.com/Vincentwei1021/video-shotcraft/raw/main/template/out/reference-final.mp4
+
+Swap in your product's screenshots, copy, and branding to reproduce the same
+quality — the fastest, most reliable path. To run it yourself:
+
+```bash
+cd template
+npm install        # installs Remotion and all dependencies
+npm run dev        # opens Remotion Studio for live preview
+npm run render     # renders the film to template/out/promo.mp4
+```
+
+Read the [template breakdown and adaptation guide](template/TEMPLATE.md) before
+replacing assets.
+
+## 📦 What's included
+
+| Content | Description |
+| --- | --- |
+| 106 shot recipe cards | Purpose, energy, suggested duration, parameters, implementation notes, and known pitfalls |
+| 161 motion previews | Covering 162 styles; searchable and filterable in the online Gallery |
+| Remotion implementations | Tuned TSX demos containing the actual easing and timing parameters for each card |
+| Complete video template | A validated 36.2-second, 1920×1080, 30fps product promo with 10 shots |
+| Components and assets | 2.5D page camera, captions, flash cuts, digit rolls, SFX, and capture scripts |
+| Production methodology | Capture, visual direction, storyboarding, sound design, beat sync, and final QA |
+
+The toolkit primarily targets web and desktop product promos, while individual
+shot cards can also be used in feature demos, brand films, launch videos, and
+other motion projects.
+
+## 🗂 Repository structure
 
 ```text
 video-shotcraft/
@@ -104,7 +115,7 @@ For the complete workflow and implementation requirements, see [SKILL.md](SKILL.
 the [production pipeline](references/pipeline.md), and the
 [visual QA criteria](references/aesthetic-rules.md).
 
-## Audio and asset notes
+## 🔊 Audio and asset notes
 
 Audio files under `assets/audio/` may be used according to their respective license terms.
 See [ATTRIBUTION.md](assets/audio/ATTRIBUTION.md) for sources and license details.
