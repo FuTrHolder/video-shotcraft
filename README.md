@@ -54,9 +54,9 @@ If no shot card is specified, the skill introduces the built-in video template
 first and asks whether to use it; you can also pick shots in the
 [Gallery](https://vincentwei1021.github.io/video-shotcraft/) before starting.
 
-## 📼 Video template: Morning Paper
+## 📼 Video template: Ink Press
 
-The skill ships with **Morning Paper** — a validated, complete promo template:
+The skill ships with **Ink Press** — a validated, complete promo template:
 36.2 seconds, 1920×1080, 30fps, 10 shots in a paper-ink-amber style, with 2.5D
 real-page camera moves, title cards, transitions, and a fully pinned cinematic
 SFX pass:
@@ -66,7 +66,7 @@ https://github.com/Vincentwei1021/video-shotcraft/raw/main/template/out/referenc
 To use it, just tell your agent:
 
 ```text
-Use video-shotcraft to make a promo for my product with the Morning Paper template.
+Use video-shotcraft to make a promo for my product with the Ink Press template.
 ```
 
 The agent swaps in your product's screenshots, copy, and branding to reproduce

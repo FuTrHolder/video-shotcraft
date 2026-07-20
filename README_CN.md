@@ -52,9 +52,9 @@ ln -s "$(pwd)" ~/.codex/skills/video-shotcraft    # Codex
 如果没有指定镜头卡，skill 会先介绍现成成片模板并询问是否采用；
 也可以先在 [Gallery](https://vincentwei1021.github.io/video-shotcraft/) 里挑好镜头再开始。
 
-## 📼 成片模板：Morning Paper（晨读）
+## 📼 成片模板：Ink Press（墨压）
 
-skill 内置 **Morning Paper（晨读）** 模板——一支已验收的完整宣传片：
+skill 内置 **Ink Press（墨压）** 模板——一支已验收的完整宣传片：
 36.2 秒、1920×1080、30fps、10 个镜头的纸墨琥珀风，含 2.5D 真实页面运镜、
 字卡、转场和配好的电影感 SFX：
 
@@ -63,7 +63,7 @@ https://github.com/Vincentwei1021/video-shotcraft/raw/main/template/out/referenc
 使用方式：直接告诉你的 agent——
 
 ```text
-用 video-shotcraft 的 Morning Paper 模板给我的产品做一支宣传片。
+用 video-shotcraft 的 Ink Press 模板给我的产品做一支宣传片。
 ```
 
 agent 会替换成目标产品的截图、文案和品牌信息，复现同等质感——
