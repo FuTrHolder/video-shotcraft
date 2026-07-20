@@ -12,6 +12,12 @@
 
 </div>
 
+**video-shotcraft** is an AI agent skill that turns Claude Code or Codex into a
+motion-design studio: point it at your product and it storyboards, animates, and
+sound-designs a cinematic promo, marketing, launch, or demo video with
+[Remotion](https://www.remotion.dev/) — real page captures, 2.5D camera moves,
+beat-synced cuts, and film-grade SFX included.
+
 ## 🎬 Showcase
 
 The 38-second Gallery intro below was itself produced with this skill —
@@ -34,7 +40,12 @@ In Claude Code / Codex or a similar agent, just say:
 Install this skill for me: https://github.com/Vincentwei1021/video-shotcraft
 ```
 
-The agent will clone the repo and link it into your skills directory. Manual install:
+The agent will clone the repo and link it into your skills directory. Or install
+with the [skills](https://skills.sh/) CLI / manually:
+
+```bash
+npx skills add Vincentwei1021/video-shotcraft
+```
 
 ```bash
 git clone https://github.com/Vincentwei1021/video-shotcraft.git

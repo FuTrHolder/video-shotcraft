@@ -63,6 +63,10 @@ def main():
     LIB.write_text(json.dumps(lib, ensure_ascii=False) + '\n', encoding='utf-8')
     print(f"synced {len(lib['cards'])} cards; missing card files: {missing or 'none'}")
 
+    # 3. regenerate SEO artifacts (prerendered card list, sitemap.xml, llms.txt)
+    import runpy
+    runpy.run_path(str(Path(__file__).parent / 'build-seo.py'))
+
 
 if __name__ == '__main__':
     main()

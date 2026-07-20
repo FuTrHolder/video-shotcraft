@@ -23,7 +23,7 @@ const state = {
   filter: 'all',
   revision: '',
   hasLoaded: false,
-  language: savedLanguage === 'en' ? 'en' : 'zh',
+  language: savedLanguage === 'zh' ? 'zh' : 'en',
   theme: savedTheme,
   selectedStyles: {},
   selectedCards: new Set(),

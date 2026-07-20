@@ -12,6 +12,11 @@
 
 </div>
 
+**video-shotcraft** 是一个把 Claude Code / Codex 变成动效工作室的 AI agent skill：
+把你的产品交给它，它会用 [Remotion](https://www.remotion.dev/) 完成分镜、动画
+和声音设计，产出一支电影感的宣传片 / 营销视频 / 发布视频 / 功能演示——
+真实页面截图、2.5D 运镜、节奏卡点和电影级 SFX 全部包含。
+
 ## 🎬 效果预览
 
 下面这支 38 秒的 Gallery 介绍片，本身就是用这个 skill 制作的——
@@ -33,7 +38,12 @@ https://github.com/user-attachments/assets/cba2df8a-4b2e-4247-bace-d0b1dea9c2bd
 帮我安装这个 skill：https://github.com/Vincentwei1021/video-shotcraft
 ```
 
-agent 会克隆仓库并链接到 skills 目录。也可以手动安装：
+agent 会克隆仓库并链接到 skills 目录。也可以用 [skills](https://skills.sh/) CLI
+或手动安装：
+
+```bash
+npx skills add Vincentwei1021/video-shotcraft
+```
 
 ```bash
 git clone https://github.com/Vincentwei1021/video-shotcraft.git
