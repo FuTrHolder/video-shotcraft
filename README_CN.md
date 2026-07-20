@@ -17,9 +17,9 @@
 下面这支 38 秒的 Gallery 介绍片，本身就是用这个 skill 制作的——
 从分镜、镜头实现到声音设计，全部由 agent 按库内方法论完成：
 
-https://github.com/user-attachments/assets/f8d17d19-7683-4361-9b8a-2cd08ba043a8
+https://github.com/user-attachments/assets/cba2df8a-4b2e-4247-bace-d0b1dea9c2bd
 
-▶️ [在 YouTube 观看高清版](https://youtu.be/94F62hzbQ2U)
+▶️ [在 YouTube 观看高清版](https://youtu.be/gcVvRM_P3SM)
 
 > 在线浏览全部镜头卡与动态样片：**[Gallery](https://vincentwei1021.github.io/video-shotcraft/)**
 > —— 支持搜索、筛选、切换样式和多选复制镜头卡名称。

@@ -18,9 +18,9 @@ The 38-second Gallery intro below was itself produced with this skill —
 storyboard, shot implementation, and sound design were all done by an agent
 following the toolkit's methodology:
 
-https://github.com/user-attachments/assets/f8d17d19-7683-4361-9b8a-2cd08ba043a8
+https://github.com/user-attachments/assets/cba2df8a-4b2e-4247-bace-d0b1dea9c2bd
 
-▶️ [Watch in HD on YouTube](https://youtu.be/94F62hzbQ2U)
+▶️ [Watch in HD on YouTube](https://youtu.be/gcVvRM_P3SM)
 
 > Browse every shot card and motion preview online: **[Gallery](https://vincentwei1021.github.io/video-shotcraft/)**
 > — search, filter, switch between variants, and copy selected shot-card names.
