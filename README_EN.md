@@ -63,7 +63,10 @@ camera moves, title cards, transitions, and a fully pinned cinematic SFX pass:
 https://github.com/Vincentwei1021/video-shotcraft/raw/main/template/out/reference-final.mp4
 
 Swap in your product's screenshots, copy, and branding to reproduce the same
-quality — the fastest, most reliable path. To run it yourself:
+quality — the fastest, most reliable path. To run it yourself (requires
+[Node.js](https://nodejs.org/) ≥ 18; **no global Remotion install needed** —
+Remotion is an npm dependency of the template project, so `npm install` pulls
+in `@remotion/cli` along with everything else):
 
 ```bash
 cd template
@@ -71,6 +74,9 @@ npm install        # installs Remotion and all dependencies
 npm run dev        # opens Remotion Studio for live preview
 npm run render     # renders the film to template/out/promo.mp4
 ```
+
+> On the agent route you can skip even this — the agent creates the Remotion
+> project and installs dependencies itself.
 
 Read the [template breakdown and adaptation guide](template/TEMPLATE.md) before
 replacing assets.

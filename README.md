@@ -60,7 +60,8 @@ ln -s "$(pwd)" ~/.codex/skills/video-shotcraft    # Codex
 https://github.com/Vincentwei1021/video-shotcraft/raw/main/template/out/reference-final.mp4
 
 替换目标产品的截图、文案和品牌信息即可复现同等质感——这是最快、质量最有保障的路径。
-想自己跑起来：
+想自己跑起来（需要 [Node.js](https://nodejs.org/) ≥ 18；**Remotion 无需全局安装**，
+它是模板工程的 npm 依赖，`npm install` 会连同 `@remotion/cli` 一起装好）：
 
 ```bash
 cd template
@@ -68,6 +69,8 @@ npm install        # 安装 Remotion 及全部依赖
 npm run dev        # 打开 Remotion Studio 实时预览
 npm run render     # 渲染成片到 template/out/promo.mp4
 ```
+
+> 走 agent 路线时连这一步都不用管——agent 会自己创建 Remotion 工程并安装依赖。
 
 替换素材前请先读 [模板解构与复现指南](template/TEMPLATE.md)。
 
