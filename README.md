@@ -160,3 +160,7 @@ Special thanks to:
   Vlambeer's screenshake talks, classic animation timing) inform several cards.
 - **Claude Code** — this library itself was built, iterated, and QA'd with an
   AI coding agent, using the same workflow the skill teaches.
+
+## ⭐ Star history
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Vincentwei1021/video-shotcraft&type=Date)](https://star-history.com/#Vincentwei1021/video-shotcraft&Date)

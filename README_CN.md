@@ -153,3 +153,7 @@ Pitch、Miro、Superhuman、Loom** 等产品的宣传片。镜头卡记录的是
   经典动画时序原则），多张镜头卡受其启发。
 - **Claude Code** —— 本库自身的构建、迭代与验收全程由 AI coding agent
   完成，用的正是这个 skill 所传授的工作流。
+
+## ⭐ Star 历史
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Vincentwei1021/video-shotcraft&type=Date)](https://star-history.com/#Vincentwei1021/video-shotcraft&Date)
