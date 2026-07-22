@@ -13,6 +13,14 @@ SHOTS = ROOT / 'references' / 'shots'
 SOURCE = ROOT / 'gallery' / 'source'
 LIB = ROOT / 'gallery' / 'api' / 'library.json'
 
+# These variants have a recipe/sample but no reusable demo source. Keep them visible for
+# reference, but do not let the workflow recommend them by default.
+STYLE_STATUS = {
+    ('wall-reveal-moves', 'grid-wave-flip'): 'reference-only',
+    ('wall-reveal-moves', 'wireframe-draw-on'): 'reference-only',
+    ('ui-to-brand-morph', 'input-morph-assemble'): 'missing-preview',
+}
+
 
 def parse_card(path):
     text = path.read_text(encoding='utf-8')
@@ -60,12 +68,14 @@ def main():
             card['intention'] = intention
         if len(card.get('styles', [])) == 1:
             card['styles'][0]['description'] = card['summary']
+        for style in card.get('styles', []):
+            status = STYLE_STATUS.get((card['name'], style['key']))
+            if status:
+                style['implementationStatus'] = status
+            else:
+                style.pop('implementationStatus', None)
     LIB.write_text(json.dumps(lib, ensure_ascii=False) + '\n', encoding='utf-8')
     print(f"synced {len(lib['cards'])} cards; missing card files: {missing or 'none'}")
-
-    # 3. regenerate SEO artifacts (prerendered card list, sitemap.xml, llms.txt)
-    import runpy
-    runpy.run_path(str(Path(__file__).parent / 'build-seo.py'))
 
 
 if __name__ == '__main__':

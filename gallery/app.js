@@ -23,7 +23,7 @@ const state = {
   filter: 'all',
   revision: '',
   hasLoaded: false,
-  language: savedLanguage === 'zh' ? 'zh' : 'en',
+  language: savedLanguage === 'en' ? 'en' : 'zh',
   theme: savedTheme,
   selectedStyles: {},
   selectedCards: new Set(),
@@ -67,6 +67,12 @@ const styleName = (style) => state.language === 'zh'
 const cardDescription = (card) => state.language === 'zh'
   ? card.summary || card.intention
   : translations.cardsEn[card.name] || card.name.split('-').join(' ');
+
+function implementationStatusLabel(style) {
+  if (style.implementationStatus === 'reference-only') return text('referenceOnly');
+  if (style.implementationStatus === 'missing-preview') return text('missingPreview');
+  return '';
+}
 
 function durationText(value = '') {
   if (state.language === 'zh' || !value) return value || '-';
@@ -135,12 +141,13 @@ function applyLanguage() {
 
 function mediaMarkup(style, cardIndex) {
   const title = escapeHtml(styleName(style));
+  const status = implementationStatusLabel(style);
   if (!style.media) {
     return `
       <div class="preview preview-missing">
         <span class="missing-glyph" aria-hidden="true"></span>
-        <p>${escapeHtml(text('noSample'))}</p>
-        <small>${escapeHtml(text('noSampleHint'))}</small>
+        <p>${escapeHtml(status || text('noSample'))}</p>
+        <small>${escapeHtml(status ? text('noSample') : text('noSampleHint'))}</small>
       </div>`;
   }
 
@@ -180,6 +187,7 @@ function cardMarkup(card, cardIndex) {
   const encodedSource = card.source.split('/').map(encodeURIComponent).join('/');
   const sourceUrl = card.sourceUrl || `/source/${encodedSource}`;
   const previewed = card.styles.filter((item) => item.media).length;
+  const status = implementationStatusLabel(style);
   const title = cardName(card);
   const subtitle = state.language === 'zh' ? card.name : '';
 
@@ -208,6 +216,7 @@ function cardMarkup(card, cardIndex) {
           <span>${escapeHtml(text('style'))} ${String(selectedIndex + 1).padStart(2, '0')}</span>
           <strong>${escapeHtml(styleName(style))}</strong>
           ${state.language === 'zh' ? `<code>${escapeHtml(style.key)}</code>` : ''}
+          ${status ? `<em class="implementation-status implementation-status--${escapeHtml(style.implementationStatus)}">${escapeHtml(status)}</em>` : ''}
         </div>
 
         <p class="summary">${escapeHtml(cardDescription(card))}</p>
