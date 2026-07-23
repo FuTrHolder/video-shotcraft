@@ -1,6 +1,6 @@
-// glow-wake-sleep-panel v2 —— 按用户截图 clickup02 重做：
-// 聚光灯从右向左"扫过"斜置面板；一条带辉光的紫色光线贴着 UI 顶边/边框/
-// logo 划过，光到即亮、光走即暗，尾段沉回黑暗（左缘残留蓝紫）。
+// glow-wake-sleep-panel v3 —— 扫光方向改为从左向右（用户裁决）：
+// 聚光灯从左向右"扫过"斜置面板；一条带辉光的紫色光线贴着 UI 顶边/边框/
+// logo 划过，光到即亮、光走即暗，尾段沉回黑暗（右缘残留蓝紫）。
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, interpolate } from 'remotion';
 
@@ -98,8 +98,8 @@ const EdgeStreak: React.FC<{ cx: number; y: number; len: number; opacity: number
 export const GlowWakeSleepPanel: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // 聚光沿面板顶边从右向左匀速扫过（面板本地座标）
-  const sx = interpolate(frame, [4, 120], [W + 260, -260], {
+  // 聚光沿面板顶边从左向右匀速扫过（面板本地座标）
+  const sx = interpolate(frame, [4, 120], [-260, W + 260], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
   });
   const sy = 150; // 聚光照在面板上部
@@ -108,8 +108,8 @@ export const GlowWakeSleepPanel: React.FC = () => {
   const env = interpolate(frame, [0, 16, 100, 130], [0, 1, 1, 0], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
   });
-  // 尾段左缘残光（截图⑥⑦：最后只剩左缘一线蓝紫）
-  const leftNear = Math.max(0, Math.min(1, (420 - sx) / 420));
+  // 尾段右缘残光：最后只剩右缘一线蓝紫
+  const rightNear = Math.max(0, Math.min(1, (sx - (W - 420)) / 420));
   const tailBlue = interpolate(frame, [100, 116, 132], [0, 0.8, 0.25], {
     extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
   });
@@ -117,8 +117,8 @@ export const GlowWakeSleepPanel: React.FC = () => {
   // logo 描光：聚光经过 logo（本地 x≈60）时点亮
   const logoGlow = Math.exp(-((sx - 60) ** 2) / (2 * 230 ** 2)) * env;
 
-  // 摄影机慢漂移：面板随扫光从右上往左下走（对应截图构图变化）
-  const drift = interpolate(frame, [0, 132], [150, -150]);
+  // 摄影机慢漂移：面板随扫光从左上往右下走（对应扫光方向）
+  const drift = interpolate(frame, [0, 132], [-150, 150]);
   const driftY = interpolate(frame, [0, 132], [-36, 36]);
 
   return (
@@ -153,17 +153,17 @@ export const GlowWakeSleepPanel: React.FC = () => {
               position: 'absolute', inset: 0, borderRadius: R,
               background: `radial-gradient(circle 640px at ${sx}px ${sy}px, rgba(4,3,8,${0.12 * (1 - env)}) 0%, rgba(4,3,8,${1 - 0.72 * env}) 58%, rgba(4,3,8,0.985) 92%)`,
             }} />
-            {/* 尾段左缘蓝紫残光罩 */}
+            {/* 尾段右缘蓝紫残光罩 */}
             <div style={{
               position: 'absolute', inset: 0, borderRadius: R,
-              background: 'linear-gradient(100deg, rgba(120,130,235,0.30) 0%, rgba(120,130,235,0) 16%)',
+              background: 'linear-gradient(260deg, rgba(120,130,235,0.30) 0%, rgba(120,130,235,0) 16%)',
               opacity: tailBlue,
             }} />
           </div>
           {/* 贴顶边划过的紫色光线（本体） */}
           <EdgeStreak cx={sx} y={-2} len={980} opacity={env} />
-          {/* 左缘竖直光线：聚光接近左侧时点亮（截图⑤⑥），尾段转蓝紫 */}
-          <EdgeStreak cx={260} y={-2} len={620} opacity={Math.max(leftNear * env, tailBlue * 0.9)} vertical />
+          {/* 右缘竖直光线：聚光接近右侧时点亮，尾段转蓝紫 */}
+          <EdgeStreak cx={260} y={W + 2} len={620} opacity={Math.max(rightNear * env, tailBlue * 0.9)} vertical />
           {/* logo 一圈描光（截图⑤：光经过 logo 时） */}
           <div style={{
             position: 'absolute', left: 8, top: 12, width: 150, height: 66, borderRadius: 16,
