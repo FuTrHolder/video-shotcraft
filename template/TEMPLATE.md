@@ -56,7 +56,8 @@
 
 ## 四、换产品复现指南（保质量的最短路径）
 
-1. **采集素材**（详细流程见 ../references/pipeline.md 阶段 1）：
+1. **采集素材**（具体采集方法见 ../references/pipeline.md 阶段 4；模板路线只借用
+   采集方法，不执行自由创作的阶段 0–3）：
    复制 `../assets/scripts/capture-template.mjs` 进目标产品项目，改 BASE_URL
    与选择器，产出三件套——整页 2x 截图、元素透明底切片、layout.json。
    素材命名对齐本模板（projects-full/detail-full/…），可直接覆盖 public/。

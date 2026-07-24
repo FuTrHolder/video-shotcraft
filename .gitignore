@@ -2,5 +2,6 @@ node_modules/
 out/qa/
 .DS_Store
 .synapse/
+__pycache__/
 CLAUDE.md
 AGENT.md
