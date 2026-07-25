@@ -202,10 +202,10 @@
       display: inline-flex;
       align-items: center;
       gap: 0.6rem;
-      padding: 1rem 2.2rem;
+      padding: 1.15rem 2.6rem;
       border-radius: 999px;
       font-weight: 750;
-      font-size: clamp(1rem, 1.4vw, 1.12rem);
+      font-size: clamp(1.18rem, 1.8vw, 1.4rem);
       text-decoration: none;
       transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
     }
@@ -266,6 +266,24 @@
     }
     .hero-foot a { color: inherit; text-decoration: none; }
     .hero-foot a:hover { color: var(--text); }
+
+    /* ---- Chinese typography tuning ---- */
+    html[lang="zh-CN"] .hero h1 {
+      letter-spacing: 0.04em;
+      line-height: 1.32;
+      font-weight: 750;
+    }
+    html[lang="zh-CN"] .hero h1 em { padding: 0 0.06em; }
+    html[lang="zh-CN"] .hero-kicker { letter-spacing: 0.3em; }
+    html[lang="zh-CN"] .hero-sub {
+      max-width: 34em;
+      letter-spacing: 0.03em;
+      line-height: 1.9;
+      text-wrap: balance;
+    }
+    html[lang="zh-CN"] .button-primary,
+    html[lang="zh-CN"] .button-github { letter-spacing: 0.08em; }
+    html[lang="zh-CN"] .hero-stats span { letter-spacing: 0.06em; }
 
     @media (max-width: 900px) {
       .wall { grid-template-columns: repeat(3, 1fr); }
@@ -336,12 +354,12 @@
       },
       zh: {
         kicker: '一个 Claude Code / Codex 的 agent skill',
-        heroTitle: '106 张镜头配方卡，<br>宣传片<em>一句话直出</em>。',
-        heroSub: '你身后滚动的每一个动效，都是一张调校好、即取即用的镜头配方卡——agent 负责选镜头、用 Remotion 给真实产品截图做动画、卡上节奏，交付成片。',
+        heroTitle: '106 张镜头配方卡<br>宣传片<em>一键直出</em>',
+        heroSub: '页面背后滚动的每个动效，都是一张调校好、即取即用的镜头配方卡。agent 负责选镜头、给真实产品截图做动画、卡上节奏，直接交付成片。',
         ctaLibrary: '浏览全部动效',
-        ctaStar: '去 GitHub 点星',
+        ctaStar: '收藏 GitHub',
         statCards: '镜头配方卡',
-        statStyles: '式',
+        statStyles: '动效样式',
         statSamples: '动态样片',
         statTemplate: '现成模板',
         footer: 'Apache-2.0 · 基于 Remotion 构建 · ',
