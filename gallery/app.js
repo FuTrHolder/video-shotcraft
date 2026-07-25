@@ -337,6 +337,7 @@ async function loadLibrary({silent = false} = {}) {
     elements.cardCount.textContent = library.stats.cardCount;
     elements.styleCount.textContent = library.stats.styleCount;
     elements.previewCount.textContent = library.stats.previewCount;
+    renderCategoryCounts();
     setSyncStatus('ready', text('synced'));
     if (changed) {
       render();
@@ -356,6 +357,25 @@ async function loadLibrary({silent = false} = {}) {
       document.querySelector('#retryLoad')?.addEventListener('click', () => loadLibrary());
     }
   }
+}
+
+function renderCategoryCounts() {
+  if (!state.library) return;
+  const counts = {all: state.library.cards.length};
+  state.library.cards.forEach((card) => {
+    counts[card.category] = (counts[card.category] || 0) + 1;
+  });
+  elements.filters.querySelectorAll('[data-filter]').forEach((button) => {
+    const key = button.dataset.filter;
+    if (key === 'missing') return;
+    let badge = button.querySelector('.count');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'count';
+      button.append(badge);
+    }
+    badge.textContent = counts[key] ?? 0;
+  });
 }
 
 elements.searchInput.addEventListener('input', (event) => {

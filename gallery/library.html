@@ -76,44 +76,49 @@
     </div>
   </header>
 
-  <main>
-    <section class="intro" aria-labelledby="pageTitle">
-      <div class="intro-copy">
-        <h1 id="pageTitle">Shot Recipes &amp; Motion Samples</h1>
-        <p class="intro-description" data-i18n="intro">video-shotcraft is an AI agent skill for Claude Code and Codex that makes cinematic product promo videos with Remotion. Browse production shot recipes and switch between their motion samples.</p>
-      </div>
+  <main class="library-layout">
+    <aside class="sidebar" aria-label="Categories">
+      <p class="sidebar-heading" data-i18n="categoriesHeading">Categories</p>
+      <nav class="category-nav" id="filters" data-i18n-aria-label="filtersLabel" aria-label="Filter by category">
+        <button class="category-link is-active" type="button" data-filter="all"><span data-i18n="all">All shots</span></button>
+        <button class="category-link" type="button" data-filter="opening"><span data-i18n="catOpening">Opening &amp; Brand</span></button>
+        <button class="category-link" type="button" data-filter="typography"><span data-i18n="catTypography">Typography</span></button>
+        <button class="category-link" type="button" data-filter="ui-entrance"><span data-i18n="catUiEntrance">UI Entrance</span></button>
+        <button class="category-link" type="button" data-filter="camera"><span data-i18n="catCamera">Camera</span></button>
+        <button class="category-link" type="button" data-filter="data"><span data-i18n="catData">Data</span></button>
+        <button class="category-link" type="button" data-filter="interaction"><span data-i18n="catInteraction">Interaction</span></button>
+        <button class="category-link" type="button" data-filter="transition"><span data-i18n="catTransition">Transitions</span></button>
+        <button class="category-link" type="button" data-filter="rhythm"><span data-i18n="catRhythm">Rhythm</span></button>
+        <button class="category-link" type="button" data-filter="effects"><span data-i18n="catEffects">Light &amp; Emphasis</span></button>
+        <button class="category-link" type="button" data-filter="outro"><span data-i18n="catOutro">Outro</span></button>
+        <button class="category-link" type="button" data-filter="missing"><span data-i18n="missing">Missing</span></button>
+      </nav>
+    </aside>
 
-      <dl class="stats" aria-label="Shot library statistics" data-i18n-aria-label="statsLabel">
-        <div><dt data-i18n="cards">Cards</dt><dd id="cardCount">106</dd></div>
-        <div><dt data-i18n="styles">Styles</dt><dd id="styleCount">162</dd></div>
-        <div><dt data-i18n="samples">Samples</dt><dd id="previewCount">161</dd></div>
-      </dl>
-    </section>
+    <div class="library-main">
+      <section class="intro" aria-labelledby="pageTitle">
+        <div class="intro-copy">
+          <h1 id="pageTitle">Shot Recipes &amp; Motion Samples</h1>
+          <p class="intro-description" data-i18n="intro">video-shotcraft is an AI agent skill for Claude Code and Codex that makes cinematic product promo videos with Remotion. Browse production shot recipes and switch between their motion samples.</p>
+        </div>
 
-    <section class="controls" aria-label="Filter shots" data-i18n-aria-label="controlsLabel">
-      <label class="search-field" for="searchInput">
-        <span class="search-icon" aria-hidden="true"></span>
-        <span class="sr-only" data-i18n="searchLabel">Search shot cards</span>
-        <input id="searchInput" type="search" autocomplete="off" placeholder="Search names, use cases, and styles…">
-        <kbd>⌘ K</kbd>
-      </label>
-      <div class="filter-row" id="filters" role="group" aria-label="Filter by category" data-i18n-aria-label="filtersLabel">
-        <button class="filter-button is-active" type="button" data-filter="all" data-i18n="all">All</button>
-        <button class="filter-button" type="button" data-filter="opening" data-i18n="catOpening">Opening &amp; Brand</button>
-        <button class="filter-button" type="button" data-filter="typography" data-i18n="catTypography">Typography</button>
-        <button class="filter-button" type="button" data-filter="ui-entrance" data-i18n="catUiEntrance">UI Entrance</button>
-        <button class="filter-button" type="button" data-filter="camera" data-i18n="catCamera">Camera</button>
-        <button class="filter-button" type="button" data-filter="data" data-i18n="catData">Data</button>
-        <button class="filter-button" type="button" data-filter="interaction" data-i18n="catInteraction">Interaction</button>
-        <button class="filter-button" type="button" data-filter="transition" data-i18n="catTransition">Transitions</button>
-        <button class="filter-button" type="button" data-filter="rhythm" data-i18n="catRhythm">Rhythm</button>
-        <button class="filter-button" type="button" data-filter="effects" data-i18n="catEffects">Light &amp; Emphasis</button>
-        <button class="filter-button" type="button" data-filter="outro" data-i18n="catOutro">Outro</button>
-        <button class="filter-button" type="button" data-filter="missing" data-i18n="missing">Missing</button>
-      </div>
-    </section>
+        <dl class="stats" aria-label="Shot library statistics" data-i18n-aria-label="statsLabel">
+          <div><dt data-i18n="cards">Cards</dt><dd id="cardCount">106</dd></div>
+          <div><dt data-i18n="styles">Styles</dt><dd id="styleCount">162</dd></div>
+          <div><dt data-i18n="samples">Samples</dt><dd id="previewCount">161</dd></div>
+        </dl>
+      </section>
 
-    <section class="library" id="library" aria-live="polite" aria-busy="true">
+      <section class="controls" aria-label="Filter shots" data-i18n-aria-label="controlsLabel">
+        <label class="search-field" for="searchInput">
+          <span class="search-icon" aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="searchLabel">Search shot cards</span>
+          <input id="searchInput" type="search" autocomplete="off" placeholder="Search names, use cases, and styles…">
+          <kbd>⌘ K</kbd>
+        </label>
+      </section>
+
+      <section class="library" id="library" aria-live="polite" aria-busy="true">
     <!-- seo:cards:start -->
       <article class="shot-card" id="ai-stream-response">
         <h2>ai-stream-response</h2>
@@ -646,12 +651,13 @@
         <p>Styles: word-relay-filmstrip</p>
       </article>
     <!-- seo:cards:end -->
-    </section>
+      </section>
 
-    <section class="empty-state" id="emptyState" hidden>
-      <p data-i18n="empty">No shots match the current filters.</p>
-      <button type="button" id="clearFilters" data-i18n="clear">Clear filters</button>
-    </section>
+      <section class="empty-state" id="emptyState" hidden>
+        <p data-i18n="empty">No shots match the current filters.</p>
+        <button type="button" id="clearFilters" data-i18n="clear">Clear filters</button>
+      </section>
+    </div>
   </main>
 
   <template id="loadingTemplate">
