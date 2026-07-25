@@ -201,8 +201,11 @@
     .button-github {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 0.6rem;
-      padding: 1.15rem 2.6rem;
+      min-width: clamp(240px, 24vw, 300px);
+      height: clamp(58px, 6.4vh, 66px);
+      padding: 0 2.2rem;
       border-radius: 999px;
       font-weight: 750;
       font-size: clamp(1.18rem, 1.8vw, 1.4rem);
@@ -216,6 +219,7 @@
     }
     .button-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(211, 146, 60, 0.55); }
     .button-github {
+      position: relative;
       border: 1px solid rgba(240, 237, 229, 0.35);
       color: var(--text);
       background: rgba(14, 14, 12, 0.5);
@@ -223,16 +227,32 @@
       -webkit-backdrop-filter: blur(10px);
     }
     .button-github:hover { transform: translateY(-2px); background: rgba(240, 237, 229, 0.12); }
-    .button-github svg { width: 20px; height: 20px; fill: currentColor; }
+    .button-github svg { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
     .star-glyph { color: var(--accent); }
+    /* star count: floating badge, only revealed on hover/focus */
     .star-count {
-      padding: 0.14rem 0.6rem;
+      position: absolute;
+      top: -0.85rem;
+      right: 0.9rem;
+      padding: 0.18rem 0.65rem;
       border-radius: 999px;
-      background: rgba(240, 237, 229, 0.14);
-      font-size: 0.82em;
+      border: 1px solid rgba(211, 146, 60, 0.5);
+      background: rgba(14, 14, 12, 0.92);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
       font-variant-numeric: tabular-nums;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 160ms ease, transform 160ms ease;
+      pointer-events: none;
     }
-    .star-count:empty { display: none; }
+    .star-count::before { content: "★ "; }
+    .button-github:hover .star-count:not(:empty),
+    .button-github:focus-visible .star-count:not(:empty) {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
     .hero-stats {
       display: flex;
