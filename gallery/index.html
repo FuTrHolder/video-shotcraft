@@ -10,14 +10,14 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="video-shotcraft">
   <meta property="og:title" content="video-shotcraft — AI Video Skill for Claude Code &amp; Codex">
-  <meta property="og:description" content="An agent skill for crafting cinematic product videos with Remotion: 106 shot recipe cards, 161 motion previews, and a production-ready promo template.">
+  <meta property="og:description" content="An agent skill for crafting cinematic product videos with Remotion: 106 shot recipe cards, 163 motion previews, and a production-ready promo template.">
   <meta property="og:url" content="https://vincentwei1021.github.io/video-shotcraft/">
   <meta property="og:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.png">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="video-shotcraft — AI Video Skill for Claude Code &amp; Codex">
-  <meta name="twitter:description" content="An agent skill for crafting cinematic product videos with Remotion: 106 shot recipe cards, 161 motion previews, and a production-ready promo template.">
+  <meta name="twitter:description" content="An agent skill for crafting cinematic product videos with Remotion: 106 shot recipe cards, 163 motion previews, and a production-ready promo template.">
   <meta name="twitter:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.png">
   <link rel="icon" href="data:,">
   <title>video-shotcraft — AI Video Skill for Claude Code &amp; Codex | Cinematic Product Videos with Remotion</title>
@@ -26,7 +26,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "video-shotcraft",
-    "description": "An AI agent skill for Claude Code and Codex that crafts cinematic product promo videos with Remotion: 106 shot recipe cards organized by function, 162 styles, 161 motion previews, and a production-ready 36.2-second video template.",
+    "description": "An AI agent skill for Claude Code and Codex that crafts cinematic product promo videos with Remotion: 106 shot recipe cards organized by function, 164 styles, 163 motion previews, and a production-ready 36.2-second video template.",
     "url": "https://vincentwei1021.github.io/video-shotcraft/",
     "sameAs": ["https://github.com/Vincentwei1021/video-shotcraft"],
     "applicationCategory": "MultimediaApplication",
@@ -225,6 +225,14 @@
     .button-github:hover { transform: translateY(-2px); background: rgba(240, 237, 229, 0.12); }
     .button-github svg { width: 20px; height: 20px; fill: currentColor; }
     .star-glyph { color: var(--accent); }
+    .star-count {
+      padding: 0.14rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(240, 237, 229, 0.14);
+      font-size: 0.82em;
+      font-variant-numeric: tabular-nums;
+    }
+    .star-count:empty { display: none; }
 
     .hero-stats {
       display: flex;
@@ -297,12 +305,13 @@
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         <span data-l10n="ctaStar">Star on GitHub</span>
         <span class="star-glyph" aria-hidden="true">★</span>
+        <span class="star-count" id="starCount" aria-label="GitHub stars"></span>
       </a>
     </div>
     <ul class="hero-stats" aria-label="Library statistics">
       <li><strong id="statCards">106</strong><span data-l10n="statCards">recipe cards</span></li>
-      <li><strong id="statStyles">162</strong><span data-l10n="statStyles">styles</span></li>
-      <li><strong id="statSamples">161</strong><span data-l10n="statSamples">motion previews</span></li>
+      <li><strong id="statStyles">164</strong><span data-l10n="statStyles">styles</span></li>
+      <li><strong id="statSamples">163</strong><span data-l10n="statSamples">motion previews</span></li>
       <li><strong>36.2s</strong><span data-l10n="statTemplate">ready template</span></li>
     </ul>
   </main>
@@ -410,6 +419,28 @@
         });
       }, {once: true});
     }
+
+    /* ---- live GitHub star count (cached 1h to spare the rate limit) ---- */
+    (() => {
+      const el = document.querySelector('#starCount');
+      const fmt = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(n));
+      const CACHE_KEY = 'video-shotcraft-stars';
+      try {
+        const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+        if (cached && Date.now() - cached.at < 3600_000) {
+          el.textContent = fmt(cached.stars);
+          return;
+        }
+      } catch {}
+      fetch('https://api.github.com/repos/Vincentwei1021/video-shotcraft')
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
+        .then((repo) => {
+          if (typeof repo.stargazers_count !== 'number') return;
+          el.textContent = fmt(repo.stargazers_count);
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({stars: repo.stargazers_count, at: Date.now()})); } catch {}
+        })
+        .catch(() => {});
+    })();
 
     fetch('./api/library.json', {cache: 'no-store'})
       .then((response) => response.json())
