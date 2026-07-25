@@ -196,6 +196,8 @@
 3. **静帧验收（最高频动作）**：每镜头在计划里写死 2 个验收帧号，
    完成即跑 `npx remotion still src/index.ts <Comp> out/qa/<name>.png
    --frame=<N>`，自己肉眼检查构图/穿帮/文字锐度后才算完成。
+   含字幕/文字的镜头加查有效字高（字幕 ≥56px、辅助文字 ≥32px，
+   按渲染帧实际像素量，3D 镜头计入 scale 与透视压缩，见审美准则 Q11）。
    静帧产物按迭代版本归档 `out/qa/`，用户贴帧反馈时可直接对号。
 4. **每轮修改后整片渲染**：`npx remotion render src/index.ts <Comp>
    out/promo.mp4`，再用 `ffmpeg -i out/promo.mp4 -vf "select=eq(n,…)"`
