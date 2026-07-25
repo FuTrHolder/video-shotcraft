@@ -28,8 +28,27 @@ def parse_card(path):
     return fm, intention
 
 
+# 功能类别（目录名 → 中/英标签）；references/shots/<类别>/<卡名>.md
+CATEGORIES = {
+    'opening': {'zh': '开场与品牌', 'en': 'Opening & Brand'},
+    'typography': {'zh': '文字与字卡', 'en': 'Typography & Title Cards'},
+    'ui-entrance': {'zh': '界面登场与陈列', 'en': 'UI Entrance & Showcase'},
+    'camera': {'zh': '运镜与空间', 'en': 'Camera & Space'},
+    'data': {'zh': '数据与指标', 'en': 'Data & Metrics'},
+    'interaction': {'zh': '交互与功能演示', 'en': 'Interaction & Feature Demo'},
+    'transition': {'zh': '转场', 'en': 'Transitions'},
+    'rhythm': {'zh': '节奏与蒙太奇', 'en': 'Rhythm & Montage'},
+    'effects': {'zh': '光效与强调', 'en': 'Light & Emphasis'},
+    'outro': {'zh': '收尾', 'en': 'Outro'},
+}
+
+
 def main():
-    cards = {p.stem: p for p in SHOTS.glob('*.md')}
+    cards = {p.stem: p for p in SHOTS.glob('*/*.md')}
+    card_category = {p.stem: p.parent.name for p in SHOTS.glob('*/*.md')}
+    unknown = sorted(set(card_category.values()) - set(CATEGORIES))
+    if unknown:
+        raise SystemExit(f'unknown category folders: {unknown} (add to CATEGORIES)')
 
     # 1. refresh gallery/source copies (drop copies whose card no longer exists)
     for old in SOURCE.glob('*.md'):
@@ -58,8 +77,11 @@ def main():
             card['energy'] = fm['能量']
         if intention:
             card['intention'] = intention
+        card['category'] = card_category[card['name']]
+        card['source'] = f"references/shots/{card['category']}/{card['name']}.md"
         if len(card.get('styles', [])) == 1:
             card['styles'][0]['description'] = card['summary']
+    lib['categories'] = CATEGORIES
     LIB.write_text(json.dumps(lib, ensure_ascii=False) + '\n', encoding='utf-8')
     print(f"synced {len(lib['cards'])} cards; missing card files: {missing or 'none'}")
 

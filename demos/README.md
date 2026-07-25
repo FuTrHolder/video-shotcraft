@@ -1,6 +1,7 @@
 # demos/ — 镜头卡参考实现源码
 
-每个 `demos/<卡名>/` 目录对应 `references/shots/<卡名>.md` 的"参考实现"。
+每个 `demos/<类别>/<卡名>/` 目录对应 `references/shots/<类别>/<卡名>.md` 的"参考实现"
+（十个功能类别目录说明见 SKILL.md）。
 这些是调校过的 Remotion 组件——**用卡先读这里的源码**（SKILL.md 理念 5）。
 
 使用方式：copy 需要的 .tsx 进你的 Remotion 项目（30fps / 1920×1080），

@@ -35,7 +35,7 @@ description: 用镜头配方卡 + 已验收模板 + 代码/音频资产制作电
 **例外二：用户已明确指定要使用或参考某些镜头卡时，视为路线已经选定。**
 例如“用 `deck-deal-flyin` 和 `row-embed` 做这支视频”或“参考
 `spotlight-hero-card` 的效果”。此时不要介绍模板、也不要询问是否使用模板；
-直接确认指定的镜头卡，完整阅读每张卡及其 `demos/<卡名>/` 实现源码后执行。
+直接确认指定的镜头卡，完整阅读每张卡及其 `demos/<类别>/<卡名>/` 实现源码后执行。
 
 ## 三种用法
 
@@ -44,9 +44,29 @@ description: 用镜头配方卡 + 已验收模板 + 代码/音频资产制作电
    最快且质量有底。
 2. **完整宣传片（自由创作）**：新风格 → 按 `references/pipeline.md`
    六阶段走（阶段 0 开工三问起步）。
-3. **单镜头/单动效**：从 `references/shots/` 选卡（或让用户在
-   `gallery/` 画廊里挑），读卡全文 + `demos/<卡名>/` 实现源码，
+3. **单镜头/单动效**：从 `references/shots/<类别>/` 选卡（或让用户在
+   `gallery/` 画廊里挑），读卡全文 + `demos/<类别>/<卡名>/` 实现源码，
    适配到目标素材。
+
+## 镜头卡按功能类别归档
+
+`references/shots/` 与 `demos/` 均按功能分十个类别目录，找镜头先定类别再进目录：
+
+| 目录 | 类别 | 管什么 |
+|------|------|--------|
+| `opening/` | 开场与品牌 | 片头定场、品牌字标/主视觉登场 |
+| `typography/` | 文字与字卡 | 大标题/标语/章节字卡的入场与节奏 |
+| `ui-entrance/` | 界面登场与陈列 | UI/卡片墙/列表的显形、涌入、体量感陈列 |
+| `camera/` | 运镜与空间 | 2.5D/3D 相机语言：推拉摇移、俯仰、贴面飞掠 |
+| `data/` | 数据与指标 | 图表、数字揭晓、KPI/里程碑叙事 |
+| `interaction/` | 交互与功能演示 | 操作链路、AI 响应、输入/切换等功能镜头 |
+| `transition/` | 转场 | 两镜衔接的全部手法（技法卡集中在此） |
+| `rhythm/` | 节奏与蒙太奇 | 卡点、切法、段落呼吸形状、速度控制 |
+| `effects/` | 光效与强调 | 光扫/霓虹/命中反馈等强调性包装层 |
+| `outro/` | 收尾 | 片尾收束、全家福、UI→品牌变形 |
+
+同一张卡只归一类；跨界卡按"最常被用来做什么"归档（如 speed-ramp-freeze
+在 rhythm/）。分镜选卡时按叙事槽位逐类别扫 frontmatter 即可。
 
 ## 核心理念
 
@@ -85,7 +105,7 @@ description: 用镜头配方卡 + 已验收模板 + 代码/音频资产制作电
    成片抽音轨回测切点误差 ≤3f。方法论见 `references/music-beat-sync.md`。
 
 6. **用镜头卡动效必须先读它的 demo 实现代码。** 配方卡给的是语义和
-   参数表，`demos/<卡名>/` 里的源码才是调校过的参数真相（缓动、时值
+   参数表，`demos/<类别>/<卡名>/` 里的源码才是调校过的参数真相（缓动、时值
    配比、摘罩时机、已知坑的规避写法）。允许适配性改动，但卡上
    "已知坑/命门"标注的参数不得降档——质量标准只升不降。凭卡名和
    理解新写＝放弃全部调校积累。
@@ -108,7 +128,7 @@ description: 用镜头配方卡 + 已验收模板 + 代码/音频资产制作电
 
 按 `references/pipeline.md` 六阶段执行（阶段 0 开工三问：音乐选好了吗 /
 用模板还是自由创作 / 数据合规口径）。阶段 3（分镜）时扫
-`references/shots/` 各卡 frontmatter 按能量曲线选镜头；阶段 4–6 持续
+`references/shots/` 各类别目录的卡片 frontmatter 按能量曲线选镜头；阶段 4–6 持续
 对照 `references/aesthetic-rules.md` 自检；阶段 5 读
 `references/sound-design.md`；卡点片全程贴 `references/music-beat-sync.md`。
 
@@ -119,8 +139,8 @@ description: 用镜头配方卡 + 已验收模板 + 代码/音频资产制作电
 | 项目启动 | pipeline.md（阶段 0 三问） |
 | 用户已选 BGM | music-beat-sync.md（先分析再分镜） |
 | 走模板路线 | template/TEMPLATE.md 全文 |
-| 分镜设计 | sequences/ 桥段模板（全片骨架先填空）；shots/ 全部 frontmatter；选中的卡读全文 |
-| 逐镜头实现 | 该镜头卡全文 + demos/<卡名>/ 实现源码全文 + assets/lib/ 对应组件 |
+| 分镜设计 | sequences/ 桥段模板（全片骨架先填空）；shots/ 各类别目录 frontmatter；选中的卡读全文 |
+| 逐镜头实现 | 该镜头卡全文 + demos/<类别>/<卡名>/ 实现源码全文 + assets/lib/ 对应组件 |
 | 声音设计 | sound-design.md + assets/audio/ |
 | 验收 | aesthetic-rules.md 全文过 checklist（独立 subagent 执行） |
 

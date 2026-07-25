@@ -17,10 +17,18 @@ const savedTheme = (() => {
   }
 })();
 
+const initialCategory = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get('cat') || 'all';
+  } catch {
+    return 'all';
+  }
+})();
+
 const state = {
   library: null,
   query: '',
-  filter: 'all',
+  filter: initialCategory,
   revision: '',
   hasLoaded: false,
   language: savedLanguage === 'zh' ? 'zh' : 'en',
@@ -58,6 +66,14 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character)
 }[character]));
 
 const text = (key) => translations.ui[state.language][key] || key;
+const CATEGORY_ORDER = [
+  'opening', 'typography', 'ui-entrance', 'camera', 'data',
+  'interaction', 'transition', 'rhythm', 'effects', 'outro',
+];
+const categoryName = (key) => {
+  const labels = state.library?.categories?.[key];
+  return labels ? labels[state.language] || labels.en : key;
+};
 const cardName = (card) => state.language === 'zh'
   ? translations.cardsZh[card.name] || card.name
   : card.name;
@@ -242,18 +258,32 @@ function cardMatches(card) {
   ].join(' ').toLowerCase();
 
   if (state.query && !searchable.includes(state.query.toLowerCase())) return false;
-  const energy = card.energy || '';
-  if (state.filter === 'high' && !energy.includes('高')) return false;
-  if (state.filter === 'medium' && !energy.includes('中')) return false;
-  if (state.filter === 'low' && !energy.includes('低')) return false;
   if (state.filter === 'missing' && card.styles.every((style) => style.media)) return false;
+  if (state.filter !== 'all' && state.filter !== 'missing' && card.category !== state.filter) return false;
   return true;
 }
 
 function render() {
   if (!state.library) return;
   const cards = state.library.cards.filter(cardMatches);
-  elements.library.innerHTML = cards.map(cardMarkup).join('');
+  // 按功能类别分组渲染；单一类别筛选时不重复出该类标题
+  const groups = new Map();
+  cards.forEach((card) => {
+    const key = card.category || 'other';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(card);
+  });
+  const orderedKeys = [...CATEGORY_ORDER.filter((key) => groups.has(key)),
+    ...[...groups.keys()].filter((key) => !CATEGORY_ORDER.includes(key))];
+  let cardIndex = 0;
+  const showHeadings = state.filter === 'all' || state.filter === 'missing';
+  elements.library.innerHTML = orderedKeys.map((key) => {
+    const heading = showHeadings
+      ? `<h2 class="category-heading" id="category-${escapeHtml(key)}">${escapeHtml(categoryName(key))}<span>${groups.get(key).length}</span></h2>`
+      : '';
+    const body = groups.get(key).map((card) => cardMarkup(card, cardIndex++)).join('');
+    return `${heading}${body}`;
+  }).join('');
   elements.library.setAttribute('aria-busy', 'false');
   elements.emptyState.hidden = cards.length > 0;
   observeMedia();
@@ -503,6 +533,13 @@ function showLoadingCards() {
   }
 }
 
+if (state.filter !== 'all') {
+  elements.filters.querySelectorAll('[data-filter]').forEach((item) => {
+    const active = item.dataset.filter === state.filter;
+    item.classList.toggle('is-active', active);
+    item.setAttribute('aria-pressed', String(active));
+  });
+}
 applyLanguage();
 showLoadingCards();
 loadLibrary();

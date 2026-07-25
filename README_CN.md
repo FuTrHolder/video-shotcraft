@@ -111,7 +111,7 @@ video-shotcraft/
 │   ├── aesthetic-rules.md   # 视觉验收准则
 │   ├── music-beat-sync.md   # BGM 节奏分析与卡点方法
 │   └── sound-design.md      # 声音设计方法与判例
-├── demos/                   # 镜头卡的 Remotion 参考实现
+├── demos/                   # 镜头卡的 Remotion 参考实现（同类别目录）
 ├── gallery/                 # 在线样片画廊的静态站点
 ├── template/                # 可直接运行的完整成片模板
 └── assets/

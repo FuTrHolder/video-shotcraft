@@ -111,12 +111,12 @@ video-shotcraft/
 ├── SKILL.md                 # Agent entry point and core production rules
 ├── references/
 │   ├── pipeline.md          # End-to-end production workflow
-│   ├── shots/               # 106 shot recipe cards
+│   ├── shots/               # 106 shot recipe cards in 10 functional categories
 │   ├── sequences/           # Reusable full-video structures and sequence patterns
 │   ├── aesthetic-rules.md   # Visual QA criteria
 │   ├── music-beat-sync.md   # BGM analysis and beat-sync methodology
 │   └── sound-design.md      # Sound-design guidance and examples
-├── demos/                   # Remotion reference implementations for shot cards
+├── demos/                   # Remotion reference implementations (same categories)
 ├── gallery/                 # Static motion-preview Gallery
 ├── template/                # Runnable complete video template
 └── assets/

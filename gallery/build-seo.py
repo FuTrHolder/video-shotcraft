@@ -5,7 +5,7 @@ Run from repo root after cards or library.json change:
     python3 gallery/build-seo.py
 
 Outputs:
-- static pre-rendered card list injected into index.html between
+- static pre-rendered card list injected into library.html between
   <!-- seo:cards:start --> and <!-- seo:cards:end --> markers
   (replaced by app.js at runtime; exists so crawlers see the full list without JS)
 - sitemap.xml
@@ -56,7 +56,7 @@ static_block = (
     + '\n    <!-- seo:cards:end -->'
 )
 
-index_path = HERE / 'index.html'
+index_path = HERE / 'library.html'
 html = index_path.read_text(encoding='utf-8')
 pattern = re.compile(
     r'(<section class="library" id="library"[^>]*>).*?(</section>)', re.S)
@@ -70,6 +70,7 @@ newest = lib['stats']['newest'][:10]
     '<?xml version="1.0" encoding="UTF-8"?>\n'
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
     f'  <url><loc>{SITE}/</loc><lastmod>{newest}</lastmod></url>\n'
+    f'  <url><loc>{SITE}/library.html</loc><lastmod>{newest}</lastmod></url>\n'
     '</urlset>\n', encoding='utf-8')
 
 # 3. llms.txt
@@ -93,15 +94,28 @@ lines = [
     f'- [SKILL.md]({REPO}/blob/main/SKILL.md): agent entry point and core production rules',
     f'- [Production pipeline]({REPO}/blob/main/references/pipeline.md): six-stage workflow',
     f'- [Ink Press template]({REPO}/blob/main/template/TEMPLATE.md): complete 36.2s promo template',
-    f'- [Gallery]({SITE}/): browse all shot cards and motion previews',
+    f'- [Gallery landing]({SITE}/): what the skill is, categories overview',
+    f'- [Shot library]({SITE}/library.html): browse all shot cards and motion previews',
     '',
     '## Shot recipe cards',
     '',
 ]
+cat_labels = lib.get('categories', {})
+by_cat = {}
 for card in lib['cards']:
-    desc = en_desc(card)
-    lines.append(f'- [{card["name"]}]({SITE}/#{card["name"]}): {desc}')
+    by_cat.setdefault(card.get('category', 'other'), []).append(card)
+for cat_key in ['opening', 'typography', 'ui-entrance', 'camera', 'data',
+                'interaction', 'transition', 'rhythm', 'effects', 'outro']:
+    if cat_key not in by_cat:
+        continue
+    label = cat_labels.get(cat_key, {}).get('en', cat_key)
+    lines.append(f'### {label}')
+    lines.append('')
+    for card in by_cat[cat_key]:
+        desc = en_desc(card)
+        lines.append(f'- [{card["name"]}]({SITE}/library.html#{card["name"]}): {desc}')
+    lines.append('')
 lines.append('')
 (HERE / 'llms.txt').write_text('\n'.join(lines), encoding='utf-8')
 
-print(f'prerendered {len(items)} cards into index.html; wrote sitemap.xml, llms.txt')
+print(f'prerendered {len(items)} cards into library.html; wrote sitemap.xml, llms.txt')
