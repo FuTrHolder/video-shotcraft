@@ -14,12 +14,10 @@ SHOTS = ROOT / 'references' / 'shots'
 SOURCE = ROOT / 'gallery' / 'source'
 LIB = ROOT / 'gallery' / 'api' / 'library.json'
 
-# These variants have a recipe/sample but no reusable demo source. Keep them visible for
-# reference, but do not let the workflow recommend them by default.
-STYLE_STATUS = {
-    ('wall-reveal-moves', 'grid-wave-flip'): 'reference-only',
-    ('wall-reveal-moves', 'wireframe-draw-on'): 'reference-only',
-}
+# Variants with a recipe/sample but no reusable demo source get 'reference-only'
+# here so the workflow does not recommend them by default. Currently empty:
+# every style has demo source.
+STYLE_STATUS = {}
 
 
 def parse_card(path):
