@@ -1,12 +1,18 @@
-# video-shotcraft 🎬
-
 <div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/brand/logo-mark-reverse.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/brand/logo-mark.svg">
+  <img alt="video-shotcraft logo" src="./assets/brand/logo-mark.svg" width="112" height="112">
+</picture>
+
+<h1>video-shotcraft</h1>
 
 [![GitHub stars](https://img.shields.io/github/stars/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/network/members)
 [![Gallery](https://img.shields.io/badge/Gallery-live%20previews-d3923c)](https://vincentwei1021.github.io/video-shotcraft/)
 
-**An agent skill for crafting cinematic product videos: 106 shot recipe cards · 162 styles · 161 motion previews · a production-ready template**
+**An agent skill for crafting cinematic product videos: 104 shot recipe cards · 161 styles · 161 motion previews · a production-ready template**
 
 [English](README.md) | [中文](README_CN.md)
 
@@ -93,8 +99,8 @@ the same quality — the fastest, most reliable path to a finished film.
 
 | Content | Description |
 | --- | --- |
-| 106 shot recipe cards | Purpose, energy, suggested duration, parameters, implementation notes, and known pitfalls |
-| 161 motion previews | Covering 162 styles; searchable and filterable in the online Gallery |
+| 104 shot recipe cards | Purpose, energy, suggested duration, parameters, implementation notes, and known pitfalls |
+| 161 motion previews | Covering 161 styles; searchable and filterable in the online Gallery |
 | Remotion implementations | Tuned TSX demos containing the actual easing and timing parameters for each card |
 | Complete video template | A validated 36.2-second, 1920×1080, 30fps product promo with 10 shots |
 | Components and assets | 2.5D page camera, captions, flash cuts, digit rolls, SFX, and capture scripts |
@@ -111,7 +117,7 @@ video-shotcraft/
 ├── SKILL.md                 # Agent entry point and core production rules
 ├── references/
 │   ├── pipeline.md          # End-to-end production workflow
-│   ├── shots/               # 106 shot recipe cards in 10 functional categories
+│   ├── shots/               # 104 shot recipe cards in 10 functional categories
 │   ├── sequences/           # Reusable full-video structures and sequence patterns
 │   ├── aesthetic-rules.md   # Visual QA criteria
 │   ├── music-beat-sync.md   # BGM analysis and beat-sync methodology

@@ -45,7 +45,7 @@ for card in lib['cards']:
     desc = en_desc(card)
     items.append(
         f'      <article class="shot-card" id="{esc(card["name"])}">\n'
-        f'        <h2>{esc(card["name"])}</h2>\n'
+        f'        <h3>{esc(card["name"])}</h3>\n'
         f'        <p>{esc(desc)}</p>\n'
         f'        <p>Styles: {esc(styles)}</p>\n'
         f'      </article>'
@@ -63,6 +63,35 @@ pattern = re.compile(
 html_new = pattern.sub(
     lambda m: f'{m.group(1)}\n    {static_block}\n    {m.group(2)}', html, count=1)
 index_path.write_text(html_new, encoding='utf-8')
+
+
+# 1b. rewrite hardcoded counts in both pages' head/meta/JSON-LD and the
+# landing hero. Runtime JS corrects the visible stats, but crawlers, social
+# cards and no-JS readers see these literals, so they must not drift.
+CARDS = lib['stats']['cardCount']
+STYLES = lib['stats']['styleCount']
+PREVIEWS = lib['stats']['previewCount']
+COUNT_PATTERNS = [
+    (r'\b\d+ shot recipe cards\b', f'{CARDS} shot recipe cards'),
+    (r'\b\d+ cinematic shot recipes\b', f'{CARDS} cinematic shot recipes'),
+    (r'\b\d+ 张镜头配方卡', f'{CARDS} 张镜头配方卡'),
+    (r'\b\d+ styles\b', f'{STYLES} styles'),
+    (r'\b\d+ motion previews\b', f'{PREVIEWS} motion previews'),
+]
+for page in ('index.html', 'library.html'):
+    path = HERE / page
+    text = path.read_text(encoding='utf-8')
+    for pat, repl in COUNT_PATTERNS:
+        text = re.sub(pat, repl, text)
+    # landing hero h1 and its zh/en L10N strings carry the card count too
+    text = re.sub(r'(<strong id="statCards">)\d+(</strong>)', rf'\g<1>{CARDS}\g<2>', text)
+    text = re.sub(r'(<strong id="statStyles">)\d+(</strong>)', rf'\g<1>{STYLES}\g<2>', text)
+    text = re.sub(r'(<strong id="statSamples">)\d+(</strong>)', rf'\g<1>{PREVIEWS}\g<2>', text)
+    text = re.sub(r'(<dd id="cardCount">)\d+(</dd>)', rf'\g<1>{CARDS}\g<2>', text)
+    text = re.sub(r'(<dd id="styleCount">)\d+(</dd>)', rf'\g<1>{STYLES}\g<2>', text)
+    text = re.sub(r'(<dd id="previewCount">)\d+(</dd>)', rf'\g<1>{PREVIEWS}\g<2>', text)
+    path.write_text(text, encoding='utf-8')
+print(f'normalized counts to {CARDS} cards / {STYLES} styles / {PREVIEWS} previews')
 
 # 2. sitemap.xml
 newest = lib['stats']['newest'][:10]

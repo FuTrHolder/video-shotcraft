@@ -82,8 +82,18 @@ def main():
         if len(card.get('styles', [])) == 1:
             card['styles'][0]['description'] = card['summary']
     lib['categories'] = CATEGORIES
+
+    # stats are the single source of truth every page and llms.txt reads;
+    # recompute from the cards rather than trusting whatever was there
+    styles = [style for card in lib['cards'] for style in card['styles']]
+    lib['stats']['cardCount'] = len(lib['cards'])
+    lib['stats']['styleCount'] = len(styles)
+    lib['stats']['previewCount'] = sum(1 for style in styles if style.get('media'))
+    lib['stats']['mediaCount'] = lib['stats']['previewCount']
+
     LIB.write_text(json.dumps(lib, ensure_ascii=False) + '\n', encoding='utf-8')
-    print(f"synced {len(lib['cards'])} cards; missing card files: {missing or 'none'}")
+    print(f"synced {len(lib['cards'])} cards ({lib['stats']['styleCount']} styles, "
+          f"{lib['stats']['previewCount']} previews); missing card files: {missing or 'none'}")
 
     # 3. regenerate SEO artifacts (prerendered card list, sitemap.xml, llms.txt)
     import runpy

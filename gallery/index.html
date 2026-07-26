@@ -12,14 +12,15 @@
   <meta property="og:title" content="video-shotcraft — AI Video Skill for Claude Code &amp; Codex">
   <meta property="og:description" content="An agent skill for crafting cinematic product videos with Remotion: 104 shot recipe cards, 161 motion previews, and a production-ready promo template.">
   <meta property="og:url" content="https://vincentwei1021.github.io/video-shotcraft/">
-  <meta property="og:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.png">
+  <meta property="og:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.jpg?v=20260726b">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="video-shotcraft Gallery — shot recipes and motion samples">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="video-shotcraft — AI Video Skill for Claude Code &amp; Codex">
   <meta name="twitter:description" content="An agent skill for crafting cinematic product videos with Remotion: 104 shot recipe cards, 161 motion previews, and a production-ready promo template.">
-  <meta name="twitter:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.png">
-  <link rel="icon" href="data:,">
+  <meta name="twitter:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.jpg?v=20260726b">
+  <link rel="icon" href="./logo-mark.svg" type="image/svg+xml">
   <title>video-shotcraft — AI Video Skill for Claude Code &amp; Codex | Cinematic Product Videos with Remotion</title>
   <script type="application/ld+json">
   {
@@ -76,12 +77,17 @@
       border-radius: 10px;
       background: #14130f;
     }
+    /* poster carries the wall until the clip is decoded: 140KB of stills
+       stands in for 8MB of video, so the grid is never empty */
+    .wall-tile img,
     .wall-tile video {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
+    }
+    .wall-tile video {
       opacity: 0;
       transition: opacity 900ms ease;
     }
@@ -116,16 +122,15 @@
       gap: 0.6rem;
       color: var(--text);
       text-decoration: none;
-      font-weight: 750;
-      letter-spacing: 0.12em;
-      font-size: 0.9rem;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      font-size: 1.22rem;
     }
     .brand-mark {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 14px rgba(211, 146, 60, 0.55);
+      display: block;
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
     }
     .language-switch {
       display: inline-flex;
@@ -143,6 +148,7 @@
       font: inherit;
       font-size: 0.8rem;
       padding: 0.38rem 0.85rem;
+      white-space: nowrap;
       cursor: pointer;
     }
     .language-switch button.is-active { color: var(--text); font-weight: 700; background: rgba(240, 237, 229, 0.1); }
@@ -312,10 +318,23 @@
       .wall { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(8, 1fr); }
       .hero-actions { flex-direction: column; width: 100%; max-width: 340px; }
       .button-primary, .button-github { justify-content: center; }
+      /* the enlarged wordmark plus the language switch overflow a 390px bar */
+      .brand { font-size: 0.85rem; letter-spacing: 0.08em; }
+      .brand-mark { width: 28px; height: 28px; }
     }
     @media (prefers-reduced-motion: reduce) {
       .wall-tile video { transition: none; }
+      .button-primary:hover, .button-github:hover { transform: none; }
     }
+
+    /* amber ring, not the browser's default blue against an amber system */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    .button-primary:focus-visible,
+    .button-github:focus-visible { outline-offset: 4px; }
   </style>
 </head>
 <body>
@@ -324,13 +343,13 @@
 
   <header class="topbar">
     <a class="brand" href="./" aria-label="video-shotcraft home">
-      <span class="brand-mark" aria-hidden="true"></span>
+      <img class="brand-mark" src="./logo-mark-reverse.svg" alt="" width="24" height="24" aria-hidden="true">
       <span>VIDEO SHOTCRAFT</span>
     </a>
-    <div class="language-switch" id="languageSwitch" role="group" aria-label="Language">
+    <nav class="language-switch" id="languageSwitch" aria-label="Language">
       <button type="button" data-language="zh" aria-pressed="false">中文</button>
       <button type="button" data-language="en" aria-pressed="true">EN</button>
-    </div>
+    </nav>
   </header>
 
   <main class="hero">
@@ -441,7 +460,9 @@
       video.muted = true;
       video.loop = true;
       video.playsInline = true;
-      video.preload = 'auto';
+      // metadata, not auto: the poster already holds the tile, so the full
+      // clip is fetched by play() rather than racing first paint
+      video.preload = 'metadata';
       video.src = url;
       tile.append(video);
       const start = () => {
@@ -457,7 +478,19 @@
       const tile = document.createElement('div');
       tile.className = 'wall-tile';
       wall.append(tile);
-      // stagger mounts so the page doesn't fire 16 requests at once
+      if (reduceMotion) {
+        // no video is fetched at all here, so the tile would stay black
+        // forever; the poster still frame stands in for the clip
+        const poster = document.createElement('img');
+        poster.src = `./media/poster/${name}.jpg`;
+        poster.alt = '';
+        poster.decoding = 'async';
+        tile.append(poster);
+        return;
+      }
+      // tiles start black and each clip fades itself in on arrival:
+      // the wall assembling one tile at a time IS the reveal, so no poster
+      // here — a still would pre-fill the grid and kill it
       setTimeout(() => mountVideo(tile, `./media/${name}.mp4`), index * 180);
     });
 

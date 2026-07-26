@@ -1,12 +1,18 @@
-# video-shotcraft 🎬
-
 <div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/brand/logo-mark-reverse.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/brand/logo-mark.svg">
+  <img alt="video-shotcraft logo" src="./assets/brand/logo-mark.svg" width="112" height="112">
+</picture>
+
+<h1>video-shotcraft</h1>
 
 [![GitHub stars](https://img.shields.io/github/stars/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/network/members)
 [![Gallery](https://img.shields.io/badge/Gallery-在线样片-d3923c)](https://vincentwei1021.github.io/video-shotcraft/)
 
-**让 agent 帮你制作电影感产品视频的 skill：106 张镜头配方卡 · 162 个样式 · 161 条动态样片 · 已验收成片模板**
+**让 agent 帮你制作电影感产品视频的 skill：104 张镜头配方卡 · 161 个样式 · 161 条动态样片 · 已验收成片模板**
 
 [English](README.md) | [中文](README_CN.md)
 
@@ -89,8 +95,8 @@ agent 会替换成目标产品的截图、文案和品牌信息，复现同等�
 
 | 内容 | 说明 |
 | --- | --- |
-| 106 张镜头配方卡 | 记录用途、能量、建议时长、参数、实现要点与已知坑 |
-| 161 条动态样片 | 覆盖 162 个样式，可在在线 Gallery 中直接预览、搜索和筛选 |
+| 104 张镜头配方卡 | 记录用途、能量、建议时长、参数、实现要点与已知坑 |
+| 161 条动态样片 | 覆盖 161 个样式，可在在线 Gallery 中直接预览、搜索和筛选 |
 | Remotion 参考实现 | 每张卡对应经过调校的 TSX demo，包含实际缓动和时序参数 |
 | 完整成片模板 | 36.2 秒、1920×1080、30fps、10 镜头的纸墨琥珀风产品宣传片 |
 | 组件与素材 | 2.5D 页面相机、字幕、闪切、数字滚动、音效和素材采集脚本 |
@@ -106,7 +112,7 @@ video-shotcraft/
 ├── SKILL.md                 # Agent 使用入口与核心制作规则
 ├── references/
 │   ├── pipeline.md          # 完整制作流水线
-│   ├── shots/               # 106 张镜头配方卡
+│   ├── shots/               # 104 张镜头配方卡
 │   ├── sequences/           # 可复用的全片结构与桥段模板
 │   ├── aesthetic-rules.md   # 视觉验收准则
 │   ├── music-beat-sync.md   # BGM 节奏分析与卡点方法
