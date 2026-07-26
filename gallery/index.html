@@ -65,7 +65,7 @@
       inset: -2vh -2vw;
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      grid-template-rows: repeat(3, 1fr);
+      grid-template-rows: repeat(4, 1fr);
       gap: 10px;
       z-index: 0;
       pointer-events: none;
@@ -306,10 +306,10 @@
     html[lang="zh-CN"] .hero-stats span { letter-spacing: 0.06em; }
 
     @media (max-width: 900px) {
-      .wall { grid-template-columns: repeat(3, 1fr); }
+      .wall { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(6, 1fr); }
     }
     @media (max-width: 620px) {
-      .wall { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(4, 1fr); }
+      .wall { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(8, 1fr); }
       .hero-actions { flex-direction: column; width: 100%; max-width: 340px; }
       .button-primary, .button-github { justify-content: center; }
     }
@@ -416,16 +416,25 @@
     /* ---- random motion wall ---- */
     const wall = document.querySelector('#wall');
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const TILES = window.matchMedia('(max-width: 620px)').matches ? 8 : 12;
-    let pool = [];
-
-    const shuffle = (list) => {
-      for (let i = list.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [list[i], list[j]] = [list[j], list[i]];
-      }
-      return list;
-    };
+    // 固定 16 支精选样片（4×4 墙位，一一对应，不轮换）
+    const WALL_CLIPS = [
+      'autolayout-gap-dial',
+      'beat-step-list-theme-cycle',
+      'before-after-slider-scrub',
+      'bottom-push-stack-wipe',
+      'unit-dot-swarm-regroup',
+      'circle-match-iris',
+      'graze-face-tour',
+      'magician-card-flourish',
+      'neon-frame-orbit-drop',
+      'comic-panel-split',
+      'paper-title-card',
+      'spotlight-hero-card',
+      'slide-spotlight-pan',
+      'palette-theme-ripple',
+      'ui-strip-away-outro',
+      'word-relay-filmstrip',
+    ];
 
     function mountVideo(tile, url) {
       const video = document.createElement('video');
@@ -444,19 +453,13 @@
       return video;
     }
 
-    function swapTile(tile) {
-      if (!pool.length) return;
-      const url = pool.shift();
-      pool.push(url);
-      const old = tile.querySelectorAll('video');
-      const fresh = mountVideo(tile, url);
-      fresh.addEventListener('loadeddata', () => {
-        old.forEach((v) => {
-          v.classList.remove('is-on');
-          setTimeout(() => v.remove(), 1000);
-        });
-      }, {once: true});
-    }
+    WALL_CLIPS.forEach((name, index) => {
+      const tile = document.createElement('div');
+      tile.className = 'wall-tile';
+      wall.append(tile);
+      // stagger mounts so the page doesn't fire 16 requests at once
+      setTimeout(() => mountVideo(tile, `./media/${name}.mp4`), index * 180);
+    });
 
     /* ---- live GitHub star count (cached 1h to spare the rate limit) ---- */
     (() => {
@@ -486,28 +489,6 @@
         document.querySelector('#statCards').textContent = library.stats.cardCount;
         document.querySelector('#statStyles').textContent = library.stats.styleCount;
         document.querySelector('#statSamples').textContent = library.stats.previewCount;
-
-        pool = shuffle(library.cards
-          .flatMap((card) => card.styles)
-          .filter((style) => style.media && style.media.type === 'mp4')
-          .map((style) => style.media.url));
-        if (!pool.length) return;
-
-        for (let i = 0; i < TILES; i += 1) {
-          const tile = document.createElement('div');
-          tile.className = 'wall-tile';
-          wall.append(tile);
-        }
-        const tiles = [...wall.children];
-        // stagger initial mounts so the page doesn't fire 12 requests at once
-        tiles.forEach((tile, index) => {
-          setTimeout(() => swapTile(tile), index * 260);
-        });
-        if (!reduceMotion) {
-          setInterval(() => {
-            swapTile(tiles[Math.floor(Math.random() * tiles.length)]);
-          }, 3200);
-        }
       })
       .catch(() => {});
 
