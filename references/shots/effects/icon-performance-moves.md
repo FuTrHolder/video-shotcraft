@@ -4,6 +4,7 @@ name: icon-performance-moves
 适用: 半屏级 icon 特写段落；A "完成/成功"的标点符号，B 新功能引出
 时长: A 3–4s / B 4–5s
 能量: A 高潮点缀 / B 蓄势引入
+标签: interaction
 ---
 
 ## 意图

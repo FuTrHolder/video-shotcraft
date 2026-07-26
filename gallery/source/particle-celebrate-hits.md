@@ -4,6 +4,7 @@ name: particle-celebrate-hits
 适用: 里程碑数字/KPI 揭晓/成就段落；A 一次性大庆祝，B 持续小打点
 时长: A 3–4s / B 4–5s
 能量: 高潮点缀型（爆发后必须落回纯净静止）
+标签: effects
 ---
 
 ## 意图

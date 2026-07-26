@@ -4,6 +4,7 @@ name: transition-travel
 适用: 前后两镜存在"元素/容器"级空间关系的接缝（技法卡，与 shot-transitions 六式互补选用）
 时长: n/a（技法卡；各式动作段 25–60f，前后 hold 另计，帧数从相邻镜头预算里划）
 能量: n/a（技法卡，不占能量位）
+标签: camera
 ---
 
 ## 意图

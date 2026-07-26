@@ -19,7 +19,10 @@ const savedTheme = (() => {
 
 const initialCategory = (() => {
   try {
-    return new URLSearchParams(window.location.search).get('cat') || 'all';
+    const cat = new URLSearchParams(window.location.search).get('cat');
+    // 只认侧栏里真实存在的筛选键；旧链接（如已删除的 ?cat=missing）回退 all
+    return cat && document.querySelector(`#filters [data-filter="${CSS.escape(cat)}"]`)
+      ? cat : 'all';
   } catch {
     return 'all';
   }
@@ -66,23 +69,22 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character)
 }[character]));
 
 const text = (key) => translations.ui[state.language][key] || key;
-const CATEGORY_ORDER = [
-  'opening', 'typography', 'ui-entrance', 'camera', 'data',
-  'interaction', 'transition', 'rhythm', 'effects', 'outro',
-];
-const categoryName = (key) => {
-  const labels = state.library?.categories?.[key];
-  return labels ? labels[state.language] || labels.en : key;
-};
 const cardName = (card) => state.language === 'zh'
   ? translations.cardsZh[card.name] || card.name
   : card.name;
 const styleName = (style) => state.language === 'zh'
   ? translations.stylesZh[style.key] || style.label
   : style.key;
-const cardDescription = (card) => state.language === 'zh'
-  ? card.summary || card.intention
-  : translations.cardsEn[card.name] || card.name.split('-').join(' ');
+// 多式卡的描述跟随当前所选式（zh 用 library.json 的 style.description，
+// en 用 translations.stylesEn）；单式卡沿用整卡描述
+const cardDescription = (card, style) => {
+  const multi = card.styles.length > 1;
+  if (state.language === 'zh') {
+    return (multi && style?.description) || card.summary || card.intention;
+  }
+  return (multi && translations.stylesEn[style?.key])
+    || translations.cardsEn[card.name] || card.name.split('-').join(' ');
+};
 
 function implementationStatusLabel(style) {
   if (style.implementationStatus === 'reference-only') return text('referenceOnly');
@@ -205,7 +207,7 @@ function cardMarkup(card, cardIndex) {
           </div>
         </div>
 
-        <p class="summary">${escapeHtml(cardDescription(card))}</p>
+        <p class="summary">${escapeHtml(cardDescription(card, style))}</p>
 
         <div class="card-actions">
           <button type="button" class="select-button${isSelected ? ' is-selected' : ''}" data-select-name="${escapeHtml(card.name)}"
@@ -233,14 +235,15 @@ function cardMatches(card) {
       style.key,
       style.label,
       translations.stylesZh[style.key],
+      translations.stylesEn[style.key],
       style.description,
       style.use,
     ]),
   ].join(' ').toLowerCase();
 
   if (state.query && !searchable.includes(state.query.toLowerCase())) return false;
-  if (state.filter === 'missing' && card.styles.every((style) => style.media)) return false;
-  if (state.filter !== 'all' && state.filter !== 'missing' && card.category !== state.filter) return false;
+  // tags = 主类别（目录）+ frontmatter 标签，一张卡可命中多个筛选类
+  if (state.filter !== 'all' && !(card.tags || [card.category]).includes(state.filter)) return false;
   return true;
 }
 
@@ -275,24 +278,8 @@ function render() {
   if (!state.library) return;
   const focusMark = captureFocus();
   const cards = state.library.cards.filter(cardMatches);
-  // 按功能类别分组渲染；单一类别筛选时不重复出该类标题
-  const groups = new Map();
-  cards.forEach((card) => {
-    const key = card.category || 'other';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(card);
-  });
-  const orderedKeys = [...CATEGORY_ORDER.filter((key) => groups.has(key)),
-    ...[...groups.keys()].filter((key) => !CATEGORY_ORDER.includes(key))];
-  let cardIndex = 0;
-  const showHeadings = state.filter === 'all' || state.filter === 'missing';
-  elements.library.innerHTML = orderedKeys.map((key) => {
-    const heading = showHeadings
-      ? `<h2 class="category-heading" id="category-${escapeHtml(key)}">${escapeHtml(categoryName(key))}<span>${groups.get(key).length}</span></h2>`
-      : '';
-    const body = groups.get(key).map((card) => cardMarkup(card, cardIndex++)).join('');
-    return `${heading}${body}`;
-  }).join('');
+  // 跨类标签之后按主类别分组名不副实：All 视图就是一整片按字母序的平铺
+  elements.library.innerHTML = cards.map((card, index) => cardMarkup(card, index)).join('');
   elements.library.setAttribute('aria-busy', 'false');
   elements.emptyState.hidden = cards.length > 0;
   restoreFocus(focusMark);
@@ -375,11 +362,12 @@ function renderCategoryCounts() {
   if (!state.library) return;
   const counts = {all: state.library.cards.length};
   state.library.cards.forEach((card) => {
-    counts[card.category] = (counts[card.category] || 0) + 1;
+    (card.tags || [card.category]).forEach((tag) => {
+      counts[tag] = (counts[tag] || 0) + 1;
+    });
   });
   elements.filters.querySelectorAll('[data-filter]').forEach((button) => {
     const key = button.dataset.filter;
-    if (key === 'missing') return;
     let badge = button.querySelector('.count');
     if (!badge) {
       badge = document.createElement('span');

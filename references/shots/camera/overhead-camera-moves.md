@@ -4,6 +4,7 @@ name: overhead-camera-moves
 适用: 用"俯仰角"讲故事的开场/转场：单页 establishing 用 A，多页巡视择一扎入用 B
 时长: A ~4.8s / B ~4.7s
 能量: A 中 / B 中高
+标签: opening、transition
 ---
 
 ## 意图

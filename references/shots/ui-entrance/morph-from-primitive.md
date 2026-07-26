@@ -4,6 +4,7 @@ name: morph-from-primitive
 适用: 图形/图标/卡轮廓类主体的入场；logo→UI 容器的经典原语
 时长: ~4.7s（呼吸 20f + 变形 24f + 内容淡入 12f）
 能量: 中低
+标签: opening
 ---
 
 ## 意图

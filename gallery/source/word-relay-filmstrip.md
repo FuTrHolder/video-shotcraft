@@ -4,6 +4,7 @@ name: word-relay-filmstrip
 适用: "一个主体 × 多种能力"的枚举段（Computer researches/builds/codes…）；作品集/案例流展示；产品多场景巡礼
 时长: 每词期 ~1.5–2s × 3–4 词；全段 5–7s
 能量: 中低（编辑部气质，节奏靠切词的"咔哒"感）
+标签: ui-entrance
 ---
 
 ## 意图

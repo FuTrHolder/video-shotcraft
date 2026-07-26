@@ -4,6 +4,7 @@ name: scroll-brake-moves
 适用: changelog/发布史/长列表段落："一直在发货，今天这条最大"；要给停点更强打击感用 B
 时长: A 4–5s / B 5s
 能量: 高开中收（速度对比型）
+标签: rhythm
 ---
 
 ## 意图

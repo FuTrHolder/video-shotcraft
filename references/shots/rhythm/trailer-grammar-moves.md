@@ -4,6 +4,7 @@ name: trailer-grammar-moves
 适用: 预告片的三个结构性时刻：开场怎么钩（A）、中段怎么对话（B）、高潮怎么收（C）；三式合用即一支预告片的骨架
 时长: A ~4.7s / B ~5s / C ~4.5s
 能量: A 高 / B 中 / C 高
+标签: opening、transition
 ---
 
 ## 意图

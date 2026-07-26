@@ -30,6 +30,7 @@ Each shot recipe card documents a motion technique: purpose, energy level, sugge
 ### Typography & Title Cards
 
 - [cel-flash-stomp](https://vincentwei1021.github.io/video-shotcraft/library.html#cel-flash-stomp): Large words stamp into frame on the beat while flat background colors flash behind the locked typography.
+- [document-typewriter-reveal](https://vincentwei1021.github.io/video-shotcraft/library.html#document-typewriter-reveal): A fully typeset document writes itself behind one accent-color caret, opens both side columns, and drops history entries into the rail.
 - [gradient-word-sweep](https://vincentwei1021.github.io/video-shotcraft/library.html#gradient-word-sweep): A gradient light sweeps left to right across a keyword, charging each character with glow that decays behind the wavefront until the whole word breathes.
 - [marker-underline-title](https://vincentwei1021.github.io/video-shotcraft/library.html#marker-underline-title): After the headline settles, a marker stroke draws itself under the keyword — tapered, rough-edged, and slightly tilted to follow the italic.
 - [paper-title-card](https://vincentwei1021.github.io/video-shotcraft/library.html#paper-title-card): A sentence stamps onto paper word by word, highlights one amber italic term, and closes with a short rule.
@@ -41,7 +42,6 @@ Each shot recipe card documents a motion technique: purpose, energy level, sugge
 - [type-entrance-moves](https://vincentwei1021.github.io/video-shotcraft/library.html#type-entrance-moves): Two title entrances: characters decoding from noise and letters falling under gravity before bouncing into alignment.
 - [type-rhythm-sync](https://vincentwei1021.github.io/video-shotcraft/library.html#type-rhythm-sync): Two voice-and-beat synchronizations: font weight pulsing on percussion and spoken words filling like karaoke.
 - [typewriter-moves](https://vincentwei1021.github.io/video-shotcraft/library.html#typewriter-moves): Two typing narratives: a terminal command that triggers the scene and a three-act mistake, deletion, and retype.
-- [document-typewriter-reveal](https://vincentwei1021.github.io/video-shotcraft/library.html#document-typewriter-reveal): A fully typeset document writes itself behind one accent-color caret, opens both side columns, and drops history entries into the rail.
 - [word-relay-filmstrip](https://vincentwei1021.github.io/video-shotcraft/library.html#word-relay-filmstrip): A filmstrip of page cards steps vertically while a serif word relay swaps only its verb, each swap aligned to the center of the current card.
 
 ### UI Entrance & Showcase

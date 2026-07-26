@@ -4,6 +4,7 @@ name: neon-frame-orbit-drop
 适用: 单页 UI 的一次性隆重登场（与巡礼/逐区亮相相对）；暗场霓虹调性段落的主视觉揭幕；neon-frame-forerun 的姊妹镜
 时长: 描框 ~0.5s + 旋转&同时贴落 ~2.5s + 落定 ~1s；全段 4–4.5s
 能量: 中高（一次性的大动作，落定即静）
+标签: effects、camera
 ---
 
 ## 意图

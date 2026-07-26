@@ -4,6 +4,7 @@ name: cel-flash-stomp
 适用: 口号/三连词的高能段落（"SHIP / FASTER / TODAY"式）；文字节奏卡，与 type-rhythm-sync 互补（那是字属性动，这是字砸+底闪）
 时长: 每词 ~30f × 词数 + 收尾 ≥45f；三词约 4.8s
 能量: 高
+标签: rhythm
 ---
 
 ## 意图

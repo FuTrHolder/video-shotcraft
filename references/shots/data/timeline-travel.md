@@ -4,6 +4,7 @@ name: timeline-travel
 适用: changelog/里程碑/发展史段落（"我们一直在发货"的另一种拍法）；与 scroll-brake-moves 分工：那卡是纵向列表急刹，本卡是横向时间旅行
 时长: 4–5s
 能量: 中高（加速→急刹的节奏型镜头）
+标签: camera
 ---
 
 ## 意图

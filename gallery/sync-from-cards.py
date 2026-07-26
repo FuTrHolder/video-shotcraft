@@ -14,12 +14,10 @@ SHOTS = ROOT / 'references' / 'shots'
 SOURCE = ROOT / 'gallery' / 'source'
 LIB = ROOT / 'gallery' / 'api' / 'library.json'
 
-# These variants have a recipe/sample but no reusable demo source. Keep them visible for
-# reference, but do not let the workflow recommend them by default.
-STYLE_STATUS = {
-    ('wall-reveal-moves', 'grid-wave-flip'): 'reference-only',
-    ('wall-reveal-moves', 'wireframe-draw-on'): 'reference-only',
-}
+# Variants with a recipe/sample but no reusable demo source get 'reference-only'
+# here so the workflow does not recommend them by default. Currently empty:
+# every style has demo source.
+STYLE_STATUS = {}
 
 
 def parse_card(path):
@@ -93,6 +91,13 @@ def main():
         if intention:
             card['intention'] = intention
         card['category'] = card_category[card['name']]
+        # 多类别标签：frontmatter 的「标签:」列出这张卡也成立的其他类别；
+        # 目录名永远是主类别（分组归属），标签只扩大筛选命中面
+        extra = [t.strip() for t in re.split(r'[,，、\s]+', fm.get('标签', '')) if t.strip()]
+        bad = [t for t in extra if t not in CATEGORIES]
+        if bad:
+            raise SystemExit(f"{card['name']}: unknown 标签 {bad} (must be CATEGORIES keys)")
+        card['tags'] = [card['category']] + [t for t in extra if t != card['category']]
         card['source'] = f"references/shots/{card['category']}/{card['name']}.md"
         if card['name'] in touched:
             card['updatedAt'] = now
@@ -105,6 +110,8 @@ def main():
             else:
                 style.pop('implementationStatus', None)
     lib['categories'] = CATEGORIES
+    # All 视图直接按 cards 顺序平铺渲染，这里就是排序的唯一权威
+    lib['cards'].sort(key=lambda card: card['name'])
 
     # stats are the single source of truth every page and llms.txt reads;
     # recompute from the cards rather than trusting whatever was there
