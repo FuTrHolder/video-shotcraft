@@ -36,7 +36,7 @@ name: crane-rise-reveal
 - demo 在灰阶/占位素材上调校通过——参数是调校起点非实战定稿，
   首次实战须以真实素材回验
 - 起点特写 = 一行内容被放大 3.2 倍盯着看，真实素材先过
-  hires-rasterize-3d-text（Q2），低倍截图开场即糊
+  审美准则 Q2 的高分辨率栅格化技法，低倍截图开场即糊
 - 快速拉升段可包 CameraMotionBlur（参数见 deck-deal-flyin 运动模糊行），
   但只包前半程快速段——临顶慢速段包了会抹软文字（轮 #8 判例）
 - 与 drone-dive-landing 同片不并用（一升一降互为镜像，观众读作同一招）；
