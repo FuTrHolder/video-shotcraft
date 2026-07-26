@@ -190,6 +190,8 @@ SFX；只有完整分镜确认后才进入最终素材采集。用户从 Gallery
   `demos/_textures/` 的真实页面纹理），copy 进 Remotion 项目即可跑。
 - `template/` 完整可渲染工程：`npm install && npx remotion render
   src/index.ts AiflPromo out/promo.mp4`。
-- `gallery/` 静态画廊：`cd gallery && python3 -m http.server 4178`
-  后浏览器打开，104 卡 161 条动态样片可浏览/搜索/多选复制卡名——
-  适合让用户看着样片挑镜头。
+- `gallery/` 静态画廊：优先直接给用户在线版
+  https://vincentwei1021.github.io/video-shotcraft/library.html ；
+  本地跑则先 `gallery/fetch-media.sh` 拉样片（mp4 不在 git 里），再
+  `cd gallery && python3 -m http.server 4178`。104 卡 161 条动态样片
+  可浏览/搜索/多选复制卡名——适合让用户看着样片挑镜头。
