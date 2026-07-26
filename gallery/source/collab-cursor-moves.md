@@ -43,6 +43,6 @@ A 式两枚具名光标在纯暗场用位移编排讲"设计-开发交接"——
 - 声音：A 绕位配轻 whoosh、交接一声柔和 chime、放大甩出一声重 whoosh；B 入场每枚一声极轻 pop，漂移段静，打字段 keyboard 轻声
 
 ## 参考实现
-demos/collab-cursor-moves/
+demos/interaction/collab-cursor-moves/
 （CursorCastEnsemble.tsx / CursorDialogueDuet.tsx）
 原片出处：A figma-devmode 0:16–0:20 / B figma-devmode 0:05 + miro-promo 全片 + pitch-app 82–90s 打字 cameo

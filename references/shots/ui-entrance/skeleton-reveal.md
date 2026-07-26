@@ -49,6 +49,6 @@ document-typewriter-reveal 分工：那是**一份文档**被逐块写出来（�
 - 声音：换真一拍钉一声 pop/whoosh，逐行显影各一声极轻 tick，末词晚半拍处配一声轻 chime 收束
 
 ## 参考实现
-demos/skeleton-reveal/
+demos/ui-entrance/skeleton-reveal/
 （SkeletonReveal.tsx）
 原片出处：slack-promo 4–4.5s + 10–15s

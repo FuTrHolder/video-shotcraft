@@ -44,6 +44,6 @@ name: gradient-word-sweep
 - 关键词外的正文保持纯白静止——全句都动就没有"只有它通电"的戏
 
 ## 参考实现
-demos/gradient-word-sweep/
+demos/typography/gradient-word-sweep/
 （GradientWordSweep.tsx）
 原片出处：clickup-30.mp4

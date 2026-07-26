@@ -42,5 +42,5 @@ name: ai-stream-response
   参数未经本库实战项目验证，首次使用必须按 P1 在正常速度下看片，不以逐帧 diff 代替体感
 
 ## 参考实现
-demos/ai-stream-response/
+demos/interaction/ai-stream-response/
 （StreamResponse.tsx）

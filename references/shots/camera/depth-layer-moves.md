@@ -36,5 +36,5 @@ name: depth-layer-moves
 - 参数经占位素材调校转正，非实战定稿，首次实战后回验
 
 ## 参考实现
-demos/depth-layer-moves/
+demos/camera/depth-layer-moves/
 （DollyZoomReal.tsx / MultiplaneReal.tsx）

@@ -57,6 +57,6 @@ transition-travel 是镜头钻进画面里的既有元素换景；本卡反过�
   要重 3D 质感请回原片路线（成本高一档）
 
 ## 参考实现
-demos/paper-plane-messenger/
+demos/transition/paper-plane-messenger/
 （PaperPlaneMessenger.tsx）
 原片出处：pitch-app 77–82s（重 3D 原版的 2.5D 降级）

@@ -49,6 +49,6 @@ name: card-flock-tumble
   三卡精确列队+坍缩，数量意义相反
 
 ## 参考实现
-demos/card-flock-tumble/
+demos/transition/card-flock-tumble/
 （CardFlockTumble.tsx）
 原片出处：clickup-30.mp4

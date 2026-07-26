@@ -48,5 +48,5 @@ name: panel-grid-moves
   入场还是节奏器）
 
 ## 参考实现
-demos/panel-grid-moves/
+demos/rhythm/panel-grid-moves/
 （ComicPanelSplit.tsx / FlipGridReflow.tsx / GridFlashMosaic.tsx）

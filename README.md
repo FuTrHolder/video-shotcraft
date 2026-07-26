@@ -95,6 +95,22 @@ the same quality — the fastest, most reliable path to a finished film.
 
 > More templates are on the way.
 
+### Headless / CI notes
+
+Rendering on a headless Linux box (tested: 2 cores, Node 22) hits three walls
+worth knowing:
+
+1. **Concurrency cap** — `remotion still/render` fails with "Maximum for
+   --concurrency is 2" on low-core machines. Fix: pass `--concurrency=1`.
+2. **Old Headless removal** — recent Chrome/Chromium dropped old headless mode;
+   pointing Remotion at system chromium fails to launch. Fix: use a
+   chrome-headless-shell binary instead of full Chrome.
+3. **Blocked CDN** — if remotion.media is unreachable, the automatic
+   headless-shell download is rejected. Fix:
+   `--browser-executable=<path-to-local chrome-headless-shell>`.
+
+With these three flags, frame renders from the bundled template work.
+
 ## 📦 What's included
 
 | Content | Description |
@@ -166,16 +182,6 @@ Special thanks to:
   Vlambeer's screenshake talks, classic animation timing) inform several cards.
 - **Claude Code** — this library itself was built, iterated, and QA'd with an
   AI coding agent, using the same workflow the skill teaches.
-
-## 🖥️ Headless / CI notes
-
-Running the Ink Press template on a headless Linux box (tested: 2 cores, Node 22) hits three walls worth knowing:
-
-1. **Concurrency cap** — `remotion still/render` fails with "Maximum for --concurrency is 2" on low-core machines. Fix: pass `--concurrency=1`.
-2. **Old Headless removal** — recent Chrome/Chromium dropped old headless mode; pointing Remotion at system chromium fails to launch. Fix: use a chrome-headless-shell binary instead of full Chrome.
-3. **Blocked CDN** — if remotion.media is unreachable, the automatic headless-shell download is rejected. Fix: `--browser-executable=<path-to-local chrome-headless-shell>`.
-
-With these three flags, frame renders from the bundled template work.
 
 ## ⭐ Star history
 

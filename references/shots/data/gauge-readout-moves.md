@@ -41,5 +41,5 @@ name: gauge-readout-moves
   低频滚动声、刹车一声闷"哐"
 
 ## 参考实现
-demos/gauge-readout-moves/
+demos/data/gauge-readout-moves/
 （NeedleSweepSelftest.tsx / TapeScrollFixedPointer.tsx）

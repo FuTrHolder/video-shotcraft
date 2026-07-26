@@ -53,6 +53,6 @@ name: title-demote-to-label
 - 标题文案 ≤3 个词——降格到 0.3x 后还要当可读标签，长句缩完就是一条灰线
 
 ## 参考实现
-demos/title-demote-to-label/
+demos/typography/title-demote-to-label/
 （TitleDemoteToLabel.tsx）
 原片出处：perplexity-promo 16–18.5s；B 式变体源自 framer text-selection-title

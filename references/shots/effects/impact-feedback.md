@@ -46,5 +46,5 @@ B 用局部顿帧叠伤害数字和 combo 跳字，把功能清单剪成一套�
   按 `真实命中帧 = 动画命中帧 + 已冻结帧数` 折算（demo HITS_REAL）
 
 ## 参考实现
-demos/impact-feedback/
+demos/effects/impact-feedback/
 （AnimeImpact.tsx / HitCounter.tsx）

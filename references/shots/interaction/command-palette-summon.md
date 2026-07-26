@@ -41,5 +41,5 @@ Raycast/Linear 发布片的标志性仪式：一声轻响，整个 UI 世界压�
   高亮一声轻 pop（S1/S4 同源）
 
 ## 参考实现
-demos/command-palette-summon/
+demos/interaction/command-palette-summon/
 （CommandPaletteSummon.tsx）

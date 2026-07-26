@@ -42,5 +42,5 @@ Wes Anderson 手账美术与立体书纸艺的 UI 翻译。A：卡片轻飘入�
   错峰对齐（S2/S4 同源）
 
 ## 参考实现
-demos/paper-craft-moves/
+demos/ui-entrance/paper-craft-moves/
 （MaskingTapeSlap.tsx / PopupBookRise.tsx）

@@ -51,5 +51,5 @@ space-camera-moves 三式是"把页面当 3D 实体拍"的高光炫技；这四�
 - D 式放结尾时后接 outro-group-photo-launch 会打架（一收一放），二选一
 
 ## 参考实现
-demos/tension-camera-moves/
+demos/camera/tension-camera-moves/
 （BulletTimeFreezeOrbit.tsx / DutchRollToLevel.tsx / PullBackIsolation.tsx / SlowPushIn.tsx）

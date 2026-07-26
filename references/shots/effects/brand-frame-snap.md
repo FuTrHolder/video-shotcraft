@@ -46,6 +46,6 @@ Mode。章节切换时整圈画框一帧内硬翻色，无渐变，颜色硬切�
 - 声音：翻色帧钉一声干脆的机械 click/换挡声，白闪与声同帧；画框生长段可静
 
 ## 参考实现
-demos/brand-frame-snap/
+demos/effects/brand-frame-snap/
 （BrandFrameSnap.tsx）
 原片出处：figma-devmode 0:28–0:32 + 0:43–0:47

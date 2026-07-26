@@ -50,6 +50,6 @@ name: text-column-converge
   demo 是纯硬切；实战可选加回但闪烁 >1f 会读作故障
 
 ## 参考实现
-demos/text-column-converge/
+demos/typography/text-column-converge/
 （TextColumnConverge.tsx）
 原片出处：raycast-teams.mp4 28–36s

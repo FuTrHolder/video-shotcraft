@@ -45,5 +45,5 @@ C 是引信——假 3D 键帽（⌘K）呼吸悬浮，3f 压扁+底部亮环溢
   同片二选一
 
 ## 参考实现
-demos/input-trigger-moves/
+demos/interaction/input-trigger-moves/
 （CursorPerformancePunchIn.tsx / KeycapSmashCut.tsx）

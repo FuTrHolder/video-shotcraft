@@ -49,5 +49,5 @@ name: slam-entrance-moves
 - 全片砸入 ≤2 次；三次以上每次都响等于都不响（P4）
 
 ## 参考实现
-demos/slam-entrance-moves/
+demos/effects/slam-entrance-moves/
 （ImpactBurstKit.tsx / KanadaPerspectiveSnap.tsx / ScoreSlam.tsx）

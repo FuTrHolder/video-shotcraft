@@ -91,6 +91,22 @@ agent 会替换成目标产品的截图、文案和品牌信息，复现同等�
 
 > 后续会持续更新更多模板。
 
+### Headless / CI 注意事项
+
+在无显示器的 Linux 服务器上渲染（实测环境：2 核、Node 22）会遇到三个坑，
+都可以一个参数解决：
+
+1. **并发上限** —— 低核机器上 `remotion still/render` 会报
+   "Maximum for --concurrency is 2"。解决：加 `--concurrency=1`。
+2. **旧版 Headless 被移除** —— 新版 Chrome/Chromium 已删除旧 headless 模式，
+   让 Remotion 指向系统 chromium 会启动失败。解决：改用
+   chrome-headless-shell 二进制，而不是完整版 Chrome。
+3. **CDN 被墙** —— 如果 remotion.media 无法访问，headless-shell 的自动下载
+   会失败。解决：用 `--browser-executable=<本地 chrome-headless-shell 路径>`
+   指定本地二进制。
+
+加上这三个参数后，内置模板即可正常渲染。
+
 ## 📦 项目包含什么
 
 | 内容 | 说明 |

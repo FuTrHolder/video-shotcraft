@@ -50,5 +50,5 @@ name: beat-cut-moves
   淡化就不是硬切了，节拍感立即糊掉
 
 ## 参考实现
-demos/beat-cut-moves/
+demos/rhythm/beat-cut-moves/
 （BeatCutAccelerando.tsx / PaparazziFlash.tsx）

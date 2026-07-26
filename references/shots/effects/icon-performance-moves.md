@@ -42,5 +42,5 @@ name: icon-performance-moves
   音调递升，面板弹出一声轻"叮"
 
 ## 参考实现
-demos/icon-performance-moves/
+demos/effects/icon-performance-moves/
 （AttentionBounce.tsx / PopBurstConfirm.tsx）

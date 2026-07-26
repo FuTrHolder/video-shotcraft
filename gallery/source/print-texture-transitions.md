@@ -36,5 +36,5 @@ name: print-texture-transitions
 - 慢转场（55–80f 动作段），高节奏连打段落别用——那里去 E 式甩镜
 
 ## 参考实现
-demos/print-texture-transitions/
+demos/transition/print-texture-transitions/
 （InkBleedReveal.tsx）

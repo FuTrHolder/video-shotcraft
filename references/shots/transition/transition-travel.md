@@ -44,5 +44,5 @@ A 是"把这张卡放回去"（详情→总览，F 式穿窗的逆向）；C 是
   再包白闪/震屏读作穿帮（规矩同 shot-transitions）
 
 ## 参考实现
-demos/transition-travel/
+demos/transition/transition-travel/
 （LetterformZoom.tsx / SharedElementMorph.tsx）

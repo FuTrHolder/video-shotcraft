@@ -54,6 +54,6 @@ name: beat-step-list-theme-cycle
   两者都跟小数会出现半白半灰的中间态词
 
 ## 参考实现
-demos/beat-step-list-theme-cycle/
+demos/rhythm/beat-step-list-theme-cycle/
 （BeatStepListThemeCycle.tsx）
 原片出处：bear-app 22.3–24.6s

@@ -48,5 +48,5 @@ name: split-flap-title
   与压印/打字机同片混用时留给最重的那句标题
 
 ## 参考实现
-demos/split-flap-title/
+demos/typography/split-flap-title/
 （SplitFlapFlip.tsx）

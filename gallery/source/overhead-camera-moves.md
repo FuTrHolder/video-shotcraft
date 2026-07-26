@@ -46,5 +46,5 @@ name: overhead-camera-moves
   一个段落只能有一个持镜人
 
 ## 参考实现
-demos/overhead-camera-moves/
+demos/camera/overhead-camera-moves/
 （OverheadTabletopDrop.tsx / TiltReveal.tsx）

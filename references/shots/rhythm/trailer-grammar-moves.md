@@ -47,5 +47,5 @@ rhythm-interrupt 管打断。本卡管**预告片的结构性时刻**——不�
   这是爆完瞬间入定（爆→静）——方向相反，别接错位置
 
 ## 参考实现
-demos/trailer-grammar-moves/
+demos/rhythm/trailer-grammar-moves/
 （CardFootageCadence.tsx / SmashCut.tsx / TrailerBumper.tsx）

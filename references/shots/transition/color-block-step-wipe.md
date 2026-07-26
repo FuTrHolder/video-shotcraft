@@ -49,6 +49,6 @@ name: color-block-step-wipe
   同色连用两次读作素材复用
 
 ## 参考实现
-demos/color-block-step-wipe/
+demos/transition/color-block-step-wipe/
 （ColorBlockStepWipe.tsx）
 原片出处：notion-ai 1.5–3.5s（A 中央阶跃）+ 26–27s（B 斜角吞屏）

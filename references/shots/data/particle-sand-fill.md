@@ -35,5 +35,5 @@ name: particle-sand-fill
 - 声音：细密颗粒落地声铺底，每柱堆满一声轻"叩"，标签弹出一声 tick
 
 ## 参考实现
-demos/particle-sand-fill/
+demos/data/particle-sand-fill/
 （ParticleSandFill.tsx）

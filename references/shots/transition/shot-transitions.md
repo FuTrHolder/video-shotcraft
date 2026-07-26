@@ -51,10 +51,10 @@ name: shot-transitions
 - F 式窗内新景语义应是被点开元素的"详情世界"（实战接真实详情页
   截图）——窗里塞无关场景语义断裂，沦为花哨擦除
 - F 纵深款参数系灰阶占位调校起点、未经真实素材验证；
-  参考实现 demos/shot-transitions/PortalWipeV2.tsx
+  参考实现 demos/transition/shot-transitions/PortalWipeV2.tsx
 
 ## 参考实现
 A 式：template/src/aifl/Main.tsx flash-cut 层；
-E 式（whip 甩镜）：demos/shot-transitions/WhipPanReal.tsx / WhipBrakeReal.tsx；
-F 式（遮罩擦除）：demos/shot-transitions/MaskWipeReal.tsx（纵深款 PortalWipeV2.tsx 同目录）；
+E 式（whip 甩镜）：demos/transition/shot-transitions/WhipPanReal.tsx / WhipBrakeReal.tsx；
+F 式（遮罩擦除）：demos/transition/shot-transitions/MaskWipeReal.tsx（纵深款 PortalWipeV2.tsx 同目录）；
 B/C/D 式暂无库内实现，按参数表自行实现。

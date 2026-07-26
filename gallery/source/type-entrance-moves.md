@@ -42,5 +42,5 @@ B 是物理喜剧感——字符从天而降、砸地弹跳、歪歪扭扭站定
   同片 ≤2 种，且都自带高注意力——别和其他高能量入场同帧抢戏
 
 ## 参考实现
-demos/type-entrance-moves/
+demos/typography/type-entrance-moves/
 （LetterDropPhysics.tsx / ScrambleDecode.tsx）

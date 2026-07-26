@@ -95,6 +95,23 @@ Use video-shotcraft to make a promo for my product with the Ink Press template.
 
 > 今後、さらに多くのテンプレートが追加される予定です。
 
+### Headless / CI に関する注意事項
+
+ヘッドレスの Linux サーバー（検証環境：2 コア、Node 22）でレンダリングする際、
+次の 3 つの問題に遭遇します。いずれもフラグ 1 つで解決できます。
+
+1. **並列数の上限** — 低コアのマシンでは `remotion still/render` が
+   "Maximum for --concurrency is 2" というエラーで失敗します。対処:
+   `--concurrency=1` を指定します。
+2. **旧 Headless モードの廃止** — 最近の Chrome/Chromium は旧 headless モードを
+   廃止したため、Remotion にシステムの chromium を指定すると起動に失敗します。
+   対処: フル版 Chrome ではなく chrome-headless-shell バイナリを使用します。
+3. **CDN への接続遮断** — remotion.media に到達できない環境では、
+   headless-shell の自動ダウンロードが失敗します。対処:
+   `--browser-executable=<ローカルの chrome-headless-shell のパス>` を指定します。
+
+この 3 つのフラグを設定すれば、同梱テンプレートのレンダリングが動作します。
+
 ## 📦 収録内容
 
 | 内容 | 説明 |

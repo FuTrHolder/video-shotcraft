@@ -45,6 +45,6 @@ name: neon-frame-forerun
   曾被裁"改改再看"（要求所有组件同时贴落），已收敛进 neon-frame-orbit-drop 卡
 
 ## 参考实现
-demos/neon-frame-forerun/
+demos/ui-entrance/neon-frame-forerun/
 （NeonFrameForerun.tsx）
 原片出处：clickup-30.mp4

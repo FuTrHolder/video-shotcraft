@@ -43,5 +43,5 @@ name: crane-rise-reveal
   与 crane 语义最近的 tilt-reveal 未入库，别混称
 
 ## 参考实现
-demos/crane-rise-reveal/
+demos/opening/crane-rise-reveal/
 （CraneRiseReveal.tsx）

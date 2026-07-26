@@ -47,6 +47,6 @@ name: runway-ground-skim
   正视图
 
 ## 参考实现
-demos/runway-ground-skim/
+demos/ui-entrance/runway-ground-skim/
 （RunwayGroundSkim.tsx）
 原片出处：clickup-30.mp4 ≈46–50s

@@ -46,5 +46,5 @@ split-flap（字符翻牌，讲文字）。本卡是**语义翻面**：一张卡
   节奏感翻倍
 
 ## 参考实现
-demos/card-flip-reveal/
+demos/transition/card-flip-reveal/
 （CardFlipReveal.tsx）

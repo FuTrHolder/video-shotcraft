@@ -34,5 +34,5 @@ name: edit-hook-moves
   不是钩子，命门
 
 ## 参考实现
-demos/edit-hook-moves/
+demos/outro/edit-hook-moves/
 （LogoStingButton.tsx）

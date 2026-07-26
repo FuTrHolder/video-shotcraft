@@ -45,5 +45,5 @@ staging 法则给 2.5D 运镜垫的物理台词。与 smear-multiples 的区别�
 - 声音：A 落点一声闷撞、B 抬起轻吸/落回轻放（sound-design §4.5）
 
 ## 参考实现
-demos/element-body-moves/
+demos/ui-entrance/element-body-moves/
 （AxialStretch.tsx / ContactShadowLift.tsx）

@@ -46,5 +46,5 @@ name: sakuga-timing-shift
   sound-design §4.5）——无标注观众只觉得"变快了"，读不出"换拍"
 
 ## 参考实现
-demos/sakuga-timing-shift/
+demos/rhythm/sakuga-timing-shift/
 （SakugaTimingShift.tsx）

@@ -49,5 +49,5 @@ name: circle-match-iris
   别再叠入场动效
 
 ## 参考实现
-demos/circle-match-iris/
+demos/transition/circle-match-iris/
 （CircleMatchIris.tsx）

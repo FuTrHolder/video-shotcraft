@@ -46,6 +46,6 @@ blur9 中层+亮芯+粉色偏移层）随扫光同步走，经过 logo 时 boxSh
   在转角帧加 1–2f 色散层提质感
 
 ## 参考实现
-demos/spotlight-sweep-moves/
+demos/effects/spotlight-sweep-moves/
 （CornerSpotlightReveal.tsx / GlowWakeSleepPanel.tsx / SlideSpotlightPan.tsx）
 原片出处：clickup-30.mp4

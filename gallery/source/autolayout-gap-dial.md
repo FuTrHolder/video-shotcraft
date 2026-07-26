@@ -48,6 +48,6 @@ name: autolayout-gap-dial
 - 声音：徽章每跳一格一声极轻 tick（拨盘咔哒），回弹落定一声 pop；tick 密度跟步进走
 
 ## 参考实现
-demos/autolayout-gap-dial/
+demos/interaction/autolayout-gap-dial/
 （AutolayoutGapDial.tsx）
 原片出处：framer-ai 4.5–5.5s

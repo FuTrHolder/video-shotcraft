@@ -52,6 +52,6 @@ control 放大到 1080px 宽拍特写，**thumb 那 8 帧位移本身就是叙�
   （demo 笑脸 laptop）是奖励感的一半，纯线框图标会淡不少
 
 ## 参考实现
-demos/segmented-thumb-hero/
+demos/interaction/segmented-thumb-hero/
 （SegmentedThumbHero.tsx）
 原片出处：perplexity-promo 2.3–5s

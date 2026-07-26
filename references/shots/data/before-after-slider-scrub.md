@@ -43,5 +43,5 @@ AI 图像产品发布片的标准对比语法：同一画面"处理前"（低对
 - 声音：快甩一声 whoosh + 回弹轻 tick，慢扫无声或极轻摩擦音（S4）
 
 ## 参考实现
-demos/before-after-slider-scrub/
+demos/data/before-after-slider-scrub/
 （BeforeAfterSliderScrub.tsx）

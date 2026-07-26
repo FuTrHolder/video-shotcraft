@@ -48,6 +48,6 @@ name: icon-field-colorize
   是装饰性图标场的品牌色点亮，不承载界面语义
 
 ## 参考实现
-demos/icon-field-colorize/
+demos/opening/icon-field-colorize/
 （IconFieldColorize.tsx）
 原片出处：bear-app.mp4 ≈0.0–3.0s

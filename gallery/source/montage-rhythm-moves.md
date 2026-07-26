@@ -51,5 +51,5 @@ A 是"静默即蓄力"——drop 前一拍切全黑死寂憋一整拍，爆开�
   后面的入场退化回普通错峰
 
 ## 参考实现
-demos/montage-rhythm-moves/
+demos/rhythm/montage-rhythm-moves/
 （DominoCascade.tsx / DropBlackoutSlam.tsx / WrightTripleCut.tsx）

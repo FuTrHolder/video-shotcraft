@@ -47,5 +47,5 @@ C 轴爆表：折线正常爬升，新值顶破图表上沿冲出卡片 220px（
   一声 riser、重标一声"哗啦"
 
 ## 参考实现
-demos/chart-live-moves/
+demos/data/chart-live-moves/
 （AxisRescaleShockV2.tsx / OscilloscopeStreamV2.tsx / UnitDotSwarmRegroupV2.tsx）

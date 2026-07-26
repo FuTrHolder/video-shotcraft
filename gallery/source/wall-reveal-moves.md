@@ -45,7 +45,7 @@ name: wall-reveal-moves
 - A 式暗态 opacity 0.18 依赖暗底（#2a2a28）成立，亮底下压暗读作褪色故障
 
 ## 参考实现
-demos/wall-reveal-moves/
+demos/ui-entrance/wall-reveal-moves/
 （BentoLightUp.tsx）
 
 实现状态：`bento-light-up` 可按上述源码适配；`grid-wave-flip` 与

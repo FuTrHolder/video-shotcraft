@@ -57,6 +57,6 @@ wipe-transitions 是一条几何边界扫过——都是"边界"思维。本卡�
   形状可换、结构不可换
 
 ## 参考实现
-demos/bubble-swarm-takeover/
+demos/transition/bubble-swarm-takeover/
 （BubbleSwarmTakeover.tsx）
 原片出处：loom-ai 9–12s（i18n 胶囊变体并入 30–34.5s）

@@ -40,5 +40,5 @@ name: rhythm-interrupt-moves
 - 声音强依赖：B 每跳一声 tick、C 每闪一声打点（sound-design §4.5）
 
 ## 参考实现
-demos/rhythm-interrupt-moves/
+demos/rhythm/rhythm-interrupt-moves/
 （JumpCutPunchIn.tsx / StrobeBlackFrames.tsx）

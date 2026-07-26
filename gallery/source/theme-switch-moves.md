@@ -40,5 +40,5 @@ B（组合变异）：⌘K 面板输入 "dark" 回车，面板收缩成一个亮
   （S4 拟音优先）
 
 ## 参考实现
-demos/theme-switch-moves/
+demos/interaction/theme-switch-moves/
 （PaletteThemeRipple.tsx / ThemeSweepToggle.tsx）

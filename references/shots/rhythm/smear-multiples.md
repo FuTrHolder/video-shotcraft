@@ -45,5 +45,5 @@ name: smear-multiples
   可减为 3 个分身重配 0.5/0.3/0.15
 
 ## 参考实现
-demos/smear-multiples/
+demos/rhythm/smear-multiples/
 （SmearMultiples.tsx）

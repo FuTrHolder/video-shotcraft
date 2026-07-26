@@ -39,5 +39,5 @@ name: timeline-travel
 - 声音：每次弹立一声轻打点，急停一声 impact（S2 同源）
 
 ## 参考实现
-demos/timeline-travel/
+demos/data/timeline-travel/
 （TimelineTravel.tsx）

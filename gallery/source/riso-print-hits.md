@@ -50,5 +50,5 @@ RGB 色散故障闪（impact-feedback C 式的一部分）是荧光屏语言，�
   在等第五拍
 
 ## 参考实现
-demos/riso-print-hits/
+demos/effects/riso-print-hits/
 （RisoBeatPump.tsx / RisoMisregistrationHit.tsx）

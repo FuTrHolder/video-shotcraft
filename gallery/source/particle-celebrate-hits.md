@@ -38,5 +38,5 @@ name: particle-celebrate-hits
 - 声音：A 双炮"砰砰"错开 1–2f 更有层次；B 每 tick 一声细"叮"
 
 ## 参考实现
-demos/particle-celebrate-hits/
+demos/data/particle-celebrate-hits/
 （ConfettiCrossfire.tsx / CounterTickSparks.tsx）

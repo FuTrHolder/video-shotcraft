@@ -34,5 +34,5 @@ Spline/C4D Cloner 语汇的 UI 翻译：一张主卡"啪"地复印出 7 个克�
 - 声音：排开一串细"啪"错峰，吸回一声上扬 whoosh，合体一声实"咚"
 
 ## 参考实现
-demos/cloner-depth-echo/
+demos/ui-entrance/cloner-depth-echo/
 （ClonerDepthEcho.tsx）

@@ -48,5 +48,5 @@ name: line-boil
   组合时字卡的打字机/压印入场完成后再起沸腾
 
 ## 参考实现
-demos/line-boil/
+demos/effects/line-boil/
 （LineBoil.tsx）

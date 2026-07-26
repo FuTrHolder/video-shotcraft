@@ -50,6 +50,6 @@ name: neon-triple-marquee
   0.35→1 幅度，不然轮唱读不出来
 
 ## 参考实现
-demos/neon-triple-marquee/
+demos/outro/neon-triple-marquee/
 （NeonTripleMarquee.tsx）
 原片出处：clickup-30 61–64.5s

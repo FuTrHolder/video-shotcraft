@@ -47,5 +47,5 @@ name: morph-from-primitive
   出现自交/尖刺才是锚点方位角没对齐
 
 ## 参考实现
-demos/morph-from-primitive/
+demos/ui-entrance/morph-from-primitive/
 （MorphFromPrimitive.tsx）

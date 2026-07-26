@@ -46,5 +46,5 @@ name: spectrum-morph-ui
 - 收拢帧后的静止段是"归还仪式"的一部分，从重给（≥35f），别急着切
 
 ## 参考实现
-demos/spectrum-morph-ui/
+demos/rhythm/spectrum-morph-ui/
 （SpectrumMorphUi.tsx）

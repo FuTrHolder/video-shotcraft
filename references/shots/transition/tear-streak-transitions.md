@@ -39,5 +39,5 @@ pixel-dissolve 方块翻黑、facade-block 砖块翻飞全部淘汰），条带�
   就失去了 glitch 的掩护
 
 ## 参考实现
-demos/tear-streak-transitions/
+demos/transition/tear-streak-transitions/
 （GlitchDisplace.tsx）

@@ -51,6 +51,6 @@ name: graze-face-tour
   切换藏在交叉淡化里——实战若做真单长镜，路径规划成本高得多
 
 ## 参考实现
-demos/graze-face-tour/
+demos/camera/graze-face-tour/
 （GrazeFaceTour.tsx）
 原片出处：clickup-30.mp4

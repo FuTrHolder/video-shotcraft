@@ -58,6 +58,6 @@ name: magician-card-flourish
   多卡节奏戏；本卡是单卡"变出来"的魔术仪式，一次只变一张
 
 ## 参考实现
-demos/magician-card-flourish/
+demos/opening/magician-card-flourish/
 （MagicianCardFlourish.tsx）
 原片出处：无（用户口述定制，多轮迭代收敛）

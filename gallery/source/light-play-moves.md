@@ -45,5 +45,5 @@ name: light-play-moves
   spotlight-hero-card 同片二选一，都是"聚光"语汇
 
 ## 参考实现
-demos/light-play-moves/
+demos/effects/light-play-moves/
 （HalationBloom.tsx / SheenSweepRetry.tsx / SpotlightSweepReveal.tsx）

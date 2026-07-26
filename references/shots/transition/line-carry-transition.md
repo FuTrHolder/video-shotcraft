@@ -48,5 +48,5 @@ name: line-carry-transition
 - 声音：线生长一声持续笔擦、框闭合一声轻叩（sound-design §4.5）
 
 ## 参考实现
-demos/line-carry-transition/
+demos/transition/line-carry-transition/
 （LineCarryTransition.tsx）

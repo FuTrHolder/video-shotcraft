@@ -34,5 +34,5 @@ name: crash-zoom-punch
 - 参数经占位素材调校转正，非实战定稿，首次实战后回验
 
 ## 参考实现
-demos/crash-zoom-punch/
+demos/camera/crash-zoom-punch/
 （CrashImpactReal.tsx / CrashZoomReal.tsx）

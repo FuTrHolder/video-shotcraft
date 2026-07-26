@@ -39,5 +39,5 @@ name: stroke-segment-build
 - 声音：逐段点亮稀疏轻拟音或无声，落位帧一声 impact + 可接 riser 铺底
 
 ## 参考实现
-demos/stroke-segment-build/
+demos/opening/stroke-segment-build/
 （StrokeSegmentBuild.tsx）

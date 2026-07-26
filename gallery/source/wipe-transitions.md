@@ -43,5 +43,5 @@ F 用页面内真实元素当遮罩（依赖构图），本卡是纯几何形—
   差一帧就是残线穿帮
 
 ## 参考实现
-demos/wipe-transitions/
+demos/transition/wipe-transitions/
 （BlindsSlice.tsx / ClockWipe.tsx）

@@ -53,6 +53,6 @@ wipe-transitions 是一条边界扫过、新旧页都不动；page-turn 是立�
   的从属关系读不出来，会退化成"卡片各自换背景"
 
 ## 参考实现
-demos/bottom-push-stack-wipe/
+demos/transition/bottom-push-stack-wipe/
 （BottomPushStackWipe.tsx）
 原片出处：slack-promo 22–27s

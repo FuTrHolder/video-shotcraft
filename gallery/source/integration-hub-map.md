@@ -49,6 +49,6 @@ linear；90° 侧棱停顿版被裁）。侧棱时刻只"闪一下"（1–3f 脉
   消失判例），管线渐变用 userSpaceOnUse 每管独立定义
 
 ## 参考实现
-demos/integration-hub-map/
+demos/ui-entrance/integration-hub-map/
 （IntegrationHubMap.tsx）
 原片出处：clickup-30.mp4

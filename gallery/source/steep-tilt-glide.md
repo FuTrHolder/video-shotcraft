@@ -48,6 +48,6 @@ name: steep-tilt-glide
 - 超宽页面手绘成本高；实战可用真实长截图代替（滑移逻辑不变）
 
 ## 参考实现
-demos/steep-tilt-glide/
+demos/camera/steep-tilt-glide/
 （SteepTiltGlide.tsx）
 原片出处：clickup-30.mp4

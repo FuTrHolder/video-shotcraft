@@ -43,6 +43,6 @@ name: marker-underline-title
   更细的笔刷噪点
 
 ## 参考实现
-demos/marker-underline-title/
+demos/typography/marker-underline-title/
 （MarkerUnderlineTitle.tsx）
 原片出处：notion-ai.mp4

@@ -41,5 +41,5 @@ B 是组合变异：急刹帧**同帧**四个 L 角标从画外飞入咬合锁�
   再叠一声"咔"（与 impact 同帧不同声部）
 
 ## 参考实现
-demos/scroll-brake-moves/
+demos/data/scroll-brake-moves/
 （BrakeReticleLock.tsx / ChangelogScrollBrake.tsx）

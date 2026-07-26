@@ -58,6 +58,6 @@ sting 是定住再彩蛋。本卡是唯一的"减法"路线——点击引爆全
   ——黑场上按钮与晕光的对比是主角光环，颜色弱则升格失败
 
 ## 参考实现
-demos/ui-strip-away-outro/
+demos/outro/ui-strip-away-outro/
 （UiStripAwayOutro.tsx）
 原片出处：framer-ai 33–36.5s

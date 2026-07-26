@@ -43,5 +43,5 @@ name: type-rhythm-sync
 - B 式词数 ≤6/屏：更多词时填色进度读不过来，拆行或拆镜
 
 ## 参考实现
-demos/type-rhythm-sync/
+demos/typography/type-rhythm-sync/
 （FontWeightPump.tsx / KaraokeFillSync.tsx）

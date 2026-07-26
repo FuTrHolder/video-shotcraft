@@ -47,6 +47,6 @@ name: letterspace-materialize
   渐变近似，实战建议用实拍/AI 生成空镜
 
 ## 参考实现
-demos/letterspace-materialize/
+demos/opening/letterspace-materialize/
 （LetterspaceMaterialize.tsx）
 原片出处：superhuman-promo.mp4 ≈4.5–6.5s

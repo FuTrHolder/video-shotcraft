@@ -50,5 +50,5 @@ name: cel-flash-stomp
   demo 的 #ececea/#cfcfca 灰差，不然白闪一场
 
 ## 参考实现
-demos/cel-flash-stomp/
+demos/typography/cel-flash-stomp/
 （CelFlashStomp.tsx）

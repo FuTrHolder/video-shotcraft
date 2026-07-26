@@ -46,5 +46,5 @@ name: text-as-mask
   合在一层则产品跟着字形一起胀成 26 倍废片
 
 ## 参考实现
-demos/text-as-mask/
+demos/opening/text-as-mask/
 （TextAsMask.tsx）

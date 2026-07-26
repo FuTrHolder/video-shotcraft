@@ -40,5 +40,5 @@ B 是运动中的捕获：四个 L 形角标从画外冲入、超调回弹、"�
   （机械 click 而非游戏 UI 音，S1 边界内）
 
 ## 参考实现
-demos/fui-hud-moves/
+demos/effects/fui-hud-moves/
 （LineUnfoldPanel.tsx / ReticleLockOn.tsx）

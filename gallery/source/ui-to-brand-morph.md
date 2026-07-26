@@ -44,7 +44,7 @@ logo 单瓣（多元素落位拼装）。观众看到的不是"logo 出现了"�
 - 声音：A 翻扁一声"唰"、绽放落定"嗒"；B 发送一声 send、每粒落位一声 pop、呼吸段静
 
 ## 参考实现
-demos/ui-to-brand-morph/
+demos/outro/ui-to-brand-morph/
 （IconFlipBloomLogo.tsx / InputMorphsIntoLogo.tsx）
 原片出处：A perplexity-promo 88–91.5s / B slack-promo 40–41s
 

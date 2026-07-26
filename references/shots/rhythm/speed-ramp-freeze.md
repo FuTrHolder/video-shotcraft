@@ -38,5 +38,5 @@ name: speed-ramp-freeze
 - 参数经占位素材调校转正，非实战定稿，首次实战后回验
 
 ## 参考实现
-demos/speed-ramp-freeze/
+demos/rhythm/speed-ramp-freeze/
 （FreezeAnnotateReal.tsx / SpeedRampReal.tsx）

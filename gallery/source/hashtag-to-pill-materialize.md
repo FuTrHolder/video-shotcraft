@@ -52,6 +52,6 @@ name: hashtag-to-pill-materialize
   正文间距 ~10px 级别偏差；节奏与硬切时点已密帧对齐
 
 ## 参考实现
-demos/hashtag-to-pill-materialize/
+demos/interaction/hashtag-to-pill-materialize/
 （HashtagToPillMaterialize.tsx）
 原片出处：bear-app.mp4 18–21.5s

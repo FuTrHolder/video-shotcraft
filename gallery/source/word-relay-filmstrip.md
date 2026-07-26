@@ -45,6 +45,6 @@ name: word-relay-filmstrip
   已知）；截图亮度要人工分档保证相间可读
 
 ## 参考实现
-demos/word-relay-filmstrip/
+demos/typography/word-relay-filmstrip/
 （WordRelayFilmstrip.tsx）
 原片出处：perplexity-promo.mp4 ≈76–90s

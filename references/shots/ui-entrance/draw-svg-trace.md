@@ -46,5 +46,5 @@ name: draw-svg-trace
 - 一次点名画一个主体；同屏多元素排队各画一圈读作加载动画
 
 ## 参考实现
-demos/draw-svg-trace/
+demos/ui-entrance/draw-svg-trace/
 （DrawSvgTrace.tsx）

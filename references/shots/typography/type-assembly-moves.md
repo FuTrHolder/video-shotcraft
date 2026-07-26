@@ -46,5 +46,5 @@ name: type-assembly-moves
   交叠面积过大会糊成一团，大字改用更长曲线或减字数
 
 ## 参考实现
-demos/type-assembly-moves/
+demos/typography/type-assembly-moves/
 （LetterformDriftAssembly.tsx / SplitTextStagger.tsx / TextOnPath.tsx / TrackingExpandReveal.tsx）

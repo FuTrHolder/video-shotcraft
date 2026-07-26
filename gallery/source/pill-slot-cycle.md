@@ -52,6 +52,6 @@ name: pill-slot-cycle
   "do it all." 若比句干大，读作新标题而非句子补完
 
 ## 参考实现
-demos/pill-slot-cycle/
+demos/typography/pill-slot-cycle/
 （PillSlotCycle.tsx）
 原片出处：notion-ai 4.5–8.5s

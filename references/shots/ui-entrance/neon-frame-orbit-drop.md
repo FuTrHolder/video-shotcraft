@@ -45,6 +45,6 @@ neon-frame-forerun 的孪生变体：同样框先行、内容后落，但镜头
   形变略平——实战若需大角度环绕考虑真 3D 场景
 
 ## 参考实现
-demos/neon-frame-orbit-drop/
+demos/ui-entrance/neon-frame-orbit-drop/
 （NeonFrameForerunOrbit.tsx）
 原片出处：无对应原段

@@ -48,5 +48,5 @@ flash-cut 是最素的一款；要方向感选 A，要仪式感选 B，要温度
 - 分镜表阶段就逐接缝标注（写进"关键动效"列），帧预算从相邻镜头划（R3）
 
 ## 参考实现
-demos/transition-hidden-cut/
+demos/transition/transition-hidden-cut/
 （InvisibleCut.tsx / LightLeakBurn.tsx / VersusSlam.tsx）

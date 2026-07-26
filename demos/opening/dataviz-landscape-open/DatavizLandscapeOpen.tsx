@@ -3,7 +3,7 @@ import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
 
 /**
  * DatavizLandscapeOpen — 暗场支流线束地景开场
- * 配方卡: references/shots/dataviz-landscape-open.md
+ * 配方卡: references/shots/opening/dataviz-landscape-open.md
  *
  * 隐喻: 无数团队工作流(支流)汇成一个产品(主干)。
  * 三层景深: 近景大虚焦流过 / 中景标签清晰可读 / 远景渐隐。

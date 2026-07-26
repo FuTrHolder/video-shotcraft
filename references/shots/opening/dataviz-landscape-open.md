@@ -50,5 +50,5 @@ Linear Releases 发布片开场实证的品牌级开场品类：把产品背后�
   S2 同源）；交棒帧一次 whoosh/impact 交给下一镜头
 
 ## 参考实现
-demos/dataviz-landscape-open/
+demos/opening/dataviz-landscape-open/
 （DatavizLandscapeOpen.tsx）

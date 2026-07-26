@@ -47,5 +47,5 @@ name: glow-flyline-moves
 - 声音：B/C 每次落点一声轻打点，A 无声（sound-design §4.5）
 
 ## 参考实现
-demos/glow-flyline-moves/
+demos/effects/glow-flyline-moves/
 （FlylineArc.tsx / GlowOrbAmbient.tsx / OrbFlylineRelay.tsx）

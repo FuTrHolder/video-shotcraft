@@ -46,5 +46,5 @@ name: typewriter-moves
   整行重排，打字变成抽搐
 
 ## 参考实现
-demos/typewriter-moves/
+demos/typography/typewriter-moves/
 （TerminalTypewriter.tsx / TypewriterErrorRetype.tsx）

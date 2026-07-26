@@ -50,6 +50,6 @@ name: canvas-materialize-moves
   不然读作整屏 zoom
 
 ## 参考实现
-demos/canvas-materialize-moves/
+demos/interaction/canvas-materialize-moves/
 （DiagramCascadeBuild.tsx / PanelToCanvasMaterialize.tsx）
 原片出处：miro-promo 84–92s（A 式）/ 104–116s（B 式）

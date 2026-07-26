@@ -50,5 +50,5 @@ Vercel Ship/Stripe Sessions 指标段的标准语法。滚动过程自带悬念
   （sound-design §4.5），无声版成立但少一半爽感
 
 ## 参考实现
-demos/odometer-digit-roll/
+demos/data/odometer-digit-roll/
 （OdometerDigitRoll.tsx）

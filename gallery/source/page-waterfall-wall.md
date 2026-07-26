@@ -49,4 +49,4 @@ name: page-waterfall-wall
 
 ## 参考实现
 assets/lib/VerticalTicker.tsx（核心组件）；
-demo 见 demos/page-waterfall-wall/（PageWaterfallWall.tsx / VerticalTicker.tsx）。
+demo 见 demos/ui-entrance/page-waterfall-wall/（PageWaterfallWall.tsx / VerticalTicker.tsx）。

@@ -44,5 +44,5 @@ shot-transitions 六式和 transition-travel/hidden-cut 都把页面当"场景"
   运动淹没
 
 ## 参考实现
-demos/page-turn-transitions/
+demos/transition/page-turn-transitions/
 （BarnDoorSplit.tsx / CubeRotate.tsx）

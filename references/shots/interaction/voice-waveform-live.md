@@ -47,6 +47,6 @@ name: voice-waveform-live
 - 声音：本卡画面就是"声音的形状"，配人声最顺；提交钮一声轻 pop + 塌缩配短促下滑音
 
 ## 参考实现
-demos/voice-waveform-live/
+demos/interaction/voice-waveform-live/
 （VoiceWaveformLive.tsx）
 原片出处：raycast-teams 19.5–26.0s
