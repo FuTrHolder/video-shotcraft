@@ -47,3 +47,6 @@ logo 单瓣（多元素落位拼装）。观众看到的不是"logo 出现了"�
 demos/ui-to-brand-morph/
 （IconFlipBloomLogo.tsx / InputMorphsIntoLogo.tsx）
 原片出处：A perplexity-promo 88–91.5s / B slack-promo 40–41s
+
+实现状态：`icon-flip-bloom` 有样片；`input-morph-assemble` 有参考实现但缺少
+Gallery 动态预览，不得声称已按样片对照还原。

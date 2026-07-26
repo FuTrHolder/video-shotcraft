@@ -632,6 +632,33 @@ kbd { padding: 0.2rem 0.34rem; border: 1px solid var(--line); border-radius: 5px
   border-color: var(--accent);
 }
 
+.implementation-status {
+  /* was a grid cell inside .current-style, which this branch removed; now a
+     standalone badge over the demo's bottom-left, where it costs no card
+     height: appearing in the body flow made the card 29px taller than its
+     row-mates whenever a reference-only style was selected. */
+  position: absolute;
+  left: 0.5rem;
+  top: 0.5rem;
+  z-index: 2;
+  /* clears the fullscreen button (top-right) and the chip row (bottom) */
+  max-width: calc(100% - 4rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: fit-content;
+  padding: 0.16rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 0.7rem;
+  font-style: normal;
+  line-height: 1.25;
+}
+.implementation-status--reference-only { border-color: var(--danger); color: var(--danger); }
+.implementation-status--missing-preview { border-style: dashed; }
+
 .summary {
   display: -webkit-box;
   margin: 0.65rem 0 0;

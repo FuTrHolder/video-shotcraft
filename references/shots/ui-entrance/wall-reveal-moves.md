@@ -47,3 +47,7 @@ name: wall-reveal-moves
 ## 参考实现
 demos/wall-reveal-moves/
 （BentoLightUp.tsx）
+
+实现状态：`bento-light-up` 可按上述源码适配；`grid-wave-flip` 与
+`wireframe-draw-on` 仅供参考，需要自定义实现。二者不默认推荐，只有用户明确
+点名后才可基于本卡参数和 Gallery 样片制作，并在设计 spec 与终检中记录风险。

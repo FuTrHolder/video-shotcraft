@@ -84,6 +84,11 @@ const cardDescription = (card) => state.language === 'zh'
   ? card.summary || card.intention
   : translations.cardsEn[card.name] || card.name.split('-').join(' ');
 
+function implementationStatusLabel(style) {
+  if (style.implementationStatus === 'reference-only') return text('referenceOnly');
+  if (style.implementationStatus === 'missing-preview') return text('missingPreview');
+  return '';
+}
 
 
 function resolveTheme(choice = state.theme) {
@@ -129,12 +134,13 @@ function applyLanguage() {
 
 function mediaMarkup(style, cardIndex) {
   const title = escapeHtml(styleName(style));
+  const status = implementationStatusLabel(style);
   if (!style.media) {
     return `
       <div class="preview preview-missing">
         <span class="missing-glyph" aria-hidden="true"></span>
-        <p>${escapeHtml(text('noSample'))}</p>
-        <small>${escapeHtml(text('noSampleHint'))}</small>
+        <p>${escapeHtml(status || text('noSample'))}</p>
+        <small>${escapeHtml(status ? text('noSample') : text('noSampleHint'))}</small>
       </div>`;
   }
 
@@ -174,6 +180,7 @@ function cardMarkup(card, cardIndex) {
   const style = card.styles[selectedIndex];
   const encodedSource = card.source.split('/').map(encodeURIComponent).join('/');
   const sourceUrl = card.sourceUrl || `/source/${encodedSource}`;
+  const status = implementationStatusLabel(style);
   const title = cardName(card);
   const subtitle = state.language === 'zh' ? card.name : '';
 
@@ -187,6 +194,7 @@ function cardMarkup(card, cardIndex) {
     <article class="shot-card${isSelected ? ' is-selected' : ''}" id="${escapeHtml(card.name)}">
       <div class="card-media">
         ${mediaMarkup(style, cardIndex)}
+        ${status && style.media ? `<p class="implementation-status implementation-status--${escapeHtml(style.implementationStatus)}">${escapeHtml(status)}</p>` : ''}
         ${multiStyle ? styleSelectorMarkup(card, selectedIndex) : ''}
       </div>
       <div class="card-body">
