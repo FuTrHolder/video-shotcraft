@@ -1,7 +1,11 @@
 node_modules/
 out/qa/
+template/out/
+# 发帖用社交封面图等本地素材，不进 skill 安装包
+assets/images/
 .DS_Store
 .synapse/
 __pycache__/
 CLAUDE.md
 AGENT.md
+PRODUCT.md

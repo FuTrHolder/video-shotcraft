@@ -1,12 +1,18 @@
-# video-shotcraft 🎬
-
 <div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/brand/logo-mark-reverse.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/brand/logo-mark.svg">
+  <img alt="video-shotcraft logo" src="./assets/brand/logo-mark.svg" width="112" height="112">
+</picture>
+
+<h1>video-shotcraft</h1>
 
 [![GitHub stars](https://img.shields.io/github/stars/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/network/members)
 [![Gallery](https://img.shields.io/badge/Gallery-live%20previews-d3923c)](https://vincentwei1021.github.io/video-shotcraft/)
 
-**映画のような製品動画を制作するためのエージェントスキル：106 種類のショットレシピカード · 162 種類のスタイル · 161 本のモーションプレビュー · 実制作に対応したテンプレート**
+**映画のような製品動画を制作するためのエージェントスキル：104 種類のショットレシピカード · 161 種類のスタイル · 161 本のモーションプレビュー · 実制作に対応したテンプレート**
 
 [English](README.md) | [中文](README_CN.md) | [日本語](README_JA.md)
 
@@ -89,12 +95,29 @@ Use video-shotcraft to make a promo for my product with the Ink Press template.
 
 > 今後、さらに多くのテンプレートが追加される予定です。
 
+### Headless / CI に関する注意事項
+
+ヘッドレスの Linux サーバー（検証環境：2 コア、Node 22）でレンダリングする際、
+次の 3 つの問題に遭遇します。いずれもフラグ 1 つで解決できます。
+
+1. **並列数の上限** — 低コアのマシンでは `remotion still/render` が
+   "Maximum for --concurrency is 2" というエラーで失敗します。対処:
+   `--concurrency=1` を指定します。
+2. **旧 Headless モードの廃止** — 最近の Chrome/Chromium は旧 headless モードを
+   廃止したため、Remotion にシステムの chromium を指定すると起動に失敗します。
+   対処: フル版 Chrome ではなく chrome-headless-shell バイナリを使用します。
+3. **CDN への接続遮断** — remotion.media に到達できない環境では、
+   headless-shell の自動ダウンロードが失敗します。対処:
+   `--browser-executable=<ローカルの chrome-headless-shell のパス>` を指定します。
+
+この 3 つのフラグを設定すれば、同梱テンプレートのレンダリングが動作します。
+
 ## 📦 収録内容
 
 | 内容 | 説明 |
 | --- | --- |
-| 106 種類のショットレシピカード | 目的、エネルギー、推奨時間、パラメータ、実装上の注意点、既知の落とし穴 |
-| 161 本のモーションプレビュー | 162 種類のスタイルを網羅し、オンライン Gallery で検索と絞り込みが可能 |
+| 104 種類のショットレシピカード | 目的、エネルギー、推奨時間、パラメータ、実装上の注意点、既知の落とし穴 |
+| 161 本のモーションプレビュー | 161 種類のスタイルを網羅し、オンライン Gallery で検索と絞り込みが可能 |
 | Remotion 実装 | 各カードの実際のイージングとタイミングパラメータを含む、調整済みの TSX デモ |
 | 完全な動画テンプレート | 検証済みの 36.2 秒、1920×1080、30fps、10 ショットの製品プロモーション |
 | コンポーネントとアセット | 2.5D ページカメラ、キャプション、フラッシュカット、数字ロール、SFX、キャプチャスクリプト |
@@ -111,7 +134,7 @@ video-shotcraft/
 ├── SKILL.md                 # Agent entry point and core production rules
 ├── references/
 │   ├── pipeline.md          # End-to-end production workflow
-│   ├── shots/               # 106 shot recipe cards
+│   ├── shots/               # 104 shot recipe cards
 │   ├── sequences/           # Reusable full-video structures and sequence patterns
 │   ├── aesthetic-rules.md   # Visual QA criteria
 │   ├── music-beat-sync.md   # BGM analysis and beat-sync methodology

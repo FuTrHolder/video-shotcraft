@@ -16,7 +16,7 @@
 
 | # | 帧区间 | 时长 | 场景文件 | 内容 | 对应镜头卡 |
 |---|--------|------|----------|------|-----------|
-| 1 | 0–220 | 7.3s | live/SceneOpen.tsx | 墨线描画+字标压印开场 → dashboard 全景 → 聚光主角卡（悬浮+光束扫+归位） | brand-ink-open / spotlight-hero-card / hires-rasterize-3d-text |
+| 1 | 0–220 | 7.3s | live/SceneOpen.tsx | 墨线描画+字标压印开场 → dashboard 全景 → 聚光主角卡（悬浮+光束扫+归位） | brand-ink-open / spotlight-hero-card（高清栅格化技法见审美准则 Q2） |
 | 2 | 220–275 | 1.8s | PaperTitleCard.tsx | 字卡①"All your team's research, one place to go." | paper-title-card |
 | 3 | 275–465 | 6.3s | live/SceneFlyIn.tsx | 牌堆特写环绕 → 发牌飞入网格 → 滚动 → 搜索打字 → 筛选 → 点击推近 | deck-deal-flyin / type-and-filter |
 | 4 | 465–565 | 3.3s | live/SceneDetail.tsx | 详情页宏观特写，行元素逐条嵌入 | row-embed |
@@ -37,7 +37,7 @@
 
 | 文件 | 作用 | 关键点 |
 |------|------|--------|
-| live/PageCam.tsx | 2.5D 页面相机——一切"真实页面"镜头的地基 | 整页截图 + 关键帧 `{frame,cx,cy,zoom,rotX/Y/Z,persp}` 插值运镜；children 按页面 CSS px 定位（与 layout.json 同坐标系）；**3D 模式用 CSS `zoom` 做布局级放大**（transform scale 会先降采样再放大导致文字糊——hires-rasterize-3d-text 卡的根治法）；可选 dof 顶部渐变糊带 |
+| live/PageCam.tsx | 2.5D 页面相机——一切"真实页面"镜头的地基 | 整页截图 + 关键帧 `{frame,cx,cy,zoom,rotX/Y/Z,persp}` 插值运镜；children 按页面 CSS px 定位（与 layout.json 同坐标系）；**3D 模式用 CSS `zoom` 做布局级放大**（transform scale 会先降采样再放大导致文字糊——根治法详见审美准则 Q2）；可选 dof 顶部渐变糊带 |
 | PaperTitleCard.tsx | 字卡呼吸位 | 衬线大字逐词入场，accent 词琥珀色；可挂 DigitRoll 数字子标 |
 | FlashCut.tsx | 暖白闪转场 | 只盖硬切两侧 10f，不当装饰光效 |
 | Caption.tsx | 底部通栏解说 | 等宽小字+字距，入出场各带轻推 |

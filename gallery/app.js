@@ -17,13 +17,21 @@ const savedTheme = (() => {
   }
 })();
 
+const initialCategory = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get('cat') || 'all';
+  } catch {
+    return 'all';
+  }
+})();
+
 const state = {
   library: null,
   query: '',
-  filter: 'all',
+  filter: initialCategory,
   revision: '',
   hasLoaded: false,
-    language: savedLanguage === 'zh' ? 'zh' : 'en',
+  language: savedLanguage === 'zh' ? 'zh' : 'en',
   theme: savedTheme,
   selectedStyles: {},
   selectedCards: new Set(),
@@ -58,6 +66,14 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character)
 }[character]));
 
 const text = (key) => translations.ui[state.language][key] || key;
+const CATEGORY_ORDER = [
+  'opening', 'typography', 'ui-entrance', 'camera', 'data',
+  'interaction', 'transition', 'rhythm', 'effects', 'outro',
+];
+const categoryName = (key) => {
+  const labels = state.library?.categories?.[key];
+  return labels ? labels[state.language] || labels.en : key;
+};
 const cardName = (card) => state.language === 'zh'
   ? translations.cardsZh[card.name] || card.name
   : card.name;
@@ -74,29 +90,6 @@ function implementationStatusLabel(style) {
   return '';
 }
 
-function durationText(value = '') {
-  if (state.language === 'zh' || !value) return value || '-';
-  if (/^n\/a/i.test(value)) return 'N/A';
-  const normalized = value.replace(/[—–]/g, '-');
-  const seconds = normalized.match(/~?\s*\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?s/i)?.[0]?.replace(/\s/g, '');
-  const frames = normalized.match(/[≥~]?\s*\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?f/i)?.[0]?.replace(/\s/g, '');
-  if (seconds && frames) return `${seconds.startsWith('~') ? '' : '~'}${seconds} (${frames})`;
-  return seconds || frames || 'Technique';
-}
-
-function energyText(value = '') {
-  if (state.language === 'zh' || !value) return value || '-';
-  if (/^n\/a/i.test(value)) return 'N/A';
-  if (value.includes('峰值')) return 'Peak';
-  if (value.includes('低开缓升')) return 'Low to medium';
-  if (value.includes('高开中收')) return 'High to medium';
-  if (value.includes('中高')) return 'Medium-high';
-  if (value.includes('低中') || value.includes('中低')) return 'Low-medium';
-  if (value.includes('高')) return 'High';
-  if (value.includes('中')) return 'Medium';
-  if (value.includes('低')) return 'Low';
-  return 'Variable';
-}
 
 function resolveTheme(choice = state.theme) {
   if (choice !== 'system') return choice;
@@ -162,15 +155,16 @@ function mediaMarkup(style, cardIndex) {
     <figure class="preview">
       <video class="lazy-media" data-src="${style.media.url}" muted loop playsinline preload="none"
         aria-label="${title}" data-key="${cardIndex}"></video>
-      <button class="video-toggle" type="button" aria-label="${escapeHtml(text('pause'))} ${title}" data-video-key="${cardIndex}">
-        <span aria-hidden="true"></span>
+      <button class="video-expand" type="button" aria-label="${escapeHtml(text('fullscreen'))} ${title}"
+        data-expand-key="${cardIndex}" title="${escapeHtml(text('fullscreen'))}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H5a1 1 0 0 0-1 1v4M15 4h4a1 1 0 0 1 1 1v4M9 20H5a1 1 0 0 1-1-1v-4M15 20h4a1 1 0 0 0 1-1v-4"/></svg>
       </button>
     </figure>`;
 }
 
 function styleSelectorMarkup(card, selectedIndex) {
   return `
-    <div class="style-selector" role="group" aria-label="${escapeHtml(text('style'))}">
+    <div class="style-selector" role="group" aria-label="${escapeHtml(text('style'))}: ${escapeHtml(card.name)}">
       ${card.styles.map((style, index) => `
         <button type="button" class="style-option${index === selectedIndex ? ' is-active' : ''}"
           data-card-name="${escapeHtml(card.name)}" data-style-index="${index}"
@@ -186,47 +180,41 @@ function cardMarkup(card, cardIndex) {
   const style = card.styles[selectedIndex];
   const encodedSource = card.source.split('/').map(encodeURIComponent).join('/');
   const sourceUrl = card.sourceUrl || `/source/${encodedSource}`;
-  const previewed = card.styles.filter((item) => item.media).length;
   const status = implementationStatusLabel(style);
   const title = cardName(card);
   const subtitle = state.language === 'zh' ? card.name : '';
 
   const isSelected = state.selectedCards.has(card.name);
 
+  // 单式卡的 style 名等于卡名，重复第三遍没有信息量；多式卡才需要
+  // "STYLE 0n + 名称" 这一行来说明当前看的是哪一式
+  const multiStyle = card.styles.length > 1;
+
   return `
     <article class="shot-card${isSelected ? ' is-selected' : ''}" id="${escapeHtml(card.name)}">
-      ${mediaMarkup(style, cardIndex)}
+      <div class="card-media">
+        ${mediaMarkup(style, cardIndex)}
+        ${status && style.media ? `<p class="implementation-status implementation-status--${escapeHtml(style.implementationStatus)}">${escapeHtml(status)}</p>` : ''}
+        ${multiStyle ? styleSelectorMarkup(card, selectedIndex) : ''}
+      </div>
       <div class="card-body">
         <div class="card-title-row">
           <div class="card-title">
-            <h2>${escapeHtml(title)}</h2>
+            <h3>${escapeHtml(title)}</h3>
             ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
           </div>
-          <div class="card-actions">
-            <button type="button" class="select-button${isSelected ? ' is-selected' : ''}" data-select-name="${escapeHtml(card.name)}"
-              aria-pressed="${isSelected}" aria-label="${escapeHtml(text('select'))} ${escapeHtml(card.name)}">
-              <span class="select-check" aria-hidden="true"></span>${escapeHtml(isSelected ? text('selected') : text('select'))}
-            </button>
-            <button type="button" class="copy-button" data-copy-name="${escapeHtml(card.name)}" aria-label="${escapeHtml(text('copy'))} ${escapeHtml(card.name)}">${escapeHtml(text('copy'))}</button>
-            <a class="source-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(text('source'))}</a>
-          </div>
-        </div>
-
-        <div class="current-style">
-          <span>${escapeHtml(text('style'))} ${String(selectedIndex + 1).padStart(2, '0')}</span>
-          <strong>${escapeHtml(styleName(style))}</strong>
-          ${state.language === 'zh' ? `<code>${escapeHtml(style.key)}</code>` : ''}
-          ${status ? `<em class="implementation-status implementation-status--${escapeHtml(style.implementationStatus)}">${escapeHtml(status)}</em>` : ''}
         </div>
 
         <p class="summary">${escapeHtml(cardDescription(card))}</p>
-        ${styleSelectorMarkup(card, selectedIndex)}
 
-        <dl class="card-meta">
-          <div><dt>${escapeHtml(text('duration'))}</dt><dd>${escapeHtml(durationText(card.duration))}</dd></div>
-          <div><dt>${escapeHtml(text('energy'))}</dt><dd>${escapeHtml(energyText(card.energy))}</dd></div>
-          <div><dt>${escapeHtml(text('sample'))}</dt><dd>${previewed}/${card.styles.length}</dd></div>
-        </dl>
+        <div class="card-actions">
+          <button type="button" class="select-button${isSelected ? ' is-selected' : ''}" data-select-name="${escapeHtml(card.name)}"
+            aria-pressed="${isSelected}" aria-label="${escapeHtml(text('select'))} ${escapeHtml(card.name)}">
+            <span class="select-check" aria-hidden="true"></span>${escapeHtml(isSelected ? text('selected') : text('select'))}
+          </button>
+          <button type="button" class="copy-button" data-copy-name="${escapeHtml(card.name)}" aria-label="${escapeHtml(text('copy'))} ${escapeHtml(card.name)}">${escapeHtml(text('copy'))}</button>
+          <a class="source-link" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(text('source'))}</a>
+        </div>
       </div>
     </article>`;
 }
@@ -251,20 +239,63 @@ function cardMatches(card) {
   ].join(' ').toLowerCase();
 
   if (state.query && !searchable.includes(state.query.toLowerCase())) return false;
-  const energy = card.energy || '';
-  if (state.filter === 'high' && !energy.includes('高')) return false;
-  if (state.filter === 'medium' && !energy.includes('中')) return false;
-  if (state.filter === 'low' && !energy.includes('低')) return false;
   if (state.filter === 'missing' && card.styles.every((style) => style.media)) return false;
+  if (state.filter !== 'all' && state.filter !== 'missing' && card.category !== state.filter) return false;
   return true;
+}
+
+// 整个网格是 innerHTML 重建的，重建后 activeElement 会掉回 body。
+// 记下焦点元素的"身份"（卡名 + 角色），重建后按同一身份找回来，
+// 否则键盘用户每点一次就被扔回文档顶部。
+function captureFocus() {
+  const el = document.activeElement;
+  if (!el || !elements.library.contains(el)) return null;
+  const card = el.closest('.shot-card');
+  if (!card) return null;
+  const role = el.dataset.selectName ? 'select'
+    : el.dataset.copyName ? 'copy'
+    : el.dataset.styleIndex !== undefined ? `style-${el.dataset.styleIndex}`
+    : el.classList.contains('source-link') ? 'source'
+    : null;
+  return role ? {card: card.id, role} : null;
+}
+
+function restoreFocus(mark) {
+  if (!mark) return;
+  const card = document.getElementById(mark.card);
+  if (!card) return;
+  const selector = mark.role === 'select' ? '[data-select-name]'
+    : mark.role === 'copy' ? '[data-copy-name]'
+    : mark.role === 'source' ? '.source-link'
+    : `[data-style-index="${mark.role.slice(6)}"]`;
+  card.querySelector(selector)?.focus({preventScroll: true});
 }
 
 function render() {
   if (!state.library) return;
+  const focusMark = captureFocus();
   const cards = state.library.cards.filter(cardMatches);
-  elements.library.innerHTML = cards.map(cardMarkup).join('');
+  // 按功能类别分组渲染；单一类别筛选时不重复出该类标题
+  const groups = new Map();
+  cards.forEach((card) => {
+    const key = card.category || 'other';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(card);
+  });
+  const orderedKeys = [...CATEGORY_ORDER.filter((key) => groups.has(key)),
+    ...[...groups.keys()].filter((key) => !CATEGORY_ORDER.includes(key))];
+  let cardIndex = 0;
+  const showHeadings = state.filter === 'all' || state.filter === 'missing';
+  elements.library.innerHTML = orderedKeys.map((key) => {
+    const heading = showHeadings
+      ? `<h2 class="category-heading" id="category-${escapeHtml(key)}">${escapeHtml(categoryName(key))}<span>${groups.get(key).length}</span></h2>`
+      : '';
+    const body = groups.get(key).map((card) => cardMarkup(card, cardIndex++)).join('');
+    return `${heading}${body}`;
+  }).join('');
   elements.library.setAttribute('aria-busy', 'false');
   elements.emptyState.hidden = cards.length > 0;
+  restoreFocus(focusMark);
   observeMedia();
 }
 
@@ -297,6 +328,8 @@ function setSyncStatus(mode, label) {
 let toastTimer;
 function showToast(message) {
   elements.toast.textContent = message;
+  // 选择条占着底部中央；有它在场时 toast 上移，别盖住刚点的按钮
+  elements.toast.classList.toggle('has-selection-bar', !elements.selectionBar.hidden);
   elements.toast.classList.add('is-visible');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => elements.toast.classList.remove('is-visible'), 2600);
@@ -316,6 +349,7 @@ async function loadLibrary({silent = false} = {}) {
     elements.cardCount.textContent = library.stats.cardCount;
     elements.styleCount.textContent = library.stats.styleCount;
     elements.previewCount.textContent = library.stats.previewCount;
+    renderCategoryCounts();
     setSyncStatus('ready', text('synced'));
     if (changed) {
       render();
@@ -337,9 +371,34 @@ async function loadLibrary({silent = false} = {}) {
   }
 }
 
+function renderCategoryCounts() {
+  if (!state.library) return;
+  const counts = {all: state.library.cards.length};
+  state.library.cards.forEach((card) => {
+    counts[card.category] = (counts[card.category] || 0) + 1;
+  });
+  elements.filters.querySelectorAll('[data-filter]').forEach((button) => {
+    const key = button.dataset.filter;
+    if (key === 'missing') return;
+    let badge = button.querySelector('.count');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'count';
+      button.append(badge);
+    }
+    badge.textContent = counts[key] ?? 0;
+  });
+}
+
+// 104 张卡全量重建，每个按键都重排一次太贵；120ms 防抖
+let searchTimer;
 elements.searchInput.addEventListener('input', (event) => {
-  state.query = event.target.value.trim();
-  render();
+  const value = event.target.value.trim();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    state.query = value;
+    render();
+  }, 120);
 });
 
 elements.filters.addEventListener('click', (event) => {
@@ -411,6 +470,7 @@ const copyCardName = (cardName) => copyText(cardCopyValue(cardName));
 function updateSelectionBar() {
   const count = state.selectedCards.size;
   elements.selectionBar.hidden = count === 0;
+  elements.toast.classList.toggle('has-selection-bar', count > 0);
   elements.selectionCount.textContent = text('selectedCount').replace('{n}', count);
   elements.copySelected.textContent = text('copySelected');
   elements.clearSelected.textContent = text('clearSelected');
@@ -436,6 +496,44 @@ function copySelectedCards() {
   copyText(value, text('selectedCount').replace('{n}', ordered.length));
 }
 
+// 全屏放大单支样片。优先原生 Fullscreen API（能真全屏、Esc 原生退出）；
+// iOS Safari 不支持元素全屏，退化成 webkitEnterFullscreen（视频原生播放器）。
+function openFullscreen(key) {
+  const video = document.querySelector(`video[data-key="${key}"]`);
+  if (!video) return;
+  if (!video.src && video.dataset.src) video.src = video.dataset.src;
+  const stage = video.closest('.preview');
+
+  if (stage?.requestFullscreen) {
+    // native controls only while fullscreen: the card itself has no pause
+    // button, so this is the one place a viewer needs scrub/pause
+    stage.requestFullscreen().then(() => {
+      video.controls = true;
+      video.play().catch(() => {});
+    }).catch(() => {});
+    return;
+  }
+  if (video.webkitEnterFullscreen) {
+    // iOS: 原生播放器需要非 muted 之外的手势上下文，直接进即可
+    video.play().catch(() => {});
+    video.webkitEnterFullscreen();
+    return;
+  }
+  // 兜底：没有任何全屏能力时，至少把这支放到视口中央播放
+  stage?.scrollIntoView({block: 'center'});
+  video.play().catch(() => {});
+}
+
+// 全屏态下 object-fit: cover 会裁掉画面；标记出来让 CSS 改成 contain
+document.addEventListener('fullscreenchange', () => {
+  document.querySelectorAll('.preview.is-fullscreen').forEach((el) => {
+    el.classList.remove('is-fullscreen');
+    const video = el.querySelector('video');
+    if (video) video.controls = false;
+  });
+  document.fullscreenElement?.classList.add('is-fullscreen');
+});
+
 elements.library.addEventListener('click', (event) => {
   const selectButton = event.target.closest('[data-select-name]');
   if (selectButton) {
@@ -456,20 +554,12 @@ elements.library.addEventListener('click', (event) => {
     return;
   }
 
-  const toggle = event.target.closest('.video-toggle');
-  if (!toggle) return;
-  const video = document.querySelector(`video[data-key="${toggle.dataset.videoKey}"]`);
-  if (!video) return;
-  if (!video.src && video.dataset.src) video.src = video.dataset.src;
-  if (video.paused) {
-    video.play().catch(() => {});
-    toggle.setAttribute('aria-label', toggle.getAttribute('aria-label').replace(text('play'), text('pause')));
-    toggle.classList.remove('is-paused');
-  } else {
-    video.pause();
-    toggle.setAttribute('aria-label', toggle.getAttribute('aria-label').replace(text('pause'), text('play')));
-    toggle.classList.add('is-paused');
+  const expand = event.target.closest('[data-expand-key]');
+  if (expand) {
+    openFullscreen(expand.dataset.expandKey);
+    return;
   }
+
 });
 
 elements.copySelected.addEventListener('click', copySelectedCards);
@@ -480,6 +570,7 @@ elements.clearSelected.addEventListener('click', () => {
 });
 
 elements.clearFilters.addEventListener('click', () => {
+  clearTimeout(searchTimer);
   state.query = '';
   state.filter = 'all';
   elements.searchInput.value = '';
@@ -497,6 +588,7 @@ document.addEventListener('keydown', (event) => {
     elements.searchInput.focus();
   }
   if (event.key === 'Escape' && document.activeElement === elements.searchInput) {
+    clearTimeout(searchTimer);
     elements.searchInput.value = '';
     state.query = '';
     render();
@@ -512,6 +604,13 @@ function showLoadingCards() {
   }
 }
 
+if (state.filter !== 'all') {
+  elements.filters.querySelectorAll('[data-filter]').forEach((item) => {
+    const active = item.dataset.filter === state.filter;
+    item.classList.toggle('is-active', active);
+    item.setAttribute('aria-pressed', String(active));
+  });
+}
 applyLanguage();
 showLoadingCards();
 loadLibrary();

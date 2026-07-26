@@ -6,6 +6,7 @@ Run from repo root after editing any card:  python3 gallery/sync-from-cards.py
 import json
 import re
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,7 +19,6 @@ LIB = ROOT / 'gallery' / 'api' / 'library.json'
 STYLE_STATUS = {
     ('wall-reveal-moves', 'grid-wave-flip'): 'reference-only',
     ('wall-reveal-moves', 'wireframe-draw-on'): 'reference-only',
-    ('ui-to-brand-morph', 'input-morph-assemble'): 'missing-preview',
 }
 
 
@@ -36,16 +36,42 @@ def parse_card(path):
     return fm, intention
 
 
-def main():
-    cards = {p.stem: p for p in SHOTS.glob('*.md')}
+# 功能类别（目录名 → 中/英标签）；references/shots/<类别>/<卡名>.md
+CATEGORIES = {
+    'opening': {'zh': '开场与品牌', 'en': 'Opening & Brand'},
+    'typography': {'zh': '文字与字卡', 'en': 'Typography & Title Cards'},
+    'ui-entrance': {'zh': '界面登场与陈列', 'en': 'UI Entrance & Showcase'},
+    'camera': {'zh': '运镜与空间', 'en': 'Camera & Space'},
+    'data': {'zh': '数据与指标', 'en': 'Data & Metrics'},
+    'interaction': {'zh': '交互与功能演示', 'en': 'Interaction & Feature Demo'},
+    'transition': {'zh': '转场', 'en': 'Transitions'},
+    'rhythm': {'zh': '节奏与蒙太奇', 'en': 'Rhythm & Montage'},
+    'effects': {'zh': '光效与强调', 'en': 'Light & Emphasis'},
+    'outro': {'zh': '收尾', 'en': 'Outro'},
+}
 
-    # 1. refresh gallery/source copies (drop copies whose card no longer exists)
+
+def main():
+    cards = {p.stem: p for p in SHOTS.glob('*/*.md')}
+    card_category = {p.stem: p.parent.name for p in SHOTS.glob('*/*.md')}
+    unknown = sorted(set(card_category.values()) - set(CATEGORIES))
+    if unknown:
+        raise SystemExit(f'unknown category folders: {unknown} (add to CATEGORIES)')
+
+    # 1. refresh gallery/source copies (drop copies whose card no longer exists).
+    # A copy that differs from its card means the card was edited since the last
+    # sync — bump that card's updatedAt so stats.newest / sitemap lastmod move.
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+    touched = set()
     for old in SOURCE.glob('*.md'):
         if old.stem not in cards:
             old.unlink()
             print(f'removed stale copy: {old.name}')
     for name, p in cards.items():
-        shutil.copyfile(p, SOURCE / p.name)
+        copy = SOURCE / p.name
+        if not copy.exists() or copy.read_bytes() != p.read_bytes():
+            touched.add(name)
+        shutil.copyfile(p, copy)
 
     # 2. refresh library.json text fields
     lib = json.loads(LIB.read_text(encoding='utf-8'))
@@ -66,6 +92,10 @@ def main():
             card['energy'] = fm['能量']
         if intention:
             card['intention'] = intention
+        card['category'] = card_category[card['name']]
+        card['source'] = f"references/shots/{card['category']}/{card['name']}.md"
+        if card['name'] in touched:
+            card['updatedAt'] = now
         if len(card.get('styles', [])) == 1:
             card['styles'][0]['description'] = card['summary']
         for style in card.get('styles', []):
@@ -74,8 +104,19 @@ def main():
                 style['implementationStatus'] = status
             else:
                 style.pop('implementationStatus', None)
+    lib['categories'] = CATEGORIES
+
+    # stats are the single source of truth every page and llms.txt reads;
+    # recompute from the cards rather than trusting whatever was there
+    styles = [style for card in lib['cards'] for style in card['styles']]
+    lib['stats']['cardCount'] = len(lib['cards'])
+    lib['stats']['styleCount'] = len(styles)
+    lib['stats']['previewCount'] = sum(1 for style in styles if style.get('media'))
+    lib['stats']['mediaCount'] = lib['stats']['previewCount']
+    lib['stats']['newest'] = max(card['updatedAt'] for card in lib['cards'])
     LIB.write_text(json.dumps(lib, ensure_ascii=False) + '\n', encoding='utf-8')
-    print(f"synced {len(lib['cards'])} cards; missing card files: {missing or 'none'}")
+    print(f"synced {len(lib['cards'])} cards ({lib['stats']['styleCount']} styles, "
+          f"{lib['stats']['previewCount']} previews); missing card files: {missing or 'none'}")
 
 
 if __name__ == '__main__':

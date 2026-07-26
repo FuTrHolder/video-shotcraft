@@ -3,30 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="dark">
   <meta name="google-site-verification" content="Qu8vMAC99goV9xnwf_0ZlGGimtmj24TWFNVUiTz2mhM">
-  <meta name="description" content="video-shotcraft is an AI agent skill for Claude Code &amp; Codex that makes cinematic product promo videos with Remotion. Browse 106 shot recipe cards and 161 motion previews.">
+  <meta name="description" content="video-shotcraft is an AI agent skill for Claude Code &amp; Codex that makes cinematic product promo videos with Remotion. 104 shot recipe cards organized by function, tuned demos, and a production-ready template.">
   <link rel="canonical" href="https://vincentwei1021.github.io/video-shotcraft/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="video-shotcraft">
   <meta property="og:title" content="video-shotcraft — AI Video Skill for Claude Code &amp; Codex">
-  <meta property="og:description" content="An agent skill for crafting cinematic product videos with Remotion: 106 shot recipe cards, 161 motion previews, and a production-ready promo template.">
+  <meta property="og:description" content="An agent skill for crafting cinematic product videos with Remotion: 104 shot recipe cards, 161 motion previews, and a production-ready promo template.">
   <meta property="og:url" content="https://vincentwei1021.github.io/video-shotcraft/">
-  <meta property="og:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.png">
+  <meta property="og:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.jpg?v=20260726b">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="video-shotcraft Gallery — shot recipes and motion samples">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="video-shotcraft — AI Video Skill for Claude Code &amp; Codex">
-  <meta name="twitter:description" content="An agent skill for crafting cinematic product videos with Remotion: 106 shot recipe cards, 161 motion previews, and a production-ready promo template.">
-  <meta name="twitter:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.png">
-  <link rel="icon" href="data:,">
-  <title>video-shotcraft — AI Video Skill for Claude Code &amp; Codex | Remotion Shot Library</title>
+  <meta name="twitter:description" content="An agent skill for crafting cinematic product videos with Remotion: 104 shot recipe cards, 161 motion previews, and a production-ready promo template.">
+  <meta name="twitter:image" content="https://vincentwei1021.github.io/video-shotcraft/og-image.jpg?v=20260726b">
+  <link rel="icon" href="./logo-mark.svg" type="image/svg+xml">
+  <title>video-shotcraft — AI Video Skill for Claude Code &amp; Codex | Cinematic Product Videos with Remotion</title>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "video-shotcraft",
-    "description": "An AI agent skill for Claude Code and Codex that crafts cinematic product promo videos with Remotion: 106 shot recipe cards, 162 styles, 161 motion previews, and a production-ready 36.2-second video template.",
+    "description": "An AI agent skill for Claude Code and Codex that crafts cinematic product promo videos with Remotion: 104 shot recipe cards organized by function, 161 styles, 161 motion previews, and a production-ready 36.2-second video template.",
     "url": "https://vincentwei1021.github.io/video-shotcraft/",
     "sameAs": ["https://github.com/Vincentwei1021/video-shotcraft"],
     "applicationCategory": "MultimediaApplication",
@@ -37,630 +38,494 @@
     "author": {"@type": "Person", "name": "Wei Yihao", "url": "https://github.com/Vincentwei1021"}
   }
   </script>
-  <script>
-    try {
-      const choice = localStorage.getItem('video-shot-gallery-theme') || 'system';
-      const theme = choice === 'system'
-        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-        : choice;
-      document.documentElement.dataset.theme = theme;
-      document.documentElement.dataset.themeChoice = choice;
-      document.documentElement.style.colorScheme = theme;
-    } catch {}
-  </script>
-  <link rel="stylesheet" href="./styles.css">
-  <script src="./translations.js" defer></script>
-  <script src="./app.js" defer></script>
+  <style>
+    :root {
+      --bg: #0e0e0c;
+      --text: #f0ede5;
+      --muted: #b5b0a5;
+      --line: rgba(240, 237, 229, 0.16);
+      --accent: #d3923c;
+      --accent-ink: #241607;
+      font-family: "Avenir Next", Avenir, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+    button, a { -webkit-tap-highlight-color: transparent; }
+
+    /* ---- full-screen motion wall ---- */
+    .wall {
+      position: fixed;
+      inset: -2vh -2vw;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 10px;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .wall-tile {
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #14130f;
+    }
+    /* poster carries the wall until the clip is decoded: 140KB of stills
+       stands in for 8MB of video, so the grid is never empty */
+    .wall-tile img,
+    .wall-tile video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .wall-tile video {
+      opacity: 0;
+      transition: opacity 900ms ease;
+    }
+    .wall-tile video.is-on { opacity: 1; }
+
+    /* dim + vignette so type stays readable */
+    .scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at center, rgba(14, 14, 12, 0.42) 0%, rgba(14, 14, 12, 0.62) 68%, rgba(14, 14, 12, 0.8) 100%),
+        linear-gradient(180deg, rgba(14, 14, 12, 0.55) 0%, rgba(14, 14, 12, 0.26) 30%, rgba(14, 14, 12, 0.26) 70%, rgba(14, 14, 12, 0.66) 100%);
+    }
+
+    /* ---- top bar ---- */
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.1rem clamp(16px, 3vw, 40px);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      font-size: 1.22rem;
+    }
+    .brand-mark {
+      display: block;
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+    }
+    .language-switch {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(14, 14, 12, 0.35);
+    }
+    .language-switch button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.8rem;
+      padding: 0.38rem 0.85rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .language-switch button.is-active { color: var(--text); font-weight: 700; background: rgba(240, 237, 229, 0.1); }
+
+    /* ---- hero ---- */
+    .hero {
+      position: relative;
+      z-index: 2;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0 24px;
+    }
+    .hero-kicker {
+      margin: 0 0 1.3rem;
+      font-size: clamp(0.72rem, 1.1vw, 0.85rem);
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8);
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2.2rem, 5.6vw, 4.2rem);
+      line-height: 1.14;
+      letter-spacing: -0.02em;
+      font-weight: 800;
+      max-width: 21ch;
+      text-shadow: 0 4px 40px rgba(0, 0, 0, 0.9), 0 1px 10px rgba(0, 0, 0, 0.7);
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+    .hero-sub {
+      margin: 1.5rem 0 0;
+      max-width: 56ch;
+      font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+      line-height: 1.7;
+      color: var(--text);
+      opacity: 0.82;
+      text-shadow: 0 2px 20px rgba(0, 0, 0, 0.85);
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 2.6rem;
+    }
+    .button-primary,
+    .button-github {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      min-width: clamp(240px, 24vw, 300px);
+      height: clamp(58px, 6.4vh, 66px);
+      padding: 0 2.2rem;
+      border-radius: 999px;
+      font-weight: 750;
+      font-size: clamp(1.18rem, 1.8vw, 1.4rem);
+      text-decoration: none;
+      transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+    }
+    .button-primary {
+      background: var(--accent);
+      color: var(--accent-ink);
+      box-shadow: 0 10px 38px rgba(211, 146, 60, 0.4);
+    }
+    .button-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(211, 146, 60, 0.55); }
+    .button-github {
+      position: relative;
+      border: 1px solid rgba(240, 237, 229, 0.35);
+      color: var(--text);
+      background: rgba(14, 14, 12, 0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .button-github:hover { transform: translateY(-2px); background: rgba(240, 237, 229, 0.12); }
+    .button-github svg { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
+    .star-glyph { color: var(--accent); }
+    /* star count: floating badge, only revealed on hover/focus */
+    .star-count {
+      position: absolute;
+      top: -0.85rem;
+      right: 0.9rem;
+      padding: 0.18rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid rgba(211, 146, 60, 0.5);
+      background: rgba(14, 14, 12, 0.92);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 160ms ease, transform 160ms ease;
+      pointer-events: none;
+    }
+    .star-count::before { content: "★ "; }
+    .button-github:hover .star-count:not(:empty),
+    .button-github:focus-visible .star-count:not(:empty) {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: clamp(1.4rem, 4vw, 3rem);
+      margin: 3rem 0 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.8);
+    }
+    .hero-stats strong {
+      display: block;
+      font-size: clamp(1.3rem, 2.4vw, 1.8rem);
+      font-weight: 800;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .hero-foot {
+      position: fixed;
+      bottom: 1.1rem;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      text-align: center;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      color: rgba(181, 176, 165, 0.7);
+    }
+    .hero-foot a { color: inherit; text-decoration: none; }
+    .hero-foot a:hover { color: var(--text); }
+
+    /* ---- Chinese typography tuning ---- */
+    html[lang="zh-CN"] .hero h1 {
+      letter-spacing: 0.04em;
+      line-height: 1.32;
+      font-weight: 750;
+    }
+    html[lang="zh-CN"] .hero h1 em { padding: 0 0.06em; }
+    html[lang="zh-CN"] .hero-kicker { letter-spacing: 0.3em; }
+    html[lang="zh-CN"] .hero-sub {
+      max-width: 34em;
+      letter-spacing: 0.03em;
+      line-height: 1.9;
+      text-wrap: balance;
+    }
+    html[lang="zh-CN"] .button-primary,
+    html[lang="zh-CN"] .button-github { letter-spacing: 0.08em; }
+    html[lang="zh-CN"] .hero-stats span { letter-spacing: 0.06em; }
+
+    @media (max-width: 900px) {
+      .wall { grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(6, 1fr); }
+    }
+    @media (max-width: 620px) {
+      .wall { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(8, 1fr); }
+      .hero-actions { flex-direction: column; width: 100%; max-width: 340px; }
+      .button-primary, .button-github { justify-content: center; }
+      /* the enlarged wordmark plus the language switch overflow a 390px bar */
+      .brand { font-size: 0.85rem; letter-spacing: 0.08em; }
+      .brand-mark { width: 28px; height: 28px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .wall-tile video { transition: none; }
+      .button-primary:hover, .button-github:hover { transform: none; }
+    }
+
+    /* amber ring, not the browser's default blue against an amber system */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    .button-primary:focus-visible,
+    .button-github:focus-visible { outline-offset: 4px; }
+  </style>
 </head>
 <body>
-  <a class="skip-link" href="#library" data-i18n="skip">Skip to shot library</a>
+  <div class="wall" id="wall" aria-hidden="true"></div>
+  <div class="scrim" aria-hidden="true"></div>
+
   <header class="topbar">
-    <a class="brand" href="#" aria-label="Back to top" data-i18n-aria-label="brandHome">
-      <span class="brand-mark" aria-hidden="true"></span>
+    <a class="brand" href="./" aria-label="video-shotcraft home">
+      <img class="brand-mark" src="./logo-mark-reverse.svg" alt="" width="24" height="24" aria-hidden="true">
       <span>VIDEO SHOTCRAFT</span>
     </a>
-    <div class="topbar-actions">
-      <div class="theme-switch" id="themeSwitch" role="group" aria-label="Page theme">
-        <button type="button" data-theme="system" aria-pressed="true">Auto</button>
-        <button type="button" data-theme="light" aria-pressed="false">Light</button>
-        <button type="button" data-theme="dark" aria-pressed="false">Dark</button>
-      </div>
-      <div class="language-switch" id="languageSwitch" role="group" aria-label="Language">
-        <button type="button" data-language="zh" aria-pressed="false">中文</button>
-        <button type="button" data-language="en" aria-pressed="true">EN</button>
-      </div>
-      <div class="sync-status" id="syncStatus" aria-live="polite">
-        <span class="sync-indicator" aria-hidden="true"></span>
-        <span>Scanning</span>
-      </div>
-    </div>
+    <nav class="language-switch" id="languageSwitch" aria-label="Language">
+      <button type="button" data-language="zh" aria-pressed="false">中文</button>
+      <button type="button" data-language="en" aria-pressed="true">EN</button>
+    </nav>
   </header>
 
-  <main>
-    <section class="intro" aria-labelledby="pageTitle">
-      <div class="intro-copy">
-        <h1 id="pageTitle">Shot Recipes &amp; Motion Samples</h1>
-        <p class="intro-description" data-i18n="intro">video-shotcraft is an AI agent skill for Claude Code and Codex that makes cinematic product promo videos with Remotion. Browse production shot recipes and switch between their motion samples.</p>
-      </div>
-
-      <dl class="stats" aria-label="Shot library statistics" data-i18n-aria-label="statsLabel">
-        <div><dt data-i18n="cards">Cards</dt><dd id="cardCount">106</dd></div>
-        <div><dt data-i18n="styles">Styles</dt><dd id="styleCount">162</dd></div>
-        <div><dt data-i18n="samples">Samples</dt><dd id="previewCount">161</dd></div>
-      </dl>
-    </section>
-
-    <section class="controls" aria-label="Filter shots" data-i18n-aria-label="controlsLabel">
-      <label class="search-field" for="searchInput">
-        <span class="search-icon" aria-hidden="true"></span>
-        <span class="sr-only" data-i18n="searchLabel">Search shot cards</span>
-        <input id="searchInput" type="search" autocomplete="off" placeholder="Search names, use cases, and styles…">
-        <kbd>⌘ K</kbd>
-      </label>
-      <div class="filter-row" id="filters" role="group" aria-label="Filter by energy and sample availability" data-i18n-aria-label="filtersLabel">
-        <button class="filter-button is-active" type="button" data-filter="all" data-i18n="all">All</button>
-        <button class="filter-button" type="button" data-filter="high" data-i18n="high">High energy</button>
-        <button class="filter-button" type="button" data-filter="medium" data-i18n="medium">Medium</button>
-        <button class="filter-button" type="button" data-filter="low" data-i18n="low">Low energy</button>
-        <button class="filter-button" type="button" data-filter="missing" data-i18n="missing">Missing</button>
-      </div>
-    </section>
-
-    <section class="library" id="library" aria-live="polite" aria-busy="true">
-    <!-- seo:cards:start -->
-      <article class="shot-card" id="ai-stream-response">
-        <h2>ai-stream-response</h2>
-        <p>A readable AI summary lands first, followed by evidence rows that stream in and resolve into a completed state.</p>
-        <p>Styles: ai-stream-response</p>
-      </article>
-      <article class="shot-card" id="autolayout-gap-dial">
-        <h2>autolayout-gap-dial</h2>
-        <p>A gap value dial pushes a row of blocks apart in real time while badge digits tick, then everything springs back into place.</p>
-        <p>Styles: autolayout-gap-dial</p>
-      </article>
-      <article class="shot-card" id="beat-cut-moves">
-        <h2>beat-cut-moves</h2>
-        <p>Two hard-cut rhythms: an accelerating sequence with shrinking intervals, and a three-flash freeze montage.</p>
-        <p>Styles: beat-cut-accelerando, paparazzi-flash</p>
-      </article>
-      <article class="shot-card" id="beat-step-list-theme-cycle">
-        <h2>beat-step-list-theme-cycle</h2>
-        <p>An adjective list steps up one row per beat while a fixed center pill catches each word and the background recolors on the same beat.</p>
-        <p>Styles: beat-step-list-theme-cycle</p>
-      </article>
-      <article class="shot-card" id="before-after-slider-scrub">
-        <h2>before-after-slider-scrub</h2>
-        <p>Before and after views share one frame while a fast-then-slow slider reveals the processed result.</p>
-        <p>Styles: before-after-slider-scrub</p>
-      </article>
-      <article class="shot-card" id="bottom-push-stack-wipe">
-        <h2>bottom-push-stack-wipe</h2>
-        <p>Each new scene pushes up from the bottom edge with its own saturated background color, physically shoving the old scene out of frame.</p>
-        <p>Styles: bottom-push-stack-wipe</p>
-      </article>
-      <article class="shot-card" id="brand-frame-snap">
-        <h2>brand-frame-snap</h2>
-        <p>A thick brand-color frame grows around the screen before content arrives, then hard-flips its color on the same frame the inner layout switches.</p>
-        <p>Styles: brand-frame-snap</p>
-      </article>
-      <article class="shot-card" id="brand-ink-open">
-        <h2>brand-ink-open</h2>
-        <p>Ink crosshairs draw in, the wordmark stamps letter by letter, a subtitle types on, then the lockup holds and lifts away.</p>
-        <p>Styles: brand-ink-open</p>
-      </article>
-      <article class="shot-card" id="bubble-swarm-takeover">
-        <h2>bubble-swarm-takeover</h2>
-        <p>Pearlescent bubbles drift in and swell until they cover the screen, hiding the scene switch at peak coverage before scattering to reveal the new page.</p>
-        <p>Styles: bubble-swarm-takeover</p>
-      </article>
-      <article class="shot-card" id="canvas-materialize-moves">
-        <h2>canvas-materialize-moves</h2>
-        <p>Two materialize moves: table rows arc out of a panel and morph into canvas cards, and a typed prompt grows a cascading diagram tree.</p>
-        <p>Styles: panel-to-canvas, diagram-cascade</p>
-      </article>
-      <article class="shot-card" id="card-flip-reveal">
-        <h2>card-flip-reveal</h2>
-        <p>Feature cards rotate 180 degrees around the Y axis, flash at the edge, and reveal a large result on the back.</p>
-        <p>Styles: card-flip-reveal</p>
-      </article>
-      <article class="shot-card" id="card-flock-tumble">
-        <h2>card-flock-tumble</h2>
-        <p>Three UI cards tumble in 3D from edge-on to a stepped formation, keep slowly rotating, then collapse inward and burst into a smoke ring under a giant word.</p>
-        <p>Styles: card-flock-tumble</p>
-      </article>
-      <article class="shot-card" id="cel-flash-stomp">
-        <h2>cel-flash-stomp</h2>
-        <p>Large words stamp into frame on the beat while flat background colors flash behind the locked typography.</p>
-        <p>Styles: cel-flash-stomp</p>
-      </article>
-      <article class="shot-card" id="chart-live-moves">
-        <h2>chart-live-moves</h2>
-        <p>Three data-driven motions: a live oscilloscope trace, dots regrouping into a figure, and an axis forced to rescale.</p>
-        <p>Styles: oscilloscope-stream, unit-dot-swarm-regroup, axis-rescale-shock</p>
-      </article>
-      <article class="shot-card" id="circle-match-iris">
-        <h2>circle-match-iris</h2>
-        <p>An iris expands from a circular UI element and lands on a matching circle in the next scene.</p>
-        <p>Styles: circle-match-iris</p>
-      </article>
-      <article class="shot-card" id="cloner-depth-echo">
-        <h2>cloner-depth-echo</h2>
-        <p>A card duplicates into a diagonal depth trail, holds briefly, then accelerates back into one springy original.</p>
-        <p>Styles: cloner-depth-echo</p>
-      </article>
-      <article class="shot-card" id="collab-cursor-moves">
-        <h2>collab-cursor-moves</h2>
-        <p>Two cursor performances: a duet of collaborator cursors dancing in a dark scene, and a five-cursor ensemble drifting and typing as ambience.</p>
-        <p>Styles: dialogue-duet, cast-ensemble</p>
-      </article>
-      <article class="shot-card" id="color-block-step-wipe">
-        <h2>color-block-step-wipe</h2>
-        <p>A color block swallows the screen in three to five discrete hard steps — either expanding from a center strip or eating diagonally from a corner.</p>
-        <p>Styles: color-block-step-wipe</p>
-      </article>
-      <article class="shot-card" id="command-palette-summon">
-        <h2>command-palette-summon</h2>
-        <p>The screen dims and blurs as a command palette drops in, populates results, and narrows while the query is typed.</p>
-        <p>Styles: command-palette-summon</p>
-      </article>
-      <article class="shot-card" id="crane-rise-reveal">
-        <h2>crane-rise-reveal</h2>
-        <p>The camera starts tight on one data row, rises and pulls back, then reveals a full dashboard filling the frame.</p>
-        <p>Styles: crane-rise-reveal</p>
-      </article>
-      <article class="shot-card" id="crash-zoom-punch">
-        <h2>crash-zoom-punch</h2>
-        <p>A six-frame push races from a wide view to a target close-up, ending with either an elastic overshoot or a heavy impact stop.</p>
-        <p>Styles: crash-zoom-punch</p>
-      </article>
-      <article class="shot-card" id="dataviz-landscape-open">
-        <h2>dataviz-landscape-open</h2>
-        <p>Streams of light merge across a dark data landscape while labels hover and a shallow-depth camera glides forward.</p>
-        <p>Styles: dataviz-landscape-open</p>
-      </article>
-      <article class="shot-card" id="deck-deal-flyin">
-        <h2>deck-deal-flyin</h2>
-        <p>A physical card stack opens the scene, then cards accelerate into a live grid as the camera follows the growing page.</p>
-        <p>Styles: deck-deal-flyin</p>
-      </article>
-      <article class="shot-card" id="depth-layer-moves">
-        <h2>depth-layer-moves</h2>
-        <p>Two depth techniques: layered parallax rails and a simulated dolly zoom that pins the subject while the background expands.</p>
-        <p>Styles: multiplane, dolly-zoom</p>
-      </article>
-      <article class="shot-card" id="draw-svg-trace">
-        <h2>draw-svg-trace</h2>
-        <p>An ink stroke traces an element outline, closes with a dark flash, and hands focus to the revealed content.</p>
-        <p>Styles: draw-svg-trace</p>
-      </article>
-      <article class="shot-card" id="edit-hook-moves">
-        <h2>edit-hook-moves</h2>
-        <p>An editorial hook: a short logo-button stinger that interrupts the ending with a 12-frame easter egg.</p>
-        <p>Styles: logo-sting-button</p>
-      </article>
-      <article class="shot-card" id="element-body-moves">
-        <h2>element-body-moves</h2>
-        <p>Two ways to give interface elements physicality: elastic axial stretch and a contact shadow that separates during lift.</p>
-        <p>Styles: axial-stretch, contact-shadow-lift</p>
-      </article>
-      <article class="shot-card" id="fui-hud-moves">
-        <h2>fui-hud-moves</h2>
-        <p>Two FUI patterns: a line unfolding into a panel, and a reticle assembling itself around a target.</p>
-        <p>Styles: line-unfold-panel, reticle-lock-on</p>
-      </article>
-      <article class="shot-card" id="gauge-readout-moves">
-        <h2>gauge-readout-moves</h2>
-        <p>Two instrument reads: a full-range needle self-test and a moving scale that races beneath a fixed pointer.</p>
-        <p>Styles: needle-sweep-selftest, tape-scroll-fixed-pointer</p>
-      </article>
-      <article class="shot-card" id="glow-flyline-moves">
-        <h2>glow-flyline-moves</h2>
-        <p>Three dark-scene accents: ambient glow orbs, connecting flight arcs, and a synchronized orb-to-line relay.</p>
-        <p>Styles: glow-orb-ambient, flyline-arc, orb-flyline-relay</p>
-      </article>
-      <article class="shot-card" id="gradient-word-sweep">
-        <h2>gradient-word-sweep</h2>
-        <p>A gradient light sweeps left to right across a keyword, charging each character with glow that decays behind the wavefront until the whole word breathes.</p>
-        <p>Styles: gradient-word-sweep</p>
-      </article>
-      <article class="shot-card" id="graze-face-tour">
-        <h2>graze-face-tour</h2>
-        <p>The camera skims low across the UI surface like terrain while page text hovers above the interface and settles down as the shot advances.</p>
-        <p>Styles: graze-face-tour</p>
-      </article>
-      <article class="shot-card" id="hashtag-to-pill-materialize">
-        <h2>hashtag-to-pill-materialize</h2>
-        <p>A typed &quot;#word&quot; hard-cuts into a wide pill tag, holds, shrinks into its slot on the page, then hard-cuts again to reveal the finished view.</p>
-        <p>Styles: hashtag-to-pill-materialize</p>
-      </article>
-      <article class="shot-card" id="hires-rasterize-3d-text">
-        <h2>hires-rasterize-3d-text</h2>
-        <p>Keep text crisp in 3D perspective by rasterizing at high resolution and scaling the layout instead of enlarging a low-resolution texture.</p>
-        <p>Styles: hires-rasterize-3d-text</p>
-      </article>
-      <article class="shot-card" id="icon-field-colorize">
-        <h2>icon-field-colorize</h2>
-        <p>A grid of grayscale icons staggers in to fill the screen, holds a beat, then brand-color bands ripple down and light the whole field at once.</p>
-        <p>Styles: icon-field-colorize</p>
-      </article>
-      <article class="shot-card" id="icon-performance-moves">
-        <h2>icon-performance-moves</h2>
-        <p>Two icon performances: an explosive confirmation burst and an escalating attention bounce that compresses on landing.</p>
-        <p>Styles: pop-burst-confirm, attention-bounce</p>
-      </article>
-      <article class="shot-card" id="impact-feedback">
-        <h2>impact-feedback</h2>
-        <p>Two impact layers: a combo counter with damage feedback, and a full anime-style impact frame.</p>
-        <p>Styles: hit-counter, anime-impact</p>
-      </article>
-      <article class="shot-card" id="input-trigger-moves">
-        <h2>input-trigger-moves</h2>
-        <p>Two input triggers: a performing cursor, and a key strike used as a hard-cut fuse.</p>
-        <p>Styles: cursor-performance, keycap-smash-cut</p>
-      </article>
-      <article class="shot-card" id="integration-hub-map">
-        <h2>integration-hub-map</h2>
-        <p>A page flips 180 degrees into an integration hub where five app icons pop in together and rainbow light tubes connect with pulses flowing through them.</p>
-        <p>Styles: integration-hub-map</p>
-      </article>
-      <article class="shot-card" id="letterspace-materialize">
-        <h2>letterspace-materialize</h2>
-        <p>Every letter of a widely tracked wordmark draws itself in parallel, growing like handwriting and finishing together on the same frame.</p>
-        <p>Styles: letterspace-materialize</p>
-      </article>
-      <article class="shot-card" id="light-play-moves">
-        <h2>light-play-moves</h2>
-        <p>Three controlled light effects: spotlight sweep, single sheen pass, and a halation bloom at impact.</p>
-        <p>Styles: spotlight-sweep, sheen-sweep, halation-bloom</p>
-      </article>
-      <article class="shot-card" id="line-boil">
-        <h2>line-boil</h2>
-        <p>Typography and outlines subtly redraw every few frames so a held image retains a handmade, living texture.</p>
-        <p>Styles: line-boil</p>
-      </article>
-      <article class="shot-card" id="line-carry-transition">
-        <h2>line-carry-transition</h2>
-        <p>A progress line exits scene A, guides the camera sideways, then turns corners to become the frame of scene B.</p>
-        <p>Styles: line-carry-transition</p>
-      </article>
-      <article class="shot-card" id="list-stack-press">
-        <h2>list-stack-press</h2>
-        <p>List cards fly up from below, compress the growing stack on every landing, and advance a synchronized counter.</p>
-        <p>Styles: list-stack-press</p>
-      </article>
-      <article class="shot-card" id="magician-card-flourish">
-        <h2>magician-card-flourish</h2>
-        <p>A blue starburst flashes on black for a third of a second, then a card shoots out of the flash, spinning along an arc toward camera before freezing near full frame.</p>
-        <p>Styles: magician-card-flourish</p>
-      </article>
-      <article class="shot-card" id="marker-underline-title">
-        <h2>marker-underline-title</h2>
-        <p>After the headline settles, a marker stroke draws itself under the keyword — tapered, rough-edged, and slightly tilted to follow the italic.</p>
-        <p>Styles: marker-underline-title</p>
-      </article>
-      <article class="shot-card" id="montage-rhythm-moves">
-        <h2>montage-rhythm-moves</h2>
-        <p>Three montage rhythms: blackout anticipation and slam, a three-shot detail burst, and a domino cascade of entrances.</p>
-        <p>Styles: drop-blackout-slam, wright-triple-cut, domino-cascade</p>
-      </article>
-      <article class="shot-card" id="morph-from-primitive">
-        <h2>morph-from-primitive</h2>
-        <p>A circle anticipates with one breath, morphs into a rounded card outline, then reveals its content.</p>
-        <p>Styles: morph-from-primitive</p>
-      </article>
-      <article class="shot-card" id="neon-frame-forerun">
-        <h2>neon-frame-forerun</h2>
-        <p>A neon frame races ahead to outline the scene in steep perspective while components drop from above and the page brightens as they land.</p>
-        <p>Styles: neon-frame-forerun</p>
-      </article>
-      <article class="shot-card" id="neon-frame-orbit-drop">
-        <h2>neon-frame-orbit-drop</h2>
-        <p>After a neon frame draws itself, the camera arcs left to right while every page component drops from the air and lands on the same frame.</p>
-        <p>Styles: neon-frame-orbit-drop</p>
-      </article>
-      <article class="shot-card" id="neon-triple-marquee">
-        <h2>neon-triple-marquee</h2>
-        <p>Three rows of outlined neon giants scroll in opposite directions across the full screen, lighting up in turn on a one-third phase offset.</p>
-        <p>Styles: neon-triple-marquee</p>
-      </article>
-      <article class="shot-card" id="odometer-digit-roll">
-        <h2>odometer-digit-roll</h2>
-        <p>A full-screen metric rolls each digit like an odometer, overshoots into place, and pulses when every column locks.</p>
-        <p>Styles: odometer-digit-roll</p>
-      </article>
-      <article class="shot-card" id="outro-group-photo-launch">
-        <h2>outro-group-photo-launch</h2>
-        <p>Elements from the film assemble around the wordmark as a crane settle, stage light, and gold dust create a launch-event finale.</p>
-        <p>Styles: outro-group-photo-launch</p>
-      </article>
-      <article class="shot-card" id="overhead-camera-moves">
-        <h2>overhead-camera-moves</h2>
-        <p>Two overhead reveals: a tilted scene leveling into view, and a tabletop layout dropping sharply into place.</p>
-        <p>Styles: tilt-reveal, overhead-tabletop-drop</p>
-      </article>
-      <article class="shot-card" id="page-turn-transitions">
-        <h2>page-turn-transitions</h2>
-        <p>Two full-page transitions: adjacent faces rotating like a cube, and an old page splitting open like double doors.</p>
-        <p>Styles: cube-rotate, barn-door-split</p>
-      </article>
-      <article class="shot-card" id="page-waterfall-wall">
-        <h2>page-waterfall-wall</h2>
-        <p>Real page captures flow at different speeds across a tilted 3D wall, creating an endless field of content.</p>
-        <p>Styles: page-waterfall-wall</p>
-      </article>
-      <article class="shot-card" id="panel-grid-moves">
-        <h2>panel-grid-moves</h2>
-        <p>Three grid rhythms: a flashing mosaic takeover, a collective flip-and-reflow, and an angled comic-panel split.</p>
-        <p>Styles: grid-flash-mosaic, flip-grid-reflow, comic-panel-split</p>
-      </article>
-      <article class="shot-card" id="paper-craft-moves">
-        <h2>paper-craft-moves</h2>
-        <p>Two paper gestures: masking tape slapping a floating card down, and cards rising from the page like a pop-up book.</p>
-        <p>Styles: masking-tape-slap, popup-book-rise</p>
-      </article>
-      <article class="shot-card" id="paper-plane-messenger">
-        <h2>paper-plane-messenger</h2>
-        <p>After Send is clicked the camera pulls back and a folded paper plane flies a bezier arc through parallax props to land at the receiving window.</p>
-        <p>Styles: paper-plane-messenger</p>
-      </article>
-      <article class="shot-card" id="paper-title-card">
-        <h2>paper-title-card</h2>
-        <p>A sentence stamps onto paper word by word, highlights one amber italic term, and closes with a short rule.</p>
-        <p>Styles: paper-title-card</p>
-      </article>
-      <article class="shot-card" id="particle-celebrate-hits">
-        <h2>particle-celebrate-hits</h2>
-        <p>Two celebration accents: crossing confetti cannons and sparks emitted when a counter passes a milestone.</p>
-        <p>Styles: confetti-crossfire, counter-tick-sparks</p>
-      </article>
-      <article class="shot-card" id="particle-sand-fill">
-        <h2>particle-sand-fill</h2>
-        <p>Chart columns form from falling square particles, solidify when full, and finish with a value pop.</p>
-        <p>Styles: particle-sand-fill</p>
-      </article>
-      <article class="shot-card" id="pill-slot-cycle">
-        <h2>pill-slot-cycle</h2>
-        <p>A fixed sentence keeps its trailing pill slot spinning like a slot machine through feature words until the final word locks the sentence.</p>
-        <p>Styles: pill-slot-cycle</p>
-      </article>
-      <article class="shot-card" id="print-texture-transitions">
-        <h2>print-texture-transitions</h2>
-        <p>A print-based reveal: ink bleeding outward from a drop point to consume the old scene.</p>
-        <p>Styles: ink-bleed-reveal</p>
-      </article>
-      <article class="shot-card" id="rhythm-interrupt-moves">
-        <h2>rhythm-interrupt-moves</h2>
-        <p>Two ways to break cadence: stepped punch-in jump cuts, and strobing black frames.</p>
-        <p>Styles: jump-cut-punch-in, strobe-black-frames</p>
-      </article>
-      <article class="shot-card" id="riso-print-hits">
-        <h2>riso-print-hits</h2>
-        <p>Two risograph impacts: a single misregistered color split that snaps into alignment, and a beat-driven series that grows stronger.</p>
-        <p>Styles: misregistration-hit, beat-pump</p>
-      </article>
-      <article class="shot-card" id="row-embed">
-        <h2>row-embed</h2>
-        <p>Content rows descend with perspective, flatten into the page, and flash a thin amber seam at the moment of insertion.</p>
-        <p>Styles: row-embed</p>
-      </article>
-      <article class="shot-card" id="runway-ground-skim">
-        <h2>runway-ground-skim</h2>
-        <p>From a low runway angle, UI cards rain down in overlapping fast drops with zero bounce, then the finished page tilts upright to camera.</p>
-        <p>Styles: runway-ground-skim</p>
-      </article>
-      <article class="shot-card" id="sakuga-timing-shift">
-        <h2>sakuga-timing-shift</h2>
-        <p>Movement begins in stepped, held drawings and suddenly switches to frame-by-frame acceleration at the climax.</p>
-        <p>Styles: sakuga-timing-shift</p>
-      </article>
-      <article class="shot-card" id="scene-locked-title">
-        <h2>scene-locked-title</h2>
-        <p>A large title is anchored inside the page perspective so it shares the same vanishing point while the camera moves.</p>
-        <p>Styles: scene-locked-title</p>
-      </article>
-      <article class="shot-card" id="scroll-brake-moves">
-        <h2>scroll-brake-moves</h2>
-        <p>Two fast-scroll stops: a long page decelerating precisely onto a target, and the same stop paired with a locking reticle.</p>
-        <p>Styles: changelog-scroll-brake, brake-reticle-lock</p>
-      </article>
-      <article class="shot-card" id="segmented-thumb-hero">
-        <h2>segmented-thumb-hero</h2>
-        <p>An oversized segmented control gets a close-up: a cursor slides in, presses, and the white thumb snaps to the other segment as icons swap with a spring.</p>
-        <p>Styles: segmented-thumb-hero</p>
-      </article>
-      <article class="shot-card" id="shot-transitions">
-        <h2>shot-transitions</h2>
-        <p>Six handoff recipes for matching scene energy: flash cut, dark fly-through, focus relay, black title card, whip pan, and mask wipe.</p>
-        <p>Styles: flash-cut, shot-transitions-4, shot-transitions-5, shot-transitions-6, whip-pan, mask-wipe</p>
-      </article>
-      <article class="shot-card" id="skeleton-reveal">
-        <h2>skeleton-reveal</h2>
-        <p>Content develops in three stages — wobbling doodle placeholders, gray skeleton bars, then rows resolving into avatars and word-by-word text.</p>
-        <p>Styles: skeleton-reveal</p>
-      </article>
-      <article class="shot-card" id="slam-entrance-moves">
-        <h2>slam-entrance-moves</h2>
-        <p>Three high-energy arrivals: a perspective snap, a score drop, and an impact burst that pushes nearby elements.</p>
-        <p>Styles: kanada-perspective-snap, score-slam, impact-burst-kit</p>
-      </article>
-      <article class="shot-card" id="smear-multiples">
-        <h2>smear-multiples</h2>
-        <p>A fast-moving card leaves four countable translucent copies that collapse back into the original at the landing.</p>
-        <p>Styles: smear-multiples</p>
-      </article>
-      <article class="shot-card" id="space-camera-moves">
-        <h2>space-camera-moves</h2>
-        <p>Three spatial camera moves: exploded assembly, subject-locked rotation, and a drone-like dive to the landing point.</p>
-        <p>Styles: exploded-view, snorricam-lock, drone-dive-landing</p>
-      </article>
-      <article class="shot-card" id="spectrum-morph-ui">
-        <h2>spectrum-morph-ui</h2>
-        <p>A title underline breaks into animated spectrum bars for two phrases, then gathers back into a clean line.</p>
-        <p>Styles: spectrum-morph-ui</p>
-      </article>
-      <article class="shot-card" id="speed-ramp-freeze">
-        <h2>speed-ramp-freeze</h2>
-        <p>Two nonlinear timing tools: a fast-slow-fast speed ramp and a freeze used for on-screen annotation before motion resumes.</p>
-        <p>Styles: speed-ramp, freeze-annotate</p>
-      </article>
-      <article class="shot-card" id="split-flap-title">
-        <h2>split-flap-title</h2>
-        <p>Characters flip through two incorrect glyphs before locking into the title in a left-to-right mechanical wave.</p>
-        <p>Styles: split-flap-title</p>
-      </article>
-      <article class="shot-card" id="spotlight-hero-card">
-        <h2>spotlight-hero-card</h2>
-        <p>A spotlight selects one card, the camera pushes diagonally, the card lifts for two outline passes, then returns to the page.</p>
-        <p>Styles: spotlight-hero-card</p>
-      </article>
-      <article class="shot-card" id="spotlight-sweep-moves">
-        <h2>spotlight-sweep-moves</h2>
-        <p>Three dark-scene spotlight moves: a wake-sleep sweep, an edge-glow pan with purple bleed, and a radial reveal expanding from a corner.</p>
-        <p>Styles: glow-wake-sleep-panel, slide-spotlight-pan, corner-spotlight-reveal</p>
-      </article>
-      <article class="shot-card" id="steep-tilt-glide">
-        <h2>steep-tilt-glide</h2>
-        <p>A page stands at a steep 60-degree perspective and glides across a fixed camera with speed ghosting while text settles onto the surface mid-flight.</p>
-        <p>Styles: steep-tilt-glide</p>
-      </article>
-      <article class="shot-card" id="stroke-segment-build">
-        <h2>stroke-segment-build</h2>
-        <p>Disconnected title strokes illuminate in a scrambled order and become readable only when the final segments snap into place.</p>
-        <p>Styles: stroke-segment-build</p>
-      </article>
-      <article class="shot-card" id="tear-streak-transitions">
-        <h2>tear-streak-transitions</h2>
-        <p>A high-energy tear: horizontal glitch strips whose displacement hides the hard cut.</p>
-        <p>Styles: glitch-displace</p>
-      </article>
-      <article class="shot-card" id="tension-camera-moves">
-        <h2>tension-camera-moves</h2>
-        <p>Four emotional camera tools: frozen orbit, Dutch roll correction, slow pressure push, and an isolating pull-back.</p>
-        <p>Styles: bullet-time-freeze-orbit, dutch-roll-to-level, slow-push-in, pull-back-isolation</p>
-      </article>
-      <article class="shot-card" id="text-as-mask">
-        <h2>text-as-mask</h2>
-        <p>Product footage moves inside oversized title letters before the type expands until the footage takes over the frame.</p>
-        <p>Styles: text-as-mask</p>
-      </article>
-      <article class="shot-card" id="text-column-converge">
-        <h2>text-column-converge</h2>
-        <p>Two words pinned at opposite screen edges hard-swap through options, then slide together exactly once to lock into the final phrase.</p>
-        <p>Styles: text-column-converge</p>
-      </article>
-      <article class="shot-card" id="theme-switch-moves">
-        <h2>theme-switch-moves</h2>
-        <p>Two theme-change patterns: a diagonal sweep that recolors content in place, and a command-palette ripple with a clear cause and effect.</p>
-        <p>Styles: theme-sweep-toggle, palette-theme-ripple</p>
-      </article>
-      <article class="shot-card" id="timeline-travel">
-        <h2>timeline-travel</h2>
-        <p>The camera accelerates along a horizontal version timeline, raises cards at each stop, then brakes sharply on the final milestone.</p>
-        <p>Styles: timeline-travel</p>
-      </article>
-      <article class="shot-card" id="title-demote-to-label">
-        <h2>title-demote-to-label</h2>
-        <p>A centered headline stands for a beat, then shrinks and slides to the top-left corner to become a section label as content grows beneath it.</p>
-        <p>Styles: title-demote-to-label</p>
-      </article>
-      <article class="shot-card" id="trailer-grammar-moves">
-        <h2>trailer-grammar-moves</h2>
-        <p>Three trailer structures: a rapid opening hook, alternating title cards and footage, and a direct smash cut into stillness.</p>
-        <p>Styles: trailer-bumper, card-footage-cadence, smash-cut</p>
-      </article>
-      <article class="shot-card" id="transition-hidden-cut">
-        <h2>transition-hidden-cut</h2>
-        <p>Three ways to conceal the edit: foreground occlusion, opposing impacts, and a brief amber light leak at the cut.</p>
-        <p>Styles: invisible-cut, versus-slam, light-leak-burn</p>
-      </article>
-      <article class="shot-card" id="transition-travel">
-        <h2>transition-travel</h2>
-        <p>Two passage transitions: shared-element relocation, and a push through the counter of a letterform.</p>
-        <p>Styles: shared-element-morph, letterform-zoom</p>
-      </article>
-      <article class="shot-card" id="type-and-filter">
-        <h2>type-and-filter</h2>
-        <p>A real interface types a search, collapses the grid to one result, then clicks through into the detail view.</p>
-        <p>Styles: type-and-filter</p>
-      </article>
-      <article class="shot-card" id="type-assembly-moves">
-        <h2>type-assembly-moves</h2>
-        <p>Four typography assemblies: split-letter rise, drifting convergence, tracking expansion, and text flowing along a path.</p>
-        <p>Styles: split-text-stagger, drift-assembly, tracking-expand, text-on-path</p>
-      </article>
-      <article class="shot-card" id="type-entrance-moves">
-        <h2>type-entrance-moves</h2>
-        <p>Two title entrances: characters decoding from noise and letters falling under gravity before bouncing into alignment.</p>
-        <p>Styles: scramble-decode, letter-drop-physics</p>
-      </article>
-      <article class="shot-card" id="type-rhythm-sync">
-        <h2>type-rhythm-sync</h2>
-        <p>Two voice-and-beat synchronizations: font weight pulsing on percussion and spoken words filling like karaoke.</p>
-        <p>Styles: font-weight-pump, karaoke-fill-sync</p>
-      </article>
-      <article class="shot-card" id="typewriter-moves">
-        <h2>typewriter-moves</h2>
-        <p>Two typing narratives: a terminal command that triggers the scene and a three-act mistake, deletion, and retype.</p>
-        <p>Styles: terminal-typewriter, error-retype</p>
-      </article>
-      <article class="shot-card" id="ui-strip-away-outro">
-        <h2>ui-strip-away-outro</h2>
-        <p>After Publish is clicked the editor UI evaporates layer by layer from the edges inward, leaving one button to slide center, grow, and hand off to the wordmark.</p>
-        <p>Styles: ui-strip-away-outro</p>
-      </article>
-      <article class="shot-card" id="ui-to-brand-morph">
-        <h2>ui-to-brand-morph</h2>
-        <p>Two UI-to-brand morphs: an icon flips flat and blooms into a logo mark, and an input field contracts into a capsule as glyphs assemble the logo.</p>
-        <p>Styles: icon-flip-bloom, input-morph-assemble</p>
-      </article>
-      <article class="shot-card" id="voice-waveform-live">
-        <h2>voice-waveform-live</h2>
-        <p>A recording capsule shows 64 live bars that surge with speech, shrink to a dotted line in pauses, and collapse on submit.</p>
-        <p>Styles: voice-waveform-live</p>
-      </article>
-      <article class="shot-card" id="wall-reveal-moves">
-        <h2>wall-reveal-moves</h2>
-        <p>Three in-place wall reveals: sequential bento lights, a wave of grid flips, and a wireframe drawing itself into a finished interface.</p>
-        <p>Styles: bento-light-up, grid-wave-flip, wireframe-draw-on</p>
-      </article>
-      <article class="shot-card" id="document-typewriter-reveal">
-        <h2>document-typewriter-reveal</h2>
-        <p>A fully typeset document writes itself behind one accent-color caret, opens both side columns, and drops history entries into the rail.</p>
-        <p>Styles: document-typewriter-reveal</p>
-      </article>
-      <article class="shot-card" id="wipe-transitions">
-        <h2>wipe-transitions</h2>
-        <p>Two geometric wipes: a radial clock sweep and twelve staggered vertical blinds.</p>
-        <p>Styles: clock-wipe, blinds-slice</p>
-      </article>
-      <article class="shot-card" id="word-relay-filmstrip">
-        <h2>word-relay-filmstrip</h2>
-        <p>A filmstrip of page cards steps vertically while a serif word relay swaps only its verb, each swap aligned to the center of the current card.</p>
-        <p>Styles: word-relay-filmstrip</p>
-      </article>
-    <!-- seo:cards:end -->
-    </section>
-
-    <section class="empty-state" id="emptyState" hidden>
-      <p data-i18n="empty">No shots match the current filters.</p>
-      <button type="button" id="clearFilters" data-i18n="clear">Clear filters</button>
-    </section>
+  <main class="hero">
+    <p class="hero-kicker" data-l10n="kicker">An agent skill for Claude Code &amp; Codex</p>
+    <h1 data-l10n="heroTitle">104 cinematic shot recipes.<br><em>One prompt</em> to a finished promo.</h1>
+    <p class="hero-sub" data-l10n="heroSub">Every motion you see behind this page is a tuned, ready-to-use shot recipe card — your agent picks the shots, animates real product screenshots with Remotion, syncs the beats, and delivers the film.</p>
+    <div class="hero-actions">
+      <a class="button-primary" href="./library.html" data-l10n="ctaLibrary">Browse all motions</a>
+      <a class="button-github" href="https://github.com/Vincentwei1021/video-shotcraft" target="_blank" rel="noreferrer">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        <span data-l10n="ctaStar">Star on GitHub</span>
+        <span class="star-glyph" aria-hidden="true">★</span>
+        <span class="star-count" id="starCount" aria-label="GitHub stars"></span>
+      </a>
+    </div>
+    <ul class="hero-stats" aria-label="Library statistics">
+      <li><strong id="statCards">104</strong><span data-l10n="statCards">recipe cards</span></li>
+      <li><strong id="statStyles">161</strong><span data-l10n="statStyles">styles</span></li>
+      <li><strong id="statSamples">161</strong><span data-l10n="statSamples">motion previews</span></li>
+      <li><strong>36.2s</strong><span data-l10n="statTemplate">ready template</span></li>
+    </ul>
   </main>
 
-  <template id="loadingTemplate">
-    <article class="shot-card skeleton-card" aria-hidden="true">
-      <div class="skeleton-line skeleton-title"></div>
-      <div class="skeleton-line"></div>
-      <div class="skeleton-media"></div>
-    </article>
-  </template>
+  <footer class="hero-foot">
+    <span data-l10n="footer">Apache-2.0 · Built with Remotion · </span><a href="https://github.com/Vincentwei1021/video-shotcraft" target="_blank" rel="noreferrer">github.com/Vincentwei1021/video-shotcraft</a>
+  </footer>
 
-  <div class="selection-bar" id="selectionBar" hidden>
-    <span class="selection-count" id="selectionCount"></span>
-    <button type="button" class="selection-copy" id="copySelected">Copy selected</button>
-    <button type="button" class="selection-clear" id="clearSelected">Clear</button>
-  </div>
+  <script>
+    const L10N = {
+      en: {
+        kicker: 'An agent skill for Claude Code & Codex',
+        heroTitle: '104 cinematic shot recipes.<br><em>One prompt</em> to a finished promo.',
+        heroSub: 'Every motion you see behind this page is a tuned, ready-to-use shot recipe card — your agent picks the shots, animates real product screenshots with Remotion, syncs the beats, and delivers the film.',
+        ctaLibrary: 'Browse all motions',
+        ctaStar: 'Star on GitHub',
+        statCards: 'recipe cards',
+        statStyles: 'styles',
+        statSamples: 'motion previews',
+        statTemplate: 'ready template',
+        footer: 'Apache-2.0 · Built with Remotion · ',
+      },
+      zh: {
+        kicker: '一个 Claude Code / Codex 的 agent skill',
+        heroTitle: '104 张镜头配方卡<br>宣传片<em>一键直出</em>',
+        heroSub: '页面背后滚动的每个动效，都是一张调校好、即取即用的镜头配方卡。agent 负责选镜头、给真实产品截图做动画、卡上节奏，直接交付成片。',
+        ctaLibrary: '浏览全部动效',
+        ctaStar: '收藏 GitHub',
+        statCards: '镜头配方卡',
+        statStyles: '动效样式',
+        statSamples: '动态样片',
+        statTemplate: '现成模板',
+        footer: 'Apache-2.0 · 基于 Remotion 构建 · ',
+      },
+    };
 
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    const state = {
+      language: (() => {
+        try { return localStorage.getItem('video-shot-gallery-language') === 'zh' ? 'zh' : 'en'; } catch { return 'en'; }
+      })(),
+    };
+    const t = (key) => L10N[state.language][key] || L10N.en[key] || key;
+
+    function applyLanguage() {
+      document.documentElement.lang = state.language === 'zh' ? 'zh-CN' : 'en';
+      document.querySelectorAll('[data-l10n]').forEach((node) => {
+        node.innerHTML = t(node.dataset.l10n);
+      });
+      document.querySelectorAll('#languageSwitch [data-language]').forEach((button) => {
+        const active = button.dataset.language === state.language;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+    }
+
+    document.querySelector('#languageSwitch').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-language]');
+      if (!button || button.dataset.language === state.language) return;
+      state.language = button.dataset.language;
+      try { localStorage.setItem('video-shot-gallery-language', state.language); } catch {}
+      applyLanguage();
+    });
+
+    /* ---- random motion wall ---- */
+    const wall = document.querySelector('#wall');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // 固定 16 支精选样片（4×4 墙位，一一对应，不轮换）
+    const WALL_CLIPS = [
+      'comic-panel-split',
+      'beat-step-list-theme-cycle',
+      'before-after-slider-scrub',
+      'bottom-push-stack-wipe',
+      'unit-dot-swarm-regroup',
+      'circle-match-iris',
+      'graze-face-tour',
+      'magician-card-flourish',
+      'paper-title-card',
+      'autolayout-gap-dial',
+      'neon-frame-orbit-drop',
+      'spotlight-hero-card',
+      'slide-spotlight-pan',
+      'palette-theme-ripple',
+      'ui-strip-away-outro',
+      'word-relay-filmstrip',
+    ];
+
+    function mountVideo(tile, url) {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      // metadata, not auto: the poster already holds the tile, so the full
+      // clip is fetched by play() rather than racing first paint
+      video.preload = 'metadata';
+      video.src = url;
+      tile.append(video);
+      const start = () => {
+        video.classList.add('is-on');
+        if (!reduceMotion) video.play().catch(() => {});
+      };
+      if (video.readyState >= 2) start();
+      else video.addEventListener('loadeddata', start, {once: true});
+      return video;
+    }
+
+    WALL_CLIPS.forEach((name, index) => {
+      const tile = document.createElement('div');
+      tile.className = 'wall-tile';
+      wall.append(tile);
+      if (reduceMotion) {
+        // no video is fetched at all here, so the tile would stay black
+        // forever; the poster still frame stands in for the clip
+        const poster = document.createElement('img');
+        poster.src = `./media/poster/${name}.jpg`;
+        poster.alt = '';
+        poster.decoding = 'async';
+        tile.append(poster);
+        return;
+      }
+      // tiles start black and each clip fades itself in on arrival:
+      // the wall assembling one tile at a time IS the reveal, so no poster
+      // here — a still would pre-fill the grid and kill it
+      setTimeout(() => mountVideo(tile, `./media/${name}.mp4`), index * 180);
+    });
+
+    /* ---- live GitHub star count (cached 1h to spare the rate limit) ---- */
+    (() => {
+      const el = document.querySelector('#starCount');
+      const fmt = (n) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(n));
+      const CACHE_KEY = 'video-shotcraft-stars';
+      try {
+        const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+        if (cached && Date.now() - cached.at < 3600_000) {
+          el.textContent = fmt(cached.stars);
+          return;
+        }
+      } catch {}
+      fetch('https://api.github.com/repos/Vincentwei1021/video-shotcraft')
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
+        .then((repo) => {
+          if (typeof repo.stargazers_count !== 'number') return;
+          el.textContent = fmt(repo.stargazers_count);
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({stars: repo.stargazers_count, at: Date.now()})); } catch {}
+        })
+        .catch(() => {});
+    })();
+
+    fetch('./api/library.json', {cache: 'no-store'})
+      .then((response) => response.json())
+      .then((library) => {
+        document.querySelector('#statCards').textContent = library.stats.cardCount;
+        document.querySelector('#statStyles').textContent = library.stats.styleCount;
+        document.querySelector('#statSamples').textContent = library.stats.previewCount;
+      })
+      .catch(() => {});
+
+    applyLanguage();
+  </script>
 </body>
 </html>

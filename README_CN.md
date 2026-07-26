@@ -1,12 +1,18 @@
-# video-shotcraft 🎬
-
 <div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/brand/logo-mark-reverse.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/brand/logo-mark.svg">
+  <img alt="video-shotcraft logo" src="./assets/brand/logo-mark.svg" width="112" height="112">
+</picture>
+
+<h1>video-shotcraft</h1>
 
 [![GitHub stars](https://img.shields.io/github/stars/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/Vincentwei1021/video-shotcraft)](https://github.com/Vincentwei1021/video-shotcraft/network/members)
 [![Gallery](https://img.shields.io/badge/Gallery-在线样片-d3923c)](https://vincentwei1021.github.io/video-shotcraft/)
 
-**让 agent 帮你制作电影感产品视频的 skill：106 张镜头配方卡 · 162 个样式 · 161 条动态样片 · 已验收成片模板**
+**让 agent 帮你制作电影感产品视频的 skill：104 张镜头配方卡 · 161 个样式 · 161 条动态样片 · 已验收成片模板**
 
 [English](README.md) | [中文](README_CN.md) | [日本語](README_JA.md)
 
@@ -85,12 +91,28 @@ agent 会替换成目标产品的截图、文案和品牌信息，复现同等�
 
 > 后续会持续更新更多模板。
 
+### Headless / CI 注意事项
+
+在无显示器的 Linux 服务器上渲染（实测环境：2 核、Node 22）会遇到三个坑，
+都可以一个参数解决：
+
+1. **并发上限** —— 低核机器上 `remotion still/render` 会报
+   "Maximum for --concurrency is 2"。解决：加 `--concurrency=1`。
+2. **旧版 Headless 被移除** —— 新版 Chrome/Chromium 已删除旧 headless 模式，
+   让 Remotion 指向系统 chromium 会启动失败。解决：改用
+   chrome-headless-shell 二进制，而不是完整版 Chrome。
+3. **CDN 被墙** —— 如果 remotion.media 无法访问，headless-shell 的自动下载
+   会失败。解决：用 `--browser-executable=<本地 chrome-headless-shell 路径>`
+   指定本地二进制。
+
+加上这三个参数后，内置模板即可正常渲染。
+
 ## 📦 项目包含什么
 
 | 内容 | 说明 |
 | --- | --- |
-| 106 张镜头配方卡 | 记录用途、能量、建议时长、参数、实现要点与已知坑 |
-| 161 条动态样片 | 覆盖 162 个样式，可在在线 Gallery 中直接预览、搜索和筛选 |
+| 104 张镜头配方卡 | 记录用途、能量、建议时长、参数、实现要点与已知坑 |
+| 161 条动态样片 | 覆盖 161 个样式，可在在线 Gallery 中直接预览、搜索和筛选 |
 | Remotion 参考实现 | 每张卡对应经过调校的 TSX demo，包含实际缓动和时序参数 |
 | 完整成片模板 | 36.2 秒、1920×1080、30fps、10 镜头的纸墨琥珀风产品宣传片 |
 | 组件与素材 | 2.5D 页面相机、字幕、闪切、数字滚动、音效和素材采集脚本 |
@@ -106,12 +128,12 @@ video-shotcraft/
 ├── SKILL.md                 # Agent 使用入口与核心制作规则
 ├── references/
 │   ├── pipeline.md          # 完整制作流水线
-│   ├── shots/               # 106 张镜头配方卡
+│   ├── shots/               # 104 张镜头配方卡
 │   ├── sequences/           # 可复用的全片结构与桥段模板
 │   ├── aesthetic-rules.md   # 视觉验收准则
 │   ├── music-beat-sync.md   # BGM 节奏分析与卡点方法
 │   └── sound-design.md      # 声音设计方法与判例
-├── demos/                   # 镜头卡的 Remotion 参考实现
+├── demos/                   # 镜头卡的 Remotion 参考实现（同类别目录）
 ├── gallery/                 # 在线样片画廊的静态站点
 ├── template/                # 可直接运行的完整成片模板
 └── assets/
