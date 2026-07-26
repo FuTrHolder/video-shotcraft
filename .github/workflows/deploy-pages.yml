@@ -1,9 +1,14 @@
 name: Deploy gallery to GitHub Pages
 
-# Publishes gallery/ to the gh-pages branch whenever it changes on main.
-# Motion-preview MP4s live as assets on the `gallery-media` release (not in
-# git) and are downloaded into place during assembly, so library.json's
+# Publishes gallery/ via the official Pages artifact path whenever it changes
+# on main. Motion-preview MP4s live as assets on the `gallery-media` release
+# (not in git) and are downloaded into place during assembly, so library.json's
 # relative ./media/*.mp4 URLs keep working unchanged.
+#
+# NOTE: this deliberately does NOT push to a gh-pages branch. The repo's Pages
+# publishing source must be set to "GitHub Actions" (build_type: workflow) —
+# with the legacy branch source, commits pushed with GITHUB_TOKEN never
+# trigger a Pages build, so the site silently stays stale.
 on:
   push:
     branches: [main]
@@ -13,7 +18,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: deploy-pages
@@ -22,6 +29,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +41,7 @@ jobs:
           rsync -a \
             --exclude 'sync-from-cards.py' \
             --exclude 'build-seo.py' \
+            --exclude 'fetch-media.sh' \
             --exclude '__pycache__' \
             gallery/ site/
           touch site/.nojekyll
@@ -67,14 +78,9 @@ jobs:
           print(f'all previews present ({len(lib["cards"])} cards checked)')
           EOF
 
-      - name: Push to gh-pages
-        run: |
-          cd site
-          git init -b gh-pages
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Deploy gallery from ${GITHUB_SHA::7}"
-          git push --force \
-            "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" \
-            gh-pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
