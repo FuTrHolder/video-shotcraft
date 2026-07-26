@@ -167,6 +167,16 @@ Special thanks to:
 - **Claude Code** — this library itself was built, iterated, and QA'd with an
   AI coding agent, using the same workflow the skill teaches.
 
+## 🖥️ Headless / CI notes
+
+Running the Ink Press template on a headless Linux box (tested: 2 cores, Node 22) hits three walls worth knowing:
+
+1. **Concurrency cap** — `remotion still/render` fails with "Maximum for --concurrency is 2" on low-core machines. Fix: pass `--concurrency=1`.
+2. **Old Headless removal** — recent Chrome/Chromium dropped old headless mode; pointing Remotion at system chromium fails to launch. Fix: use a chrome-headless-shell binary instead of full Chrome.
+3. **Blocked CDN** — if remotion.media is unreachable, the automatic headless-shell download is rejected. Fix: `--browser-executable=<path-to-local chrome-headless-shell>`.
+
+With these three flags, frame renders from the bundled template work.
+
 ## ⭐ Star history
 
 <a href="https://www.star-history.com/?repos=Vincentwei1021%2Fvideo-shotcraft&type=date&legend=top-left">
