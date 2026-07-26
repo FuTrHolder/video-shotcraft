@@ -48,5 +48,4 @@ demos/outro/ui-to-brand-morph/
 （IconFlipBloomLogo.tsx / InputMorphsIntoLogo.tsx）
 原片出处：A perplexity-promo 88–91.5s / B slack-promo 40–41s
 
-实现状态：`icon-flip-bloom` 有样片；`input-morph-assemble` 有参考实现但缺少
-Gallery 动态预览，不得声称已按样片对照还原。
+实现状态：两式均有参考实现与 Gallery 动态样片。

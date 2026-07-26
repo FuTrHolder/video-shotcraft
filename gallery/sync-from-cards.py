@@ -6,6 +6,7 @@ Run from repo root after editing any card:  python3 gallery/sync-from-cards.py
 import json
 import re
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,7 +19,6 @@ LIB = ROOT / 'gallery' / 'api' / 'library.json'
 STYLE_STATUS = {
     ('wall-reveal-moves', 'grid-wave-flip'): 'reference-only',
     ('wall-reveal-moves', 'wireframe-draw-on'): 'reference-only',
-    ('ui-to-brand-morph', 'input-morph-assemble'): 'missing-preview',
 }
 
 
@@ -58,13 +58,20 @@ def main():
     if unknown:
         raise SystemExit(f'unknown category folders: {unknown} (add to CATEGORIES)')
 
-    # 1. refresh gallery/source copies (drop copies whose card no longer exists)
+    # 1. refresh gallery/source copies (drop copies whose card no longer exists).
+    # A copy that differs from its card means the card was edited since the last
+    # sync — bump that card's updatedAt so stats.newest / sitemap lastmod move.
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+    touched = set()
     for old in SOURCE.glob('*.md'):
         if old.stem not in cards:
             old.unlink()
             print(f'removed stale copy: {old.name}')
     for name, p in cards.items():
-        shutil.copyfile(p, SOURCE / p.name)
+        copy = SOURCE / p.name
+        if not copy.exists() or copy.read_bytes() != p.read_bytes():
+            touched.add(name)
+        shutil.copyfile(p, copy)
 
     # 2. refresh library.json text fields
     lib = json.loads(LIB.read_text(encoding='utf-8'))
@@ -87,6 +94,8 @@ def main():
             card['intention'] = intention
         card['category'] = card_category[card['name']]
         card['source'] = f"references/shots/{card['category']}/{card['name']}.md"
+        if card['name'] in touched:
+            card['updatedAt'] = now
         if len(card.get('styles', [])) == 1:
             card['styles'][0]['description'] = card['summary']
         for style in card.get('styles', []):
@@ -104,6 +113,7 @@ def main():
     lib['stats']['styleCount'] = len(styles)
     lib['stats']['previewCount'] = sum(1 for style in styles if style.get('media'))
     lib['stats']['mediaCount'] = lib['stats']['previewCount']
+    lib['stats']['newest'] = max(card['updatedAt'] for card in lib['cards'])
     LIB.write_text(json.dumps(lib, ensure_ascii=False) + '\n', encoding='utf-8')
     print(f"synced {len(lib['cards'])} cards ({lib['stats']['styleCount']} styles, "
           f"{lib['stats']['previewCount']} previews); missing card files: {missing or 'none'}")
