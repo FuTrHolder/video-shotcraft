@@ -216,14 +216,34 @@
       font-weight: 750;
       font-size: clamp(1.18rem, 1.8vw, 1.4rem);
       text-decoration: none;
-      transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+      transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
     }
     .button-primary {
+      position: relative;
+      overflow: hidden;
       background: var(--accent);
       color: var(--accent-ink);
       box-shadow: 0 10px 38px rgba(211, 146, 60, 0.4);
     }
-    .button-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(211, 146, 60, 0.55); }
+    /* hover: one specular sweep left→right — the same draw-on scanline the
+       shot cards speak, kept to a single pass so it reads as light, not loop */
+    .button-primary::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg, transparent 32%, rgba(255, 244, 224, 0.55) 50%, transparent 68%);
+      transform: translateX(-110%);
+      pointer-events: none;
+    }
+    .button-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 48px rgba(211, 146, 60, 0.55);
+    }
+    .button-primary:hover::after { animation: cta-sheen 700ms ease-out; }
+    @keyframes cta-sheen {
+      from { transform: translateX(-110%); }
+      to { transform: translateX(110%); }
+    }
     .button-github {
       position: relative;
       border: 1px solid rgba(240, 237, 229, 0.35);
@@ -232,9 +252,25 @@
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
     }
-    .button-github:hover { transform: translateY(-2px); background: rgba(240, 237, 229, 0.12); }
+    .button-github:hover {
+      transform: translateY(-2px);
+      background: rgba(240, 237, 229, 0.12);
+      border-color: rgba(211, 146, 60, 0.65);
+      box-shadow: 0 10px 34px rgba(211, 146, 60, 0.22);
+    }
     .button-github svg { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
-    .star-glyph { color: var(--accent); }
+    .star-glyph {
+      color: var(--accent);
+      transition: transform 180ms ease;
+    }
+    /* the star does one anticipation-free pop-and-settle, echoing the cards'
+       spring落定 vocabulary */
+    .button-github:hover .star-glyph { animation: star-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+    @keyframes star-pop {
+      0% { transform: scale(1) rotate(0deg); }
+      45% { transform: scale(1.45) rotate(-14deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
     /* star count: floating badge, only revealed on hover/focus */
     .star-count {
       position: absolute;
@@ -325,6 +361,7 @@
     @media (prefers-reduced-motion: reduce) {
       .wall-tile video { transition: none; }
       .button-primary:hover, .button-github:hover { transform: none; }
+      .button-primary:hover::after, .button-github:hover .star-glyph { animation: none; }
     }
 
     /* amber ring, not the browser's default blue against an amber system */

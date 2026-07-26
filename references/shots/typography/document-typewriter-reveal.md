@@ -4,6 +4,7 @@ name: document-typewriter-reveal
 适用: 文档/报告/笔记类功能镜头；信息密度最高的一拍
 时长: 约 3.7s（110f，含 history-list-stack 尾段）
 能量: 低中（信息密度最高，节奏放稳让观众读字）
+标签: ui-entrance
 ---
 
 ## 意图

@@ -4,6 +4,7 @@ name: crane-rise-reveal
 适用: "从细节到全局"的开场定场；与 drone-dive-landing（全局→单点俯冲）互为反向
 时长: 5s（特写 hold 20f + 拉升 100f + 满幅静止 30f）
 能量: 中高（持续单向运动，无冲击拍）
+标签: camera、data
 ---
 
 ## 意图

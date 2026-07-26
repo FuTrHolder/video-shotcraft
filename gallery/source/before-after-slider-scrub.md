@@ -4,6 +4,7 @@ name: before-after-slider-scrub
 适用: AI 增强/优化/重构类功能的效果对比段落（"用前 vs 用后"一镜讲清）
 时长: 4–5s
 能量: 中（快甩是打击点，慢扫是阅读期）
+标签: interaction
 ---
 
 ## 意图

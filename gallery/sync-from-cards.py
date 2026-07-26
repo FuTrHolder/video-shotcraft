@@ -93,6 +93,13 @@ def main():
         if intention:
             card['intention'] = intention
         card['category'] = card_category[card['name']]
+        # 多类别标签：frontmatter 的「标签:」列出这张卡也成立的其他类别；
+        # 目录名永远是主类别（分组归属），标签只扩大筛选命中面
+        extra = [t.strip() for t in re.split(r'[,，、\s]+', fm.get('标签', '')) if t.strip()]
+        bad = [t for t in extra if t not in CATEGORIES]
+        if bad:
+            raise SystemExit(f"{card['name']}: unknown 标签 {bad} (must be CATEGORIES keys)")
+        card['tags'] = [card['category']] + [t for t in extra if t != card['category']]
         card['source'] = f"references/shots/{card['category']}/{card['name']}.md"
         if card['name'] in touched:
             card['updatedAt'] = now

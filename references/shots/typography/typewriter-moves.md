@@ -4,6 +4,7 @@ name: typewriter-moves
 适用: 开发者产品开场（A）、slogan/卖点字卡（B）；文字自带时间性的入场
 时长: A ~5s / B ~5.5s
 能量: A 中高 / B 中低
+标签: opening
 ---
 
 ## 意图

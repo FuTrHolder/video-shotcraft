@@ -4,6 +4,7 @@ name: odometer-digit-roll
 适用: 单个王牌指标的全屏亮相（"10x"/"99.98%"级）；与 impact-feedback B 式（伤害数字弹出）分工——那是元素级配菜，这是全屏级主菜
 时长: 滚动+逐位锁定 ~63f + 脉冲 8f + hold ≥45f，约 5s
 能量: 中高
+标签: typography
 ---
 
 ## 意图

@@ -239,8 +239,8 @@ function cardMatches(card) {
   ].join(' ').toLowerCase();
 
   if (state.query && !searchable.includes(state.query.toLowerCase())) return false;
-  if (state.filter === 'missing' && card.styles.every((style) => style.media)) return false;
-  if (state.filter !== 'all' && state.filter !== 'missing' && card.category !== state.filter) return false;
+  // tags = 主类别（目录）+ frontmatter 标签，一张卡可命中多个筛选类
+  if (state.filter !== 'all' && !(card.tags || [card.category]).includes(state.filter)) return false;
   return true;
 }
 
@@ -285,7 +285,7 @@ function render() {
   const orderedKeys = [...CATEGORY_ORDER.filter((key) => groups.has(key)),
     ...[...groups.keys()].filter((key) => !CATEGORY_ORDER.includes(key))];
   let cardIndex = 0;
-  const showHeadings = state.filter === 'all' || state.filter === 'missing';
+  const showHeadings = state.filter === 'all';
   elements.library.innerHTML = orderedKeys.map((key) => {
     const heading = showHeadings
       ? `<h2 class="category-heading" id="category-${escapeHtml(key)}">${escapeHtml(categoryName(key))}<span>${groups.get(key).length}</span></h2>`
@@ -375,11 +375,12 @@ function renderCategoryCounts() {
   if (!state.library) return;
   const counts = {all: state.library.cards.length};
   state.library.cards.forEach((card) => {
-    counts[card.category] = (counts[card.category] || 0) + 1;
+    (card.tags || [card.category]).forEach((tag) => {
+      counts[tag] = (counts[tag] || 0) + 1;
+    });
   });
   elements.filters.querySelectorAll('[data-filter]').forEach((button) => {
     const key = button.dataset.filter;
-    if (key === 'missing') return;
     let badge = button.querySelector('.count');
     if (!badge) {
       badge = document.createElement('span');

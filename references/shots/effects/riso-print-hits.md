@@ -4,6 +4,7 @@ name: riso-print-hits
 适用: 标题/卡片的命中强调，纸墨审美版的"故障闪"；A 单发高潮、B 节奏段连打
 时长: A 4s（单发）；B 4.7s（四拍）
 能量: 高
+标签: typography、rhythm
 ---
 
 ## 意图

@@ -4,6 +4,7 @@ name: stroke-segment-build
 适用: 开场吊悬念的产品名/大数字揭晓；一支片 ≤1 次；与 type-assembly/draw-svg-trace 分工：那些是"看着字被组装/描画"，本卡是"意义延迟揭晓"
 时长: 4–5s
 能量: 低起中收（悬念型，落位帧是能量点）
+标签: typography
 ---
 
 ## 意图

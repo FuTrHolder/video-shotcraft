@@ -4,6 +4,7 @@ name: smear-multiples
 适用: 元素高速位移段想要"漫画式速度感"而非"摄影式模糊"时；与 CameraMotionBlur 二选一
 时长: 元素级技法（移动 12f + 合拢回弹 8f，寄生在位移动作上）
 能量: 中高
+标签: effects
 ---
 
 ## 意图

@@ -4,6 +4,7 @@ name: slam-entrance-moves
 适用: 主角卡/KPI 卡的重拳入场；impact-feedback 管落位后的反馈，本卡管入场本身就是冲击
 能量: 高
 时长: 单式动作段 6–22f + 冲击余波 ~16f + hold ≥45f
+标签: ui-entrance
 ---
 
 ## 意图

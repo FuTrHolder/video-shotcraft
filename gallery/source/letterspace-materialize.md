@@ -4,6 +4,7 @@ name: letterspace-materialize
 适用: 片尾/片头品牌字标登场（SUPERHUMAN 式大字距全大写）；章节题字；needs 静谧/高级感的收束帧
 时长: 静置 ~15f + 描画 ~50f + 终态静置 ≥30f；全段 3–4s
 能量: 低（静谧仪式感，一次呼吸完成）
+标签: typography、outro
 ---
 
 ## 意图

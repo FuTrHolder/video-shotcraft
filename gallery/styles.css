@@ -641,11 +641,10 @@ kbd { padding: 0.2rem 0.34rem; border: 1px solid var(--line); border-radius: 5px
   left: 0.5rem;
   top: 0.5rem;
   z-index: 2;
-  /* clears the fullscreen button (top-right) and the chip row (bottom) */
+  /* clears the fullscreen button (top-right); wrap instead of ellipsizing —
+     a truncated "custom implementation re…" hides the one fact the badge
+     exists to state */
   max-width: calc(100% - 4rem);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   width: fit-content;
   padding: 0.16rem 0.4rem;
   border: 1px solid var(--line);
@@ -703,14 +702,11 @@ kbd { padding: 0.2rem 0.34rem; border: 1px solid var(--line); border-radius: 5px
 .style-selector::-webkit-scrollbar { display: none; }
 .style-option {
   position: relative;
-  /* 0 1 auto: shrink only when the row runs out of room, so 2-chip cards show
-     full names and crowded 4-/6-chip cards give up characters instead of
-     overflowing past the card edge */
-  flex: 0 1 auto;
-  min-width: 0;
+  /* 0 0 auto: never shrink — the row already scrolls horizontally with
+     end-fade masks, so full style names beat "bento-ligh…" truncation */
+  flex: 0 0 auto;
   height: 26px;
   padding: 0 0.5rem;
-  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 7px;
   color: #f0ede5;
@@ -718,7 +714,6 @@ kbd { padding: 0.2rem 0.34rem; border: 1px solid var(--line); border-radius: 5px
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   font-size: 0.72rem;
-  text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
 }

@@ -4,6 +4,7 @@ name: beat-step-list-theme-cycle
 适用: "同一产品多种气质/多主题展示"段落（modern/playful/expressive 式形容词连打）；全片节奏最密的一段；音乐段对拍
 时长: 铺垫 30f + 每拍 18f × 拍数 + 收尾 hold；3 拍约 3.5s（demo 110f）
 能量: 高（0.6s 一拍三通道齐跳，密度型高能）
+标签: typography
 ---
 
 ## 意图

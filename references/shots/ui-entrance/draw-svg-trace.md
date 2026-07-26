@@ -4,6 +4,7 @@ name: draw-svg-trace
 适用: 单个卡片/图表/标题的被点名入场；元素级手法（整页级蓝图描线归 wall-reveal-moves C 式）
 时长: 描边 40f + 闪黑交棒 16f + hold ≥35f，约 3–4s
 能量: 中
+标签: typography
 ---
 
 ## 意图
