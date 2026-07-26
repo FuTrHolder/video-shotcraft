@@ -66,23 +66,22 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, (character)
 }[character]));
 
 const text = (key) => translations.ui[state.language][key] || key;
-const CATEGORY_ORDER = [
-  'opening', 'typography', 'ui-entrance', 'camera', 'data',
-  'interaction', 'transition', 'rhythm', 'effects', 'outro',
-];
-const categoryName = (key) => {
-  const labels = state.library?.categories?.[key];
-  return labels ? labels[state.language] || labels.en : key;
-};
 const cardName = (card) => state.language === 'zh'
   ? translations.cardsZh[card.name] || card.name
   : card.name;
 const styleName = (style) => state.language === 'zh'
   ? translations.stylesZh[style.key] || style.label
   : style.key;
-const cardDescription = (card) => state.language === 'zh'
-  ? card.summary || card.intention
-  : translations.cardsEn[card.name] || card.name.split('-').join(' ');
+// 多式卡的描述跟随当前所选式（zh 用 library.json 的 style.description，
+// en 用 translations.stylesEn）；单式卡沿用整卡描述
+const cardDescription = (card, style) => {
+  const multi = card.styles.length > 1;
+  if (state.language === 'zh') {
+    return (multi && style?.description) || card.summary || card.intention;
+  }
+  return (multi && translations.stylesEn[style?.key])
+    || translations.cardsEn[card.name] || card.name.split('-').join(' ');
+};
 
 function implementationStatusLabel(style) {
   if (style.implementationStatus === 'reference-only') return text('referenceOnly');
@@ -205,7 +204,7 @@ function cardMarkup(card, cardIndex) {
           </div>
         </div>
 
-        <p class="summary">${escapeHtml(cardDescription(card))}</p>
+        <p class="summary">${escapeHtml(cardDescription(card, style))}</p>
 
         <div class="card-actions">
           <button type="button" class="select-button${isSelected ? ' is-selected' : ''}" data-select-name="${escapeHtml(card.name)}"
@@ -233,6 +232,7 @@ function cardMatches(card) {
       style.key,
       style.label,
       translations.stylesZh[style.key],
+      translations.stylesEn[style.key],
       style.description,
       style.use,
     ]),
@@ -275,24 +275,8 @@ function render() {
   if (!state.library) return;
   const focusMark = captureFocus();
   const cards = state.library.cards.filter(cardMatches);
-  // 按功能类别分组渲染；单一类别筛选时不重复出该类标题
-  const groups = new Map();
-  cards.forEach((card) => {
-    const key = card.category || 'other';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(card);
-  });
-  const orderedKeys = [...CATEGORY_ORDER.filter((key) => groups.has(key)),
-    ...[...groups.keys()].filter((key) => !CATEGORY_ORDER.includes(key))];
-  let cardIndex = 0;
-  const showHeadings = state.filter === 'all';
-  elements.library.innerHTML = orderedKeys.map((key) => {
-    const heading = showHeadings
-      ? `<h2 class="category-heading" id="category-${escapeHtml(key)}">${escapeHtml(categoryName(key))}<span>${groups.get(key).length}</span></h2>`
-      : '';
-    const body = groups.get(key).map((card) => cardMarkup(card, cardIndex++)).join('');
-    return `${heading}${body}`;
-  }).join('');
+  // 跨类标签之后按主类别分组名不副实：All 视图就是一整片按字母序的平铺
+  elements.library.innerHTML = cards.map((card, index) => cardMarkup(card, index)).join('');
   elements.library.setAttribute('aria-busy', 'false');
   elements.emptyState.hidden = cards.length > 0;
   restoreFocus(focusMark);
