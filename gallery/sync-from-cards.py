@@ -110,6 +110,8 @@ def main():
             else:
                 style.pop('implementationStatus', None)
     lib['categories'] = CATEGORIES
+    # All 视图直接按 cards 顺序平铺渲染，这里就是排序的唯一权威
+    lib['cards'].sort(key=lambda card: card['name'])
 
     # stats are the single source of truth every page and llms.txt reads;
     # recompute from the cards rather than trusting whatever was there

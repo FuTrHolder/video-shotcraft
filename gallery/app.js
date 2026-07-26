@@ -19,7 +19,10 @@ const savedTheme = (() => {
 
 const initialCategory = (() => {
   try {
-    return new URLSearchParams(window.location.search).get('cat') || 'all';
+    const cat = new URLSearchParams(window.location.search).get('cat');
+    // 只认侧栏里真实存在的筛选键；旧链接（如已删除的 ?cat=missing）回退 all
+    return cat && document.querySelector(`#filters [data-filter="${CSS.escape(cat)}"]`)
+      ? cat : 'all';
   } catch {
     return 'all';
   }
