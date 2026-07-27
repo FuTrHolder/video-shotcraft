@@ -56,26 +56,87 @@ v1→v2 只隔 22 分钟就又被否——说明选曲时根本没在成片语�
 
 ## 3. SFX 词汇表
 
-以下 14 个文件是 `assets/audio/` 的基础层（模板片实际使用的一批）；2026-07 扩充的 27 个新 SFX 与 `bgm/` 备选见 `assets/audio/ATTRIBUTION.md`。时长来自 ffprobe；"典型钉帧位置"引用模板片 `template/src/aifl/Main.tsx` SFX 表的定稿帧号（30fps、全片 1085f），复用时取其相对语义而非绝对数值。
+### 3.0 目录结构与找音路径
 
-| 文件 | 时长 | 用途场景 | 典型钉帧位置（模板片） | 来源与授权 |
-|---|---|---|---|---|
-| `bgm-tech-house.mp3` | 288.7s | 整片鼓底 BGM，tech-house 电子 | 全片铺底，音量包络 0→0.34→0.34→0 | Mixkit（无法逐曲反查，商用前复核） |
-| `transition-soft.mp3` | 1.27s | 柔转场：品牌落定、场景切入 | f12 / f277 / f475 / f623 / f779（每次进新场景一发） | Mixkit |
-| `whoosh-fast.mp3` | 1.76s | 快速运镜、批量元素飞走 | f78 brand→dashboard、f340/356 发牌加速、f435 筛选网格飞走 | Mixkit |
-| `whoosh-big.mp3` | 2.32s | 大幅度运镜：弹起、拉远、回摆 | f127 hero 卡弹起、f308 orbit 拉远、f388 swoosh 回搜索栏 | Mixkit |
-| `sparkle.mp3` | 4.55s | 光效 reveal：扫描光束、收尾闪光 | f141 hero 卡光束、f1005 结尾 rule 闪光 | Mixkit |
-| `transition-snap.mp3` | 0.57s | 短促落定/贴回原位的 snap | f204 hero 卡 impact reseat | Mixkit |
-| `swoosh-quick.mp3` | 0.78s | 字卡出场统一音、轻推镜 | f220/565/725/885 四张 title card、f455 点击后 push-in | Mixkit |
-| `keyboard.mp3` | 19.6s | 真实键盘打字拟音（长样本，按段落裁剪用） | f401 搜索框输入（截 24f）、f781 周报页"自己写出来"（截 44f） | Mixkit |
-| `click-camera.mp3` | 0.35s | 点击确认/快门感（全片最响 vol 0.6） | f451 点击卡片进详情、f648 papers 计数落定 | Mixkit |
-| `riser-cine.mp3` | 4.81s | 电影系上升铺垫，进 finale | f945 outro 合影组装段起 | Mixkit |
-| `impact-cine.mp3` | 4.06s | 电影系重音钉点（vol 0.55 全片 SFX 峰值） | f980 字标 stamp 落地 | Mixkit |
-| `pop.mp3` | 0.48s | 列表条目逐个落入的短促 pop | f840–865 周报周列表 6 连发，每 5f 一发、音量 0.40→0.25 阶梯递减 | **来源待考** |
-| `impact-transition.mp3` | 4.87s | **死资产：全片未被引用**，与定稿 SFX 同批下载的备用 impact | 无 | Mixkit（同批），未接线 |
-| `typewriter.mp3` | 0.22s | **死资产：全片未被引用**。文档页揭示实际用的是 `keyboard.mp3` 截 44f，此文件下了没接线 | 无 | **来源待考** |
+```
+assets/audio/
+  bgm/                5 首  BGM 备选（tech-house 鼓底 + house/hip-hop）
+  sfx/<类别>/       149 个  按场景/材质分 16 类
+```
 
-小结：12/14 在片中实际发声；2 个死资产（`impact-transition.mp3`、`typewriter.mp3`）如实保留并标注；2 个来源待考（`pop.mp3`、`typewriter.mp3`）。"Mixkit" 的判定依据是模板片 Main.tsx 的批量声明，无逐文件 URL——**商用前应逐个回查授权**。
+**找音先定类别，再挑音色**——按要配的画面动作查下表，进对应目录试听：
+
+| 类别 | 数量 | 装什么 | 什么时候进这个目录 |
+|---|---|---|---|
+| `transition/` | 23 | whoosh / sweep / swoosh / 风 | 运镜、场景切换、元素飞入飞走 |
+| `impact/` | 14 | impact / thud / stomp / bass hit | 落地钉点、重拍、slam |
+| `riser/` | 1 | 上升铺垫 | 进 finale / 大镜头前的能量铺垫 |
+| `camera/` | 10 | 快门、镜头、变焦 | 拍照感、crash zoom、对焦、iris |
+| `ui/` | 18 | 点击、开关、通知、pop | UI 反馈、主题切换、列表落入 |
+| `text/` | 13 | 打字机、键盘、书写 | 打字揭示、描线、下划线 |
+| `paper/` | 10 | 纸、翻页、印刷 | 翻页转场、撕裂、纸艺、riso |
+| `film/` | 8 | 放映机、胶片、磁带、黑胶 | 预告片语法、胶片串、回带变速 |
+| `light/` | 10 | sparkle、光效 | 扫光、点亮、余韵闪光 |
+| `data/` | 13 | glitch、电流、数据 | HUD、流式输出、骨架屏、故障 |
+| `scifi/` | 5 | 科技、太空、底噪 | 太空运镜、系统底噪（长样本铺底） |
+| `mech/` | 8 | 机械、工业、锁 | 部件组装、锁定、形变 |
+| `glass/` | 4 | 玻璃、碎裂 | 碎裂转场、硬切冲击 |
+| `fluid/` | 5 | 墨水、水、流体、颗粒 | 墨开场、颗粒填充、气泡 |
+| `crowd/` | 3 | 人群、掌声、呼吸、心跳 | 合影收尾、发布会感、张力 |
+| `counter/` | 4 | 计数器、仪表、钟、倒计时 | 数字滚动、读数、时间轴 |
+
+逐文件的时长 / 峰值 / 建议钉点见 `assets/audio/AUDITION-2026-07-27.md`；授权与 URL 见 `assets/audio/ATTRIBUTION.md`。
+
+注意：类别是**找音的索引，不是配音的判据**。选音仍按第 2 节的片种词汇纪律走——`glass/` `crowd/` `fluid/` 这类材质音是"贴画面定制"槽位（S4），泛用转场仍优先 `transition/` `impact/`。
+
+### 3.1 基础层：模板片实际使用的 14 个
+
+下表是模板片定稿用的一批，**"典型钉帧位置"是本仓库唯一有实战帧号的声音数据**，复用时取其相对语义而非绝对数值（30fps、全片 1085f）。时长来自 ffprobe。路径列给出重构后的位置。
+
+| 文件 | 所在目录 | 时长 | 用途场景 | 典型钉帧位置（模板片） | 来源与授权 |
+|---|---|---|---|---|---|
+| `bgm-tech-house.mp3` | `bgm/` | 288.7s | 整片鼓底 BGM，tech-house 电子 | 全片铺底，音量包络 0→0.34→0.34→0 | Mixkit（无法逐曲反查，商用前复核） |
+| `transition-soft.mp3` | `sfx/transition/` | 1.27s | 柔转场：品牌落定、场景切入 | f12 / f277 / f475 / f623 / f779（每次进新场景一发） | Mixkit |
+| `whoosh-fast.mp3` | `sfx/transition/` | 1.76s | 快速运镜、批量元素飞走 | f78 brand→dashboard、f340/356 发牌加速、f435 筛选网格飞走 | Mixkit |
+| `whoosh-big.mp3` | `sfx/transition/` | 2.32s | 大幅度运镜：弹起、拉远、回摆 | f127 hero 卡弹起、f308 orbit 拉远、f388 swoosh 回搜索栏 | Mixkit |
+| `sparkle.mp3` | `sfx/light/` | 4.55s | 光效 reveal：扫描光束、收尾闪光 | f141 hero 卡光束、f1005 结尾 rule 闪光 | Mixkit |
+| `transition-snap.mp3` | `sfx/transition/` | 0.57s | 短促落定/贴回原位的 snap | f204 hero 卡 impact reseat | Mixkit |
+| `swoosh-quick.mp3` | `sfx/transition/` | 0.78s | 字卡出场统一音、轻推镜 | f220/565/725/885 四张 title card、f455 点击后 push-in | Mixkit |
+| `keyboard.mp3` | `sfx/text/` | 19.6s | 真实键盘打字拟音（长样本，按段落裁剪用） | f401 搜索框输入（截 24f）、f781 周报页"自己写出来"（截 44f） | Mixkit |
+| `click-camera.mp3` | `sfx/camera/` | 0.35s | 点击确认/快门感（全片最响 vol 0.6） | f451 点击卡片进详情、f648 papers 计数落定 | Mixkit |
+| `riser-cine.mp3` | `sfx/riser/` | 4.81s | 电影系上升铺垫，进 finale | f945 outro 合影组装段起 | Mixkit |
+| `impact-cine.mp3` | **已从库中删除** | 4.06s | 电影系重音钉点（vol 0.55 全片 SFX 峰值） | f980 字标 stamp 落地 | Mixkit |
+| `pop.mp3` | `sfx/ui/` | 0.48s | 列表条目逐个落入的短促 pop | f840–865 周报周列表 6 连发，每 5f 一发、音量 0.40→0.25 阶梯递减 | **来源待考** |
+| `impact-transition.mp3` | `sfx/impact/` | 4.87s | **死资产：全片未被引用**，与定稿 SFX 同批下载的备用 impact | 无 | Mixkit（同批），未接线 |
+| `typewriter.mp3` | **已从库中删除** | 0.22s | **死资产：全片未被引用**。文档页揭示实际用的是 `keyboard.mp3` 截 44f，此文件下了没接线 | 无 | **来源待考** |
+
+小结：12/14 在片中实际发声；2 个死资产（`impact-transition.mp3` 保留在库中、`typewriter.mp3` 已删）；来源待考的 `pop.mp3` 仍在库中。
+
+**两个已删文件的处理（2026-07-27 筛选）**：
+
+- `impact-cine.mp3` 已从 `assets/audio/` 删除，但**模板片照常渲染**——Remotion 读的是 `template/public/audio/` 的独立副本（`staticFile('audio/...')`），那份仍在，`Main.tsx:86` 无需改动。新项目要复刻 outro 三拍句式时，用 `sfx/impact/impact-deep-whoosh.mp3` 代替：它与原 `impact-cine.mp3` **字节完全相同**（md5 `ce27fd2f`，见 3.2），是同一个 Mixkit 素材 Cinematic whoosh deep impact。
+- `typewriter.mp3` 已删（本就是死资产，打字揭示实际用 `keyboard.mp3` 截帧）。要单击拟音改用 `sfx/text/typewriter-hit-single.mp3` 或 `typewriter-hit-hard.mp3`。
+
+### 3.2 同素材重名：4 对文件字节完全相同
+
+2026-07-27 全库 md5 比对发现，基础层与第一批扩充里有 4 对是**同一个 Mixkit 素材下了两次、存成两个名字**：
+
+| 一对 | 实际是同一个素材 | 现状 |
+|---|---|---|
+| `transition/transition-soft` = `transition/air-zoom-vacuum` | Air zoom vacuum | 两侧都在 |
+| `transition/swoosh-quick` = `transition/sweep-fast-small` | Fast small sweep transition | 两侧都在 |
+| `impact/impact-transition` = `impact/impact-epic-trailer` | Movie trailer epic impact | 两侧都在 |
+| `impact/impact-cine` = `impact/impact-deep-whoosh` | Cinematic whoosh deep impact | `impact-cine` 已删，留 `impact-deep-whoosh` |
+
+**这几对不能用来做 4.2 的"双样本交替"**——字节相同，交替等于没换音，机枪感照旧。
+真要双样本，从同类别里挑音色近但不同的文件（如 `text/typewriter-hit-hard` + `text/typewriter-hit-soft`）。
+
+教训：库里出现同素材重名，是"批量下载后凭文件名判断有没有重复"的必然结果。**新增音效入库时先跑一遍 md5 去重**，别信名字：
+```bash
+find assets/audio -name '*.mp3' -exec md5 -r {} \; | sort | awk '{print $1}' | uniq -d
+```
+
+比对的副产品是补回了 7 个基础层文件的原始 URL（见 `ATTRIBUTION.md`），这批原本因批量下载丢 metadata 而无法反查。
 
 ---
 
@@ -102,10 +163,10 @@ v1→v2 只隔 22 分钟就又被否——说明选曲时根本没在成片语�
 大镜头（尤其 outro）的固定三拍：
 
 ```
-riser-cine（组装/铺垫段起） → 约 35f 后 impact-cine（主体 stamp 落地，全片响度峰值） → 25f 后 sparkle（余韵光效）
+riser-cine（组装/铺垫段起） → 约 35f 后 impact-deep-whoosh（主体 stamp 落地，全片响度峰值） → 25f 后 sparkle（余韵光效）
 ```
 
-模板片 f945→f980→f1005，是定稿声音方向确立后唯一从未改动的段落句式——能量铺垫、钉点、余韵三件套一次成型。其它可复用的小句式：场景切换 = `transition-soft` 一发；字卡出场 = `swoosh-quick` 统一音；点击确认 = `click-camera`（给全片最高 SFX 响度）。
+模板片 f945→f980→f1005，是定稿声音方向确立后唯一从未改动的段落句式（模板片里中间那拍的文件名叫 `impact-cine.mp3`，已从库中删除；库里等价文件是字节相同的 `impact-deep-whoosh.mp3`，见 3.1）——能量铺垫、钉点、余韵三件套一次成型。其它可复用的小句式：场景切换 = `transition-soft` 一发；字卡出场 = `swoosh-quick` 统一音；点击确认 = `click-camera`（给全片最高 SFX 响度）。
 
 ### 4.4 返工教训：三次重钉的顺序账
 
