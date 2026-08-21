@@ -124,7 +124,7 @@ describe('dampedSettle', () => {
 
   it('oscillates: sign flips every half period', () => {
     const freq = 0.1; // period 10 frames
-    const s1 = dampedSettle(2.5, freq, 0.15); // quarter period → + 
+    const s1 = dampedSettle(2.5, freq, 0.15); // quarter period → +
     const s2 = dampedSettle(7.5, freq, 0.15); // three-quarter → −
     expect(s1).toBeGreaterThan(0);
     expect(s2).toBeLessThan(0);
