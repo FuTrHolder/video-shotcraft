@@ -66,12 +66,13 @@ window.GALLERY_I18N = {
       redNoteName: '小红书',
       starGitHub: '在 GitHub 为 video-shotcraft 加星',
       starAction: 'Star',
-      starGitHubLabel: '在 GitHub 加星',
+      starGitHubLabel: '收藏 GitHub',
       themeLabel: '页面主题',
       themeSystem: '系统',
       themeLight: '浅色',
       themeDark: '深色',
-      navShowcase: '用户作品',
+      navShowcase: '社区作品展示',
+      navShowcaseAria: '浏览社区作品展示',
     },
     en: {
       title: 'Shot Recipes & Motion Samples',
@@ -145,6 +146,7 @@ window.GALLERY_I18N = {
       themeLight: 'Light',
       themeDark: 'Dark',
       navShowcase: 'Showcase',
+      navShowcaseAria: 'Browse community showcase videos',
     },
   },
   cardsZh: {
