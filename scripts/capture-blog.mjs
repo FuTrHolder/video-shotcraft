@@ -1,4 +1,3 @@
-```javascript
 import puppeteer from "puppeteer";
 import fs from "node:fs";
 import path from "node:path";
@@ -83,7 +82,6 @@ try {
 
   console.log(`HTTP status: ${response.status()}`);
 
-  // Wait for fonts and images.
   await page.evaluate(async () => {
     if (document.fonts?.ready) {
       await document.fonts.ready;
@@ -112,12 +110,6 @@ try {
 
   await new Promise((resolve) => setTimeout(resolve, 1500));
 
-  /*
-   * ------------------------------------------------------------
-   * Detect blog metadata
-   * ------------------------------------------------------------
-   */
-
   const blogData = await page.evaluate(() => {
     const text = (element) =>
       element?.textContent?.replace(/\s+/g, " ").trim() || "";
@@ -140,13 +132,6 @@ try {
       return "";
     };
 
-    /*
-     * Blogger selectors
-     *
-     * The selector list intentionally includes several common
-     * WordPress / Blogger / generic blog structures.
-     */
-
     const postSelectors = [
       "article",
       ".post-outer",
@@ -168,11 +153,6 @@ try {
         break;
       }
     }
-
-    /*
-     * Avoid accidentally collecting dozens of nested containers.
-     * The first five meaningful posts are enough for a promo video.
-     */
 
     const posts = postElements
       .map((post, index) => {
@@ -244,30 +224,6 @@ try {
       )
       .slice(0, 5);
 
-    /*
-     * If article detection failed, try Blogger's common
-     * blog-post structure.
-     */
-
-    if (posts.length === 0) {
-      const fallbackLinks = Array.from(
-        document.querySelectorAll(
-          'a[href*="/20"], a[href*="blog-post"]',
-        ),
-      );
-
-      for (const link of fallbackLinks.slice(0, 5)) {
-        posts.push({
-          index: posts.length,
-          title: text(link),
-          url: link.href,
-          date: "",
-          excerpt: "",
-          image: "",
-        });
-      }
-    }
-
     return {
       siteTitle:
         meta('meta[property="og:site_name"]') ||
@@ -304,12 +260,6 @@ try {
     };
   });
 
-  /*
-   * ------------------------------------------------------------
-   * Normalize URLs
-   * ------------------------------------------------------------
-   */
-
   blogData.url = parsedUrl.href;
 
   blogData.siteTitle =
@@ -338,12 +288,6 @@ try {
         post.image,
     );
 
-  /*
-   * ------------------------------------------------------------
-   * Capture complete homepage
-   * ------------------------------------------------------------
-   */
-
   console.log("Capturing homepage...");
 
   await page.screenshot({
@@ -353,15 +297,6 @@ try {
     ),
     fullPage: true,
   });
-
-  /*
-   * ------------------------------------------------------------
-   * Capture individual post cards
-   *
-   * This allows Remotion to use local images rather than
-   * depending on external image URLs during rendering.
-   * ------------------------------------------------------------
-   */
 
   const postSelectors = [
     "article",
@@ -429,37 +364,16 @@ try {
     }
   }
 
-  /*
-   * ------------------------------------------------------------
-   * Final result
-   * ------------------------------------------------------------
-   */
-
   const result = {
     version: 2,
-
     url: blogData.url,
-
-    siteTitle:
-      blogData.siteTitle,
-
-    description:
-      blogData.description,
-
-    pageHeading:
-      blogData.pageHeading,
-
-    ogImage:
-      blogData.ogImage,
-
-    posts:
-      blogData.posts,
-
-    postCount:
-      blogData.posts.length,
-
-    capturedAt:
-      new Date().toISOString(),
+    siteTitle: blogData.siteTitle,
+    description: blogData.description,
+    pageHeading: blogData.pageHeading,
+    ogImage: blogData.ogImage,
+    posts: blogData.posts,
+    postCount: blogData.posts.length,
+    capturedAt: new Date().toISOString(),
   };
 
   fs.writeFileSync(
@@ -487,25 +401,6 @@ try {
       2,
     ),
   );
-
-  console.log("");
-  console.log(
-    `Homepage: ${path.join(
-      OUTPUT_DIR,
-      "home.png",
-    )}`,
-  );
-
-  console.log(
-    `Metadata: ${path.join(
-      OUTPUT_DIR,
-      "blog.json",
-    )}`,
-  );
-
-  console.log(
-    `Posts: ${result.postCount}`,
-  );
 } catch (error) {
   console.error("");
   console.error("========================================");
@@ -518,4 +413,3 @@ try {
 } finally {
   await browser.close();
 }
-```
