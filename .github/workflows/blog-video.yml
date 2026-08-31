@@ -44,6 +44,18 @@ jobs:
           npm init -y
           npm install puppeteer@24
 
+      - name: Debug capture script
+        run: |
+          echo "Commit:"
+          git rev-parse HEAD
+      
+          echo "Branch:"
+          git branch --show-current
+      
+          echo "capture-blog.mjs:"
+          sed -n '1,40p' scripts/capture-blog.mjs
+          
+
       - name: Verify repository files
         run: |
           echo "Current branch/ref:"
