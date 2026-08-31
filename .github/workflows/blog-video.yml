@@ -86,7 +86,27 @@ jobs:
 
       - name: Check captured assets
         run: |
+          echo "=== Blog capture directory ==="
+          find template/public/blog -maxdepth 3 -type f -print
+      
+          echo ""
+          echo "=== Blog directory ==="
           ls -lah template/public/blog
+      
+          echo ""
+          echo "=== Posts directory ==="
+          if [ -d template/public/blog/posts ]; then
+            ls -lah template/public/blog/posts
+          else
+            echo "posts directory does not exist"
+          fi
+      
+          echo ""
+          echo "=== blog.json ==="
+          cat template/public/blog/blog.json
+      
+          echo ""
+          echo "=== Required files ==="
           test -f template/public/blog/home.png
           test -f template/public/blog/blog.json
 
@@ -121,5 +141,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: blog-capture
-          path: template/public/blog/home.png
+          path: template/public/blog
           if-no-files-found: error
