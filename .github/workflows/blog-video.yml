@@ -1,5 +1,5 @@
 name: Generate Blog Promotional Video
-
+ 
 on:
   workflow_dispatch:
     inputs:
