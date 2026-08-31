@@ -1,4 +1,14 @@
-import { registerRoot } from 'remotion';
-import { Root } from './Root';
+import { registerRoot } from "remotion";
+import { Root } from "./Root";
+import { BlogRoot } from "./BlogRoot";
 
-registerRoot(Root);
+const RootWithBlog: React.FC = () => {
+  return (
+    <>
+      <Root />
+      <BlogRoot />
+    </>
+  );
+};
+
+registerRoot(RootWithBlog);
