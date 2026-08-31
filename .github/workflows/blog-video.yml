@@ -26,8 +26,10 @@ jobs:
       # ------------------------------------------------------------
       # 1. Checkout
       # ------------------------------------------------------------
-      - name: Checkout repository
+      - name: Checkout blog-video branch
         uses: actions/checkout@v4
+        with:
+          ref: blog-video
 
       # ------------------------------------------------------------
       # 2. Node.js
