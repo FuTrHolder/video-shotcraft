@@ -85,9 +85,9 @@ jobs:
           BLOG_URL: ${{ inputs.blog_url }}
         run: |
           mkdir -p out
-
+      
           npx remotion render \
-            src/index.ts \
+            src/index.tsx \
             BlogPromo \
             out/blog-promo.mp4 \
             --concurrency=1
