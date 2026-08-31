@@ -1,13 +1,7 @@
-```tsx
-import React, {
-  useEffect,
-  useState,
-} from "react";
-
+import React, {useEffect, useState} from "react";
 import {
   AbsoluteFill,
   Img,
-  interpolate,
   Sequence,
   staticFile,
   useCurrentFrame,
@@ -15,9 +9,7 @@ import {
 } from "remotion";
 
 export const BLOG_PROMO_FPS = 30;
-
 export const BLOG_PROMO_SECONDS = 24;
-
 export const BLOG_PROMO_DURATION =
   BLOG_PROMO_FPS * BLOG_PROMO_SECONDS;
 
@@ -50,38 +42,64 @@ const clamp = {
 const fadeIn = (
   frame: number,
   start: number,
-  duration = 15,
-) =>
-  interpolate(
-    frame,
-    [start, start + duration],
-    [0, 1],
-    clamp,
+  duration: number,
+) => {
+  const input = [start, start + duration];
+  const output = [0, 1];
+
+  if (frame <= start) {
+    return 0;
+  }
+
+  if (frame >= start + duration) {
+    return 1;
+  }
+
+  const progress =
+    (frame - input[0]) /
+    (input[1] - input[0]);
+
+  return (
+    output[0] +
+    (output[1] - output[0]) *
+      progress
   );
+};
 
 const fadeOut = (
   frame: number,
   end: number,
-  duration = 15,
-) =>
-  interpolate(
-    frame,
-    [end - duration, end],
-    [1, 0],
-    clamp,
+  duration: number,
+) => {
+  if (frame <= end - duration) {
+    return 1;
+  }
+
+  if (frame >= end) {
+    return 0;
+  }
+
+  return (
+    (end - frame) /
+    duration
   );
+};
 
 const safeText = (
-  value: string,
+  value: string | undefined,
   fallback: string,
 ) => {
-  const result = value?.trim();
+  if (!value) {
+    return fallback;
+  }
+
+  const result = value.trim();
 
   return result || fallback;
 };
 
 const truncate = (
-  value: string,
+  value: string | undefined,
   length: number,
 ) => {
   const text = safeText(value, "");
@@ -90,14 +108,11 @@ const truncate = (
     return text;
   }
 
-  return `${text.slice(0, length - 1)}…`;
+  return (
+    text.substring(0, length - 1) +
+    "…"
+  );
 };
-
-/*
- * ------------------------------------------------------------
- * Blog data loader
- * ------------------------------------------------------------
- */
 
 const useBlogData = () => {
   const [data, setData] =
@@ -106,26 +121,33 @@ const useBlogData = () => {
   const [error, setError] =
     useState<string | null>(null);
 
-  const { delayRender, continueRender } =
-    useDelayRender();
+  const {
+    delayRender,
+    continueRender,
+  } = useDelayRender();
 
   useEffect(() => {
     const handle =
-      delayRender("Loading blog.json");
+      delayRender(
+        "Loading blog.json",
+      );
 
     fetch(
-      staticFile("blog/blog.json"),
+      staticFile(
+        "blog/blog.json",
+      ),
     )
-      .then(async (response) => {
+      .then((response) => {
         if (!response.ok) {
           throw new Error(
-            `Could not load blog.json (${response.status})`,
+            "Could not load blog.json: " +
+              response.status,
           );
         }
 
         return response.json();
       })
-      .then((json) => {
+      .then((json: BlogData) => {
         setData(json);
         continueRender(handle);
       })
@@ -149,12 +171,6 @@ const useBlogData = () => {
   };
 };
 
-/*
- * ------------------------------------------------------------
- * Main composition
- * ------------------------------------------------------------
- */
-
 export const BlogPromo: React.FC = () => {
   const frame =
     useCurrentFrame();
@@ -168,13 +184,10 @@ export const BlogPromo: React.FC = () => {
     return (
       <AbsoluteFill
         style={{
-          background:
-            "#111",
-          color: "white",
-          alignItems:
-            "center",
-          justifyContent:
-            "center",
+          backgroundColor: "#111",
+          color: "#fff",
+          alignItems: "center",
+          justifyContent: "center",
           fontFamily:
             "Arial, sans-serif",
           padding: 80,
@@ -206,69 +219,60 @@ export const BlogPromo: React.FC = () => {
     return (
       <AbsoluteFill
         style={{
-          background:
-            "#111",
-          color: "white",
-          alignItems:
-            "center",
-          justifyContent:
-            "center",
+          backgroundColor: "#111",
+          color: "#fff",
+          alignItems: "center",
+          justifyContent: "center",
           fontFamily:
             "Arial, sans-serif",
           fontSize: 28,
         }}
       >
-        Loading blog…
+        Loading blog...
       </AbsoluteFill>
     );
   }
 
   const posts =
-    data.posts?.slice(0, 3) || [];
-
-  /*
-   * 24 second structure
-   *
-   * 0–4       Intro / brand
-   * 4–9       What the blog offers
-   * 9–13      Post #1
-   * 13–17     Post #2
-   * 17–21     Post #3
-   * 21–24     CTA
-   */
+    data.posts
+      ? data.posts.slice(0, 3)
+      : [];
 
   return (
     <AbsoluteFill
       style={{
-        background:
-          "#0b0b0b",
-        color:
-          "white",
+        backgroundColor: "#0b0b0b",
+        color: "#fff",
         fontFamily:
-          "Inter, Arial, sans-serif",
-        overflow:
-          "hidden",
+          "Arial, sans-serif",
+        overflow: "hidden",
       }}
     >
-      <IntroScene
-        data={data}
-        frame={frame}
-      />
+      <Sequence
+        from={0}
+        durationInFrames={120}
+      >
+        <IntroScene data={data} />
+      </Sequence>
 
       <Sequence
         from={120}
         durationInFrames={150}
       >
-        <OverviewScene
-          data={data}
-        />
+        <OverviewScene data={data} />
       </Sequence>
 
       {posts.map(
         (post, index) => (
           <Sequence
-            key={`${post.url}-${index}`}
-            from={270 + index * 120}
+            key={
+              post.url ||
+              "post-" + index
+            }
+            from={
+              270 +
+              index * 120
+            }
             durationInFrames={120}
           >
             <PostScene
@@ -283,73 +287,45 @@ export const BlogPromo: React.FC = () => {
         from={630}
         durationInFrames={90}
       >
-        <OutroScene
-          data={data}
-        />
+        <OutroScene data={data} />
       </Sequence>
     </AbsoluteFill>
   );
 };
 
-/*
- * ------------------------------------------------------------
- * Scene 1
- * ------------------------------------------------------------
- */
-
 const IntroScene: React.FC<{
   data: BlogData;
-  frame: number;
-}> = ({
-  data,
-  frame,
-}) => {
-  const opacity =
-    fadeIn(frame, 0) *
-    fadeOut(frame, 105);
+}> = ({data}) => {
+  const frame =
+    useCurrentFrame();
 
-  const scale =
-    interpolate(
-      frame,
-      [0, 90],
-      [1.08, 1],
-      clamp,
-    );
+  const opacity =
+    fadeIn(frame, 0, 15) *
+    fadeOut(frame, 120, 15);
 
   return (
     <AbsoluteFill
       style={{
         opacity,
-        alignItems:
-          "center",
-        justifyContent:
-          "center",
-        transform:
-          `scale(${scale})`,
-        padding:
-          100,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 100,
       }}
     >
       <div
         style={{
-          textAlign:
-            "center",
-          maxWidth:
-            1500,
+          textAlign: "center",
+          maxWidth: 1500,
         }}
       >
         <div
           style={{
-            fontSize:
-              24,
-            letterSpacing:
-              8,
+            fontSize: 24,
+            letterSpacing: 8,
             textTransform:
               "uppercase",
-            opacity:
-              0.65,
-            marginBottom:
-              28,
+            opacity: 0.65,
+            marginBottom: 28,
           }}
         >
           DISCOVER
@@ -357,14 +333,10 @@ const IntroScene: React.FC<{
 
         <div
           style={{
-            fontSize:
-              82,
-            lineHeight:
-              1.05,
-            fontWeight:
-              800,
-            letterSpacing:
-              -3,
+            fontSize: 82,
+            lineHeight: 1.05,
+            fontWeight: 800,
+            letterSpacing: -3,
           }}
         >
           {truncate(
@@ -378,20 +350,13 @@ const IntroScene: React.FC<{
 
         <div
           style={{
-            marginTop:
-              30,
-            fontSize:
-              28,
-            lineHeight:
-              1.45,
-            opacity:
-              0.72,
-            maxWidth:
-              1100,
-            marginLeft:
-              "auto",
-            marginRight:
-              "auto",
+            marginTop: 30,
+            fontSize: 28,
+            lineHeight: 1.45,
+            opacity: 0.72,
+            maxWidth: 1100,
+            marginLeft: "auto",
+            marginRight: "auto",
           }}
         >
           {truncate(
@@ -407,17 +372,9 @@ const IntroScene: React.FC<{
   );
 };
 
-/*
- * ------------------------------------------------------------
- * Scene 2
- * ------------------------------------------------------------
- */
-
 const OverviewScene: React.FC<{
   data: BlogData;
-}> = ({
-  data,
-}) => {
+}> = ({data}) => {
   return (
     <AbsoluteFill
       style={{
@@ -429,16 +386,12 @@ const OverviewScene: React.FC<{
     >
       <div
         style={{
-          fontSize:
-            24,
-          letterSpacing:
-            5,
+          fontSize: 24,
+          letterSpacing: 5,
           textTransform:
             "uppercase",
-          opacity:
-            0.55,
-          marginBottom:
-            24,
+          opacity: 0.55,
+          marginBottom: 24,
         }}
       >
         WHAT YOU'LL FIND
@@ -446,14 +399,10 @@ const OverviewScene: React.FC<{
 
       <div
         style={{
-          fontSize:
-            60,
-          fontWeight:
-            750,
-          lineHeight:
-            1.1,
-          maxWidth:
-            1300,
+          fontSize: 60,
+          fontWeight: 750,
+          lineHeight: 1.1,
+          maxWidth: 1300,
         }}
       >
         Fresh ideas.
@@ -465,16 +414,11 @@ const OverviewScene: React.FC<{
 
       <div
         style={{
-          marginTop:
-            38,
-          fontSize:
-            25,
-          lineHeight:
-            1.5,
-          opacity:
-            0.7,
-          maxWidth:
-            1100,
+          marginTop: 38,
+          fontSize: 25,
+          lineHeight: 1.5,
+          opacity: 0.7,
+          maxWidth: 1100,
         }}
       >
         {truncate(
@@ -488,71 +432,27 @@ const OverviewScene: React.FC<{
 
       <div
         style={{
-          marginTop:
-            45,
-          display:
-            "flex",
-          alignItems:
-            "center",
-          gap:
-            18,
+          marginTop: 45,
+          fontSize: 21,
+          opacity: 0.65,
         }}
       >
-        <div
-          style={{
-            width:
-              12,
-            height:
-              12,
-            borderRadius:
-              "50%",
-            background:
-              "white",
-          }}
-        />
-
-        <div
-          style={{
-            fontSize:
-              21,
-            opacity:
-              0.65,
-          }}
-        >
-          {data.postCount || 0} articles available
-        </div>
+        {data.postCount || 0} articles available
       </div>
     </AbsoluteFill>
   );
 };
 
-/*
- * ------------------------------------------------------------
- * Scene 3–5
- * ------------------------------------------------------------
- */
-
 const PostScene: React.FC<{
   post: BlogPost;
   index: number;
-}> = ({
-  post,
-  index,
-}) => {
+}> = ({post, index}) => {
   const frame =
     useCurrentFrame();
 
   const opacity =
     fadeIn(frame, 0, 12) *
-    fadeOut(frame, 110, 10);
-
-  const imageScale =
-    interpolate(
-      frame,
-      [0, 120],
-      [1.02, 1.08],
-      clamp,
-    );
+    fadeOut(frame, 120, 10);
 
   const localImage =
     post.localScreenshot;
@@ -560,8 +460,7 @@ const PostScene: React.FC<{
   return (
     <AbsoluteFill
       style={{
-        background:
-          "#101010",
+        backgroundColor: "#101010",
         opacity,
       }}
     >
@@ -571,18 +470,11 @@ const PostScene: React.FC<{
             localImage,
           )}
           style={{
-            position:
-              "absolute",
-            inset:
-              0,
-            width:
-              "100%",
-            height:
-              "100%",
-            objectFit:
-              "cover",
-            transform:
-              `scale(${imageScale})`,
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
             filter:
               "brightness(0.42) saturate(0.75)",
           }}
@@ -593,18 +485,11 @@ const PostScene: React.FC<{
             "blog/home.png",
           )}
           style={{
-            position:
-              "absolute",
-            inset:
-              0,
-            width:
-              "100%",
-            height:
-              "100%",
-            objectFit:
-              "cover",
-            transform:
-              `scale(${imageScale})`,
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
             filter:
               "brightness(0.35)",
           }}
@@ -620,53 +505,36 @@ const PostScene: React.FC<{
 
       <div
         style={{
-          position:
-            "absolute",
-          left:
-            110,
-          right:
-            110,
-          top:
-            100,
-          bottom:
-            100,
-          display:
-            "flex",
-          flexDirection:
-            "column",
-          justifyContent:
-            "center",
+          position: "absolute",
+          left: 110,
+          right: 110,
+          top: 100,
+          bottom: 100,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
         }}
       >
         <div
           style={{
-            fontSize:
-              20,
-            letterSpacing:
-              5,
+            fontSize: 20,
+            letterSpacing: 5,
             textTransform:
               "uppercase",
-            opacity:
-              0.6,
-            marginBottom:
-              25,
+            opacity: 0.6,
+            marginBottom: 25,
           }}
         >
-          LATEST ARTICLE {index + 1}
+          LATEST ARTICLE{" "}
+          {index + 1}
         </div>
 
         <div
           style={{
-            fontSize:
-              58,
-            fontWeight:
-              800,
-            lineHeight:
-              1.1,
-            maxWidth:
-              1250,
-            letterSpacing:
-              -2,
+            fontSize: 58,
+            fontWeight: 800,
+            lineHeight: 1.1,
+            maxWidth: 1250,
           }}
         >
           {truncate(
@@ -681,12 +549,9 @@ const PostScene: React.FC<{
         {post.date && (
           <div
             style={{
-              marginTop:
-                20,
-              fontSize:
-                19,
-              opacity:
-                0.55,
+              marginTop: 20,
+              fontSize: 19,
+              opacity: 0.55,
             }}
           >
             {post.date}
@@ -696,16 +561,11 @@ const PostScene: React.FC<{
         {post.excerpt && (
           <div
             style={{
-              marginTop:
-                28,
-              fontSize:
-                24,
-              lineHeight:
-                1.45,
-              opacity:
-                0.72,
-              maxWidth:
-                1050,
+              marginTop: 28,
+              fontSize: 24,
+              lineHeight: 1.45,
+              opacity: 0.72,
+              maxWidth: 1050,
             }}
           >
             {truncate(
@@ -717,14 +577,10 @@ const PostScene: React.FC<{
 
         <div
           style={{
-            marginTop:
-              42,
-            fontSize:
-              19,
-            letterSpacing:
-              1,
-            opacity:
-              0.65,
+            marginTop: 42,
+            fontSize: 19,
+            letterSpacing: 1,
+            opacity: 0.65,
           }}
         >
           READ THE FULL ARTICLE →
@@ -734,61 +590,34 @@ const PostScene: React.FC<{
   );
 };
 
-/*
- * ------------------------------------------------------------
- * Scene 6
- * ------------------------------------------------------------
- */
-
 const OutroScene: React.FC<{
   data: BlogData;
-}> = ({
-  data,
-}) => {
+}> = ({data}) => {
   const frame =
     useCurrentFrame();
 
   const opacity =
     fadeIn(frame, 0, 15);
 
-  const y =
-    interpolate(
-      frame,
-      [0, 45],
-      [35, 0],
-      clamp,
-    );
-
   return (
     <AbsoluteFill
       style={{
-        background:
-          "#0b0b0b",
+        backgroundColor: "#0b0b0b",
         opacity,
-        alignItems:
-          "center",
-        justifyContent:
-          "center",
-        transform:
-          `translateY(${y}px)`,
-        textAlign:
-          "center",
-        padding:
-          80,
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        padding: 80,
       }}
     >
       <div
         style={{
-          fontSize:
-            26,
-          letterSpacing:
-            7,
+          fontSize: 26,
+          letterSpacing: 7,
           textTransform:
             "uppercase",
-          opacity:
-            0.55,
-          marginBottom:
-            28,
+          opacity: 0.55,
+          marginBottom: 28,
         }}
       >
         KEEP EXPLORING
@@ -796,14 +625,10 @@ const OutroScene: React.FC<{
 
       <div
         style={{
-          fontSize:
-            72,
-          fontWeight:
-            800,
-          lineHeight:
-            1.05,
-          maxWidth:
-            1300,
+          fontSize: 72,
+          fontWeight: 800,
+          lineHeight: 1.05,
+          maxWidth: 1300,
         }}
       >
         {truncate(
@@ -817,14 +642,9 @@ const OutroScene: React.FC<{
 
       <div
         style={{
-          marginTop:
-            32,
-          fontSize:
-            24,
-          opacity:
-            0.65,
-          maxWidth:
-            1000,
+          marginTop: 32,
+          fontSize: 24,
+          opacity: 0.65,
         }}
       >
         Visit the blog and discover
@@ -833,18 +653,14 @@ const OutroScene: React.FC<{
 
       <div
         style={{
-          marginTop:
-            45,
+          marginTop: 45,
           padding:
             "18px 34px",
           border:
             "1px solid rgba(255,255,255,0.35)",
-          borderRadius:
-            999,
-          fontSize:
-            20,
-          letterSpacing:
-            1,
+          borderRadius: 999,
+          fontSize: 20,
+          letterSpacing: 1,
         }}
       >
         VISIT BLOG
@@ -852,4 +668,3 @@ const OutroScene: React.FC<{
     </AbsoluteFill>
   );
 };
-```
