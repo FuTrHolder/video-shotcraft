@@ -1,5 +1,5 @@
 name: Generate Blog Promotional Video
- 
+
 on:
   workflow_dispatch:
     inputs:
@@ -23,17 +23,11 @@ jobs:
       contents: read
 
     steps:
-      # ------------------------------------------------------------
-      # 1. Checkout
-      # ------------------------------------------------------------
       - name: Checkout blog-video branch
         uses: actions/checkout@v4
         with:
           ref: blog-video
 
-      # ------------------------------------------------------------
-      # 2. Node.js
-      # ------------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -41,41 +35,49 @@ jobs:
           cache: npm
           cache-dependency-path: template/package.json
 
-      # ------------------------------------------------------------
-      # 3. Install template dependencies
-      # ------------------------------------------------------------
       - name: Install Remotion dependencies
         working-directory: template
         run: npm install
 
-      # ------------------------------------------------------------
-      # 4. Install Puppeteer
-      # ------------------------------------------------------------
       - name: Install blog capture dependencies
         run: |
           npm init -y
           npm install puppeteer@24
 
-      # ------------------------------------------------------------
-      # 5. Capture blog
-      # ------------------------------------------------------------
+      - name: Verify repository files
+        run: |
+          echo "Current branch/ref:"
+          git branch --show-current
+          git rev-parse HEAD
+
+          echo ""
+          echo "Repository root:"
+          pwd
+
+          echo ""
+          echo "capture-blog.mjs:"
+          ls -lah scripts/capture-blog.mjs
+
+          echo ""
+          echo "BlogPromo:"
+          ls -lah template/src/blog/BlogPromo.tsx
+
+          echo ""
+          echo "BlogRoot:"
+          ls -lah template/src/BlogRoot.tsx
+
       - name: Capture blog homepage
         env:
           BLOG_URL: ${{ inputs.blog_url }}
         run: |
           node scripts/capture-blog.mjs "$BLOG_URL"
 
-      # ------------------------------------------------------------
-      # 6. Validate captured asset
-      # ------------------------------------------------------------
       - name: Check captured assets
         run: |
           ls -lah template/public/blog
           test -f template/public/blog/home.png
+          test -f template/public/blog/blog.json
 
-      # ------------------------------------------------------------
-      # 7. Render Remotion video
-      # ------------------------------------------------------------
       - name: Render blog promotional video
         working-directory: template
         env:
@@ -83,24 +85,19 @@ jobs:
           BLOG_URL: ${{ inputs.blog_url }}
         run: |
           mkdir -p out
+
           npx remotion render \
             src/index.ts \
             BlogPromo \
             out/blog-promo.mp4 \
             --concurrency=1
 
-      # ------------------------------------------------------------
-      # 8. Check output
-      # ------------------------------------------------------------
       - name: Check video output
         working-directory: template
         run: |
           ls -lh out/blog-promo.mp4
           test -f out/blog-promo.mp4
 
-      # ------------------------------------------------------------
-      # 9. Upload MP4
-      # ------------------------------------------------------------
       - name: Upload promotional video
         uses: actions/upload-artifact@v4
         with:
@@ -108,9 +105,6 @@ jobs:
           path: template/out/blog-promo.mp4
           if-no-files-found: error
 
-      # ------------------------------------------------------------
-      # 10. Upload screenshot for debugging
-      # ------------------------------------------------------------
       - name: Upload captured blog screenshot
         uses: actions/upload-artifact@v4
         with:
