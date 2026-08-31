@@ -1,29 +1,55 @@
+```javascript
 import puppeteer from "puppeteer";
 import fs from "node:fs";
 import path from "node:path";
 
-const BLOG_URL = process.argv[2];
+const rawUrl = process.argv[2];
 
-if (!BLOG_URL) {
+if (!rawUrl) {
   console.error("Usage: node scripts/capture-blog.mjs <blog-url>");
   process.exit(1);
 }
+
+const BLOG_URL = rawUrl.trim();
 
 let parsedUrl;
 
 try {
   parsedUrl = new URL(BLOG_URL);
+
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Unsupported protocol");
+  }
 } catch {
   console.error(`Invalid blog URL: ${BLOG_URL}`);
   process.exit(1);
 }
 
 const OUTPUT_DIR = path.resolve("template/public/blog");
+const POSTS_DIR = path.join(OUTPUT_DIR, "posts");
 
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+fs.mkdirSync(POSTS_DIR, { recursive: true });
 
+const clean = (value = "") =>
+  value.replace(/\s+/g, " ").trim();
+
+const absoluteUrl = (value) => {
+  if (!value) return "";
+
+  try {
+    return new URL(value, parsedUrl.href).href;
+  } catch {
+    return "";
+  }
+};
+
+console.log("========================================");
+console.log("BLOG ANALYZER");
+console.log("========================================");
 console.log(`Blog URL: ${parsedUrl.href}`);
 console.log(`Output: ${OUTPUT_DIR}`);
+console.log("========================================");
 
 const browser = await puppeteer.launch({
   headless: true,
@@ -44,69 +70,452 @@ try {
     deviceScaleFactor: 1,
   });
 
-  await page.goto(parsedUrl.href, {
+  console.log("Opening blog...");
+
+  const response = await page.goto(parsedUrl.href, {
     waitUntil: "networkidle2",
     timeout: 60000,
   });
 
+  if (!response) {
+    throw new Error("No response received from blog");
+  }
+
+  console.log(`HTTP status: ${response.status()}`);
+
+  // Wait for fonts and images.
   await page.evaluate(async () => {
     if (document.fonts?.ready) {
       await document.fonts.ready;
     }
+
+    const images = Array.from(document.images);
+
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) {
+          return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+          img.addEventListener("load", resolve, {
+            once: true,
+          });
+
+          img.addEventListener("error", resolve, {
+            once: true,
+          });
+        });
+      }),
+    );
   });
 
   await new Promise((resolve) => setTimeout(resolve, 1500));
 
-  const title = await page.title();
+  /*
+   * ------------------------------------------------------------
+   * Detect blog metadata
+   * ------------------------------------------------------------
+   */
 
-  const metaDescription = await page
-    .$eval(
-      'meta[name="description"]',
-      (el) => el.getAttribute("content") || "",
-    )
-    .catch(() => "");
+  const blogData = await page.evaluate(() => {
+    const text = (element) =>
+      element?.textContent?.replace(/\s+/g, " ").trim() || "";
 
-  const h1 = await page
-    .$eval("h1", (el) => el.textContent?.trim() || "")
-    .catch(() => "");
+    const meta = (selector) =>
+      document
+        .querySelector(selector)
+        ?.getAttribute("content") || "";
 
-  const ogImage = await page
-    .$eval(
-      'meta[property="og:image"]',
-      (el) => el.getAttribute("content") || "",
-    )
-    .catch(() => "");
+    const firstAttr = (selectors, attr) => {
+      for (const selector of selectors) {
+        const value =
+          document.querySelector(selector)?.getAttribute(attr);
 
-  const result = {
-    url: parsedUrl.href,
-    title,
-    description: metaDescription,
-    h1,
-    ogImage,
-    capturedAt: new Date().toISOString(),
-  };
+        if (value) {
+          return value;
+        }
+      }
+
+      return "";
+    };
+
+    /*
+     * Blogger selectors
+     *
+     * The selector list intentionally includes several common
+     * WordPress / Blogger / generic blog structures.
+     */
+
+    const postSelectors = [
+      "article",
+      ".post-outer",
+      ".post",
+      ".blog-post",
+      ".hentry",
+      ".entry",
+    ];
+
+    let postElements = [];
+
+    for (const selector of postSelectors) {
+      const elements = Array.from(
+        document.querySelectorAll(selector),
+      );
+
+      if (elements.length > 0) {
+        postElements = elements;
+        break;
+      }
+    }
+
+    /*
+     * Avoid accidentally collecting dozens of nested containers.
+     * The first five meaningful posts are enough for a promo video.
+     */
+
+    const posts = postElements
+      .map((post, index) => {
+        const titleElement = post.querySelector(
+          [
+            ".post-title",
+            ".entry-title",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+          ].join(","),
+        );
+
+        const linkElement = post.querySelector(
+          [
+            ".post-title a",
+            ".entry-title a",
+            "h1 a",
+            "h2 a",
+            "h3 a",
+            'a[rel="bookmark"]',
+          ].join(","),
+        );
+
+        const imageElement = post.querySelector(
+          "img[src], img[data-src], img[data-original]",
+        );
+
+        const dateElement = post.querySelector(
+          [
+            "time",
+            ".date-header",
+            ".post-timestamp",
+            ".published",
+          ].join(","),
+        );
+
+        const contentElement = post.querySelector(
+          [
+            ".post-body",
+            ".post-snippet",
+            ".entry-summary",
+            ".entry-content",
+            ".post-snippet-container",
+          ].join(","),
+        );
+
+        const image =
+          imageElement?.getAttribute("src") ||
+          imageElement?.getAttribute("data-src") ||
+          imageElement?.getAttribute("data-original") ||
+          "";
+
+        return {
+          index,
+          title: text(titleElement || linkElement),
+          url: linkElement?.href || "",
+          date: text(dateElement),
+          excerpt: text(contentElement).slice(0, 300),
+          image,
+        };
+      })
+      .filter(
+        (post) =>
+          post.title ||
+          post.url ||
+          post.image,
+      )
+      .slice(0, 5);
+
+    /*
+     * If article detection failed, try Blogger's common
+     * blog-post structure.
+     */
+
+    if (posts.length === 0) {
+      const fallbackLinks = Array.from(
+        document.querySelectorAll(
+          'a[href*="/20"], a[href*="blog-post"]',
+        ),
+      );
+
+      for (const link of fallbackLinks.slice(0, 5)) {
+        posts.push({
+          index: posts.length,
+          title: text(link),
+          url: link.href,
+          date: "",
+          excerpt: "",
+          image: "",
+        });
+      }
+    }
+
+    return {
+      siteTitle:
+        meta('meta[property="og:site_name"]') ||
+        meta('meta[property="og:title"]') ||
+        text(document.querySelector(".header-title")) ||
+        text(document.querySelector("#Header1 h1")) ||
+        text(document.querySelector("h1")) ||
+        document.title ||
+        location.hostname,
+
+      description:
+        meta('meta[name="description"]') ||
+        meta('meta[property="og:description"]') ||
+        text(document.querySelector(".description")) ||
+        text(document.querySelector(".header-description")) ||
+        "",
+
+      url: location.href,
+
+      ogImage:
+        firstAttr(
+          [
+            'meta[property="og:image"]',
+            'meta[name="twitter:image"]',
+          ],
+          "content",
+        ),
+
+      pageHeading: text(
+        document.querySelector("h1"),
+      ),
+
+      posts,
+    };
+  });
+
+  /*
+   * ------------------------------------------------------------
+   * Normalize URLs
+   * ------------------------------------------------------------
+   */
+
+  blogData.url = parsedUrl.href;
+
+  blogData.siteTitle =
+    clean(blogData.siteTitle) ||
+    parsedUrl.hostname;
+
+  blogData.description =
+    clean(blogData.description);
+
+  blogData.ogImage =
+    absoluteUrl(blogData.ogImage);
+
+  blogData.posts = blogData.posts
+    .map((post) => ({
+      ...post,
+      title: clean(post.title),
+      date: clean(post.date),
+      excerpt: clean(post.excerpt),
+      url: absoluteUrl(post.url),
+      image: absoluteUrl(post.image),
+    }))
+    .filter(
+      (post) =>
+        post.title ||
+        post.url ||
+        post.image,
+    );
+
+  /*
+   * ------------------------------------------------------------
+   * Capture complete homepage
+   * ------------------------------------------------------------
+   */
+
+  console.log("Capturing homepage...");
 
   await page.screenshot({
-    path: path.join(OUTPUT_DIR, "home.png"),
+    path: path.join(
+      OUTPUT_DIR,
+      "home.png",
+    ),
     fullPage: true,
   });
 
+  /*
+   * ------------------------------------------------------------
+   * Capture individual post cards
+   *
+   * This allows Remotion to use local images rather than
+   * depending on external image URLs during rendering.
+   * ------------------------------------------------------------
+   */
+
+  const postSelectors = [
+    "article",
+    ".post-outer",
+    ".post",
+    ".blog-post",
+    ".hentry",
+    ".entry",
+  ];
+
+  let detectedSelector = null;
+
+  for (const selector of postSelectors) {
+    const count = await page.$$eval(
+      selector,
+      (elements) => elements.length,
+    );
+
+    if (count > 0) {
+      detectedSelector = selector;
+      break;
+    }
+  }
+
+  if (detectedSelector) {
+    const postElements = await page.$$(detectedSelector);
+
+    const limit = Math.min(
+      postElements.length,
+      blogData.posts.length,
+      5,
+    );
+
+    for (let i = 0; i < limit; i++) {
+      const element = postElements[i];
+
+      try {
+        await element.scrollIntoView();
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, 250),
+        );
+
+        const screenshotPath = path.join(
+          POSTS_DIR,
+          `post-${i + 1}.png`,
+        );
+
+        await element.screenshot({
+          path: screenshotPath,
+        });
+
+        blogData.posts[i].localScreenshot =
+          `blog/posts/post-${i + 1}.png`;
+
+        console.log(
+          `Captured post ${i + 1}: ${blogData.posts[i].title}`,
+        );
+      } catch (error) {
+        console.warn(
+          `Could not capture post ${i + 1}:`,
+          error.message,
+        );
+      }
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------
+   * Final result
+   * ------------------------------------------------------------
+   */
+
+  const result = {
+    version: 2,
+
+    url: blogData.url,
+
+    siteTitle:
+      blogData.siteTitle,
+
+    description:
+      blogData.description,
+
+    pageHeading:
+      blogData.pageHeading,
+
+    ogImage:
+      blogData.ogImage,
+
+    posts:
+      blogData.posts,
+
+    postCount:
+      blogData.posts.length,
+
+    capturedAt:
+      new Date().toISOString(),
+  };
+
   fs.writeFileSync(
-    path.join(OUTPUT_DIR, "blog.json"),
-    JSON.stringify(result, null, 2),
+    path.join(
+      OUTPUT_DIR,
+      "blog.json",
+    ),
+    JSON.stringify(
+      result,
+      null,
+      2,
+    ),
+    "utf8",
   );
 
-  console.log("Captured blog:");
-  console.log(JSON.stringify(result, null, 2));
+  console.log("");
+  console.log("========================================");
+  console.log("BLOG ANALYSIS COMPLETE");
+  console.log("========================================");
 
   console.log(
-    `Screenshot written to ${path.join(OUTPUT_DIR, "home.png")}`,
+    JSON.stringify(
+      result,
+      null,
+      2,
+    ),
+  );
+
+  console.log("");
+  console.log(
+    `Homepage: ${path.join(
+      OUTPUT_DIR,
+      "home.png",
+    )}`,
+  );
+
+  console.log(
+    `Metadata: ${path.join(
+      OUTPUT_DIR,
+      "blog.json",
+    )}`,
+  );
+
+  console.log(
+    `Posts: ${result.postCount}`,
   );
 } catch (error) {
-  console.error("Blog capture failed:");
+  console.error("");
+  console.error("========================================");
+  console.error("BLOG ANALYSIS FAILED");
+  console.error("========================================");
+
   console.error(error);
 
   process.exitCode = 1;
 } finally {
   await browser.close();
 }
+```
