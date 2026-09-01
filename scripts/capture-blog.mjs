@@ -133,12 +133,13 @@ try {
     };
 
     const postSelectors = [
-      "article",
+      ".post-outer-container",
       ".post-outer",
       ".post",
+      "article.post",
       ".blog-post",
       ".hentry",
-      ".entry",
+      "article",
     ];
 
     let postElements = [];
