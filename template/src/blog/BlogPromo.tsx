@@ -1,15 +1,17 @@
-import React, {useEffect, useState} from "react";
+import React from "react";
 import {
   AbsoluteFill,
   Img,
   Sequence,
+  interpolate,
   staticFile,
   useCurrentFrame,
-  useDelayRender,
 } from "remotion";
 
 export const BLOG_PROMO_FPS = 30;
+
 export const BLOG_PROMO_SECONDS = 24;
+
 export const BLOG_PROMO_DURATION =
   BLOG_PROMO_FPS * BLOG_PROMO_SECONDS;
 
@@ -22,172 +24,161 @@ type BlogPost = {
   localScreenshot?: string;
 };
 
+type BlogAnalysis = {
+  topics: string[];
+  audience: string;
+  contentStyle: string;
+  valueProposition: string;
+};
+
 type BlogData = {
   version?: number;
+
   url: string;
+
   siteTitle: string;
+
   description: string;
+
   pageHeading: string;
+
   ogImage: string;
+
   posts: BlogPost[];
+
   postCount: number;
-  capturedAt?: string;
+
+  analysis?: BlogAnalysis;
 };
 
-const clamp = {
-  extrapolateLeft: "clamp" as const,
-  extrapolateRight: "clamp" as const,
-};
-
-const fadeIn = (
-  frame: number,
-  start: number,
-  duration: number,
-) => {
-  const input = [start, start + duration];
-  const output = [0, 1];
-
-  if (frame <= start) {
-    return 0;
-  }
-
-  if (frame >= start + duration) {
-    return 1;
-  }
-
-  const progress =
-    (frame - input[0]) /
-    (input[1] - input[0]);
-
-  return (
-    output[0] +
-    (output[1] - output[0]) *
-      progress
-  );
-};
-
-const fadeOut = (
-  frame: number,
-  end: number,
-  duration: number,
-) => {
-  if (frame <= end - duration) {
-    return 1;
-  }
-
-  if (frame >= end) {
-    return 0;
-  }
-
-  return (
-    (end - frame) /
-    duration
-  );
-};
-
-const safeText = (
+const safe = (
   value: string | undefined,
   fallback: string,
 ) => {
-  if (!value) {
-    return fallback;
-  }
+  const text = (value || "").trim();
 
-  const result = value.trim();
-
-  return result || fallback;
+  return text || fallback;
 };
 
 const truncate = (
   value: string | undefined,
   length: number,
 ) => {
-  const text = safeText(value, "");
+  const text = safe(value, "");
 
   if (text.length <= length) {
     return text;
   }
 
   return (
-    text.substring(0, length - 1) +
-    "…"
+    text.slice(
+      0,
+      Math.max(1, length - 1),
+    ) + "…"
   );
 };
 
-const useBlogData = () => {
-  const [data, setData] =
-    useState<BlogData | null>(null);
+const opacityIn = (
+  frame: number,
+  start: number,
+  duration = 15,
+) =>
+  interpolate(
+    frame,
+    [start, start + duration],
+    [0, 1],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    },
+  );
 
-  const [error, setError] =
-    useState<string | null>(null);
+const opacityOut = (
+  frame: number,
+  end: number,
+  duration = 15,
+) =>
+  interpolate(
+    frame,
+    [end - duration, end],
+    [1, 0],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    },
+  );
 
-  const {
-    delayRender,
-    continueRender,
-  } = useDelayRender();
+const sceneOpacity = (
+  frame: number,
+  end: number,
+) =>
+  opacityIn(
+    frame,
+    0,
+    12,
+  ) *
+  opacityOut(
+    frame,
+    end,
+    12,
+  );
 
-  useEffect(() => {
-    const handle =
-      delayRender(
-        "Loading blog.json",
+const loadBlogData =
+  async (): Promise<BlogData> => {
+    const response =
+      await fetch(
+        staticFile(
+          "blog/blog.json",
+        ),
       );
 
-    fetch(
-      staticFile(
-        "blog/blog.json",
-      ),
-    )
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(
-            "Could not load blog.json: " +
-              response.status,
-          );
-        }
+    if (!response.ok) {
+      throw new Error(
+        "Unable to load blog/blog.json: " +
+          response.status,
+      );
+    }
 
-        return response.json();
-      })
-      .then((json: BlogData) => {
-        setData(json);
-        continueRender(handle);
-      })
-      .catch((err) => {
-        setError(
-          err instanceof Error
-            ? err.message
-            : String(err),
-        );
-
-        continueRender(handle);
-      });
-  }, [
-    delayRender,
-    continueRender,
-  ]);
-
-  return {
-    data,
-    error,
+    return response.json();
   };
-};
 
 export const BlogPromo: React.FC = () => {
   const frame =
     useCurrentFrame();
 
-  const {
-    data,
-    error,
-  } = useBlogData();
+  const [data, setData] =
+    React.useState<BlogData | null>(
+      null,
+    );
+
+  const [error, setError] =
+    React.useState<string | null>(
+      null,
+    );
+
+  React.useEffect(() => {
+    loadBlogData()
+      .then(setData)
+      .catch((err) =>
+        setError(
+          err instanceof Error
+            ? err.message
+            : String(err),
+        ),
+      );
+  }, []);
 
   if (error) {
     return (
       <AbsoluteFill
         style={{
-          backgroundColor: "#111",
-          color: "#fff",
-          alignItems: "center",
-          justifyContent: "center",
+          background:
+            "#0b0b0b",
+          color: "white",
+          alignItems:
+            "center",
+          justifyContent:
+            "center",
           fontFamily:
             "Arial, sans-serif",
           padding: 80,
@@ -195,17 +186,17 @@ export const BlogPromo: React.FC = () => {
       >
         <div
           style={{
-            fontSize: 34,
-            fontWeight: 700,
+            fontSize: 42,
+            fontWeight: 800,
           }}
         >
-          Blog data could not be loaded
+          Blog data error
         </div>
 
         <div
           style={{
             marginTop: 20,
-            fontSize: 20,
+            fontSize: 22,
             opacity: 0.7,
           }}
         >
@@ -219,404 +210,693 @@ export const BlogPromo: React.FC = () => {
     return (
       <AbsoluteFill
         style={{
-          backgroundColor: "#111",
-          color: "#fff",
-          alignItems: "center",
-          justifyContent: "center",
+          background:
+            "#0b0b0b",
+          color: "white",
+          alignItems:
+            "center",
+          justifyContent:
+            "center",
           fontFamily:
             "Arial, sans-serif",
-          fontSize: 28,
+          fontSize: 34,
         }}
       >
-        Loading blog...
+        Analyzing blog…
       </AbsoluteFill>
     );
   }
 
   const posts =
-    data.posts
-      ? data.posts.slice(0, 3)
-      : [];
+    (data.posts || [])
+      .slice(0, 3);
+
+  const analysis =
+    data.analysis || {
+      topics: [
+        "General Insights",
+      ],
+
+      audience:
+        "Readers looking for useful insights",
+
+      contentStyle:
+        "Analysis and commentary",
+
+      valueProposition:
+        "Useful ideas and insights in one place.",
+    };
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: "#0b0b0b",
-        color: "#fff",
+        background:
+          "#090909",
+
+        color:
+          "#ffffff",
+
         fontFamily:
-          "Arial, sans-serif",
-        overflow: "hidden",
+          "Arial, Helvetica, sans-serif",
+
+        overflow:
+          "hidden",
       }}
     >
+      {/* 0s - 4s */}
       <Sequence
         from={0}
         durationInFrames={120}
       >
-        <IntroScene data={data} />
+        <Intro
+          data={data}
+        />
       </Sequence>
 
+      {/* 4s - 7s */}
       <Sequence
         from={120}
-        durationInFrames={150}
+        durationInFrames={90}
       >
-        <OverviewScene data={data} />
+        <Positioning
+          data={data}
+          analysis={analysis}
+        />
       </Sequence>
 
+      {/* 7s - 17s */}
       {posts.map(
-        (post, index) => (
+        (
+          post,
+          index,
+        ) => (
           <Sequence
             key={
               post.url ||
-              "post-" + index
+              "post-" +
+                index
             }
             from={
-              270 +
-              index * 120
+              210 +
+              index *
+                100
             }
-            durationInFrames={120}
+            durationInFrames={
+              100
+            }
           >
-            <PostScene
+            <PostCard
               post={post}
-              index={index}
+              index={
+                index
+              }
             />
           </Sequence>
         ),
       )}
 
+      {/* 17s - 21s */}
+      <Sequence
+        from={510}
+        durationInFrames={120}
+      >
+        <AnalysisScene
+          data={data}
+          analysis={analysis}
+        />
+      </Sequence>
+
+      {/* 21s - 24s */}
       <Sequence
         from={630}
         durationInFrames={90}
       >
-        <OutroScene data={data} />
+        <Outro
+          data={data}
+        />
       </Sequence>
     </AbsoluteFill>
   );
 };
 
-const IntroScene: React.FC<{
+/* =========================================================
+   INTRO
+   0 - 4 seconds
+========================================================= */
+
+const Intro: React.FC<{
   data: BlogData;
-}> = ({data}) => {
+}> = ({ data }) => {
   const frame =
     useCurrentFrame();
 
   const opacity =
-    fadeIn(frame, 0, 15) *
-    fadeOut(frame, 120, 15);
+    sceneOpacity(
+      frame,
+      120,
+    );
 
   return (
     <AbsoluteFill
       style={{
         opacity,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 100,
+
+        alignItems:
+          "center",
+
+        justifyContent:
+          "center",
+
+        textAlign:
+          "center",
+
+        padding: 90,
       }}
     >
       <div
         style={{
-          textAlign: "center",
+          fontSize: 24,
+          letterSpacing: 8,
+          opacity: 0.55,
+          marginBottom: 28,
+        }}
+      >
+        DISCOVER
+      </div>
+
+      <div
+        style={{
+          fontSize: 88,
+          lineHeight: 1,
+          fontWeight: 900,
+          letterSpacing: -4,
           maxWidth: 1500,
         }}
       >
-        <div
-          style={{
-            fontSize: 24,
-            letterSpacing: 8,
-            textTransform:
-              "uppercase",
-            opacity: 0.65,
-            marginBottom: 28,
-          }}
-        >
-          DISCOVER
-        </div>
+        {truncate(
+          safe(
+            data.siteTitle,
+            "This Blog",
+          ),
+          42,
+        )}
+      </div>
 
-        <div
-          style={{
-            fontSize: 82,
-            lineHeight: 1.05,
-            fontWeight: 800,
-            letterSpacing: -3,
-          }}
-        >
-          {truncate(
-            safeText(
-              data.siteTitle,
-              "This Blog",
-            ),
-            45,
-          )}
-        </div>
-
-        <div
-          style={{
-            marginTop: 30,
-            fontSize: 28,
-            lineHeight: 1.45,
-            opacity: 0.72,
-            maxWidth: 1100,
-            marginLeft: "auto",
-            marginRight: "auto",
-          }}
-        >
-          {truncate(
-            safeText(
-              data.description,
-              "Explore useful stories, ideas and insights.",
-            ),
-            140,
-          )}
-        </div>
+      <div
+        style={{
+          marginTop: 32,
+          maxWidth: 1100,
+          fontSize: 28,
+          lineHeight: 1.45,
+          opacity: 0.7,
+        }}
+      >
+        {truncate(
+          safe(
+            data.description,
+            "Explore useful stories, ideas and insights.",
+          ),
+          150,
+        )}
       </div>
     </AbsoluteFill>
   );
 };
 
-const OverviewScene: React.FC<{
+/* =========================================================
+   POSITIONING
+   4 - 7 seconds
+========================================================= */
+
+const Positioning: React.FC<{
   data: BlogData;
-}> = ({data}) => {
+  analysis: BlogAnalysis;
+}> = ({
+  data,
+  analysis,
+}) => {
+  const frame =
+    useCurrentFrame();
+
+  const opacity =
+    sceneOpacity(
+      frame,
+      90,
+    );
+
+  const topics =
+    analysis.topics.slice(
+      0,
+      3,
+    );
+
   return (
     <AbsoluteFill
       style={{
+        opacity,
+
         padding:
-          "90px 110px",
+          "90px 120px",
+
         justifyContent:
           "center",
       }}
     >
       <div
         style={{
-          fontSize: 24,
+          fontSize: 22,
           letterSpacing: 5,
-          textTransform:
-            "uppercase",
-          opacity: 0.55,
-          marginBottom: 24,
+          opacity: 0.5,
+          marginBottom: 25,
         }}
       >
-        WHAT YOU'LL FIND
+        WHY FOLLOW THIS BLOG
       </div>
 
       <div
         style={{
-          fontSize: 60,
-          fontWeight: 750,
-          lineHeight: 1.1,
+          fontSize: 55,
+          lineHeight: 1.12,
+          fontWeight: 850,
           maxWidth: 1300,
         }}
       >
-        Fresh ideas.
-        <br />
-        Useful insights.
-        <br />
-        New stories.
-      </div>
-
-      <div
-        style={{
-          marginTop: 38,
-          fontSize: 25,
-          lineHeight: 1.5,
-          opacity: 0.7,
-          maxWidth: 1100,
-        }}
-      >
         {truncate(
-          safeText(
-            data.description,
-            "Discover the latest content from this blog.",
-          ),
-          180,
+          analysis.valueProposition,
+          170,
         )}
       </div>
 
       <div
         style={{
-          marginTop: 45,
-          fontSize: 21,
-          opacity: 0.65,
+          display:
+            "flex",
+
+          gap: 16,
+
+          marginTop: 40,
+
+          flexWrap:
+            "wrap",
         }}
       >
-        {data.postCount || 0} articles available
+        {topics.map(
+          (topic) => (
+            <div
+              key={
+                topic
+              }
+              style={{
+                border:
+                  "1px solid rgba(255,255,255,0.3)",
+
+                borderRadius:
+                  999,
+
+                padding:
+                  "12px 22px",
+
+                fontSize:
+                  20,
+
+                opacity:
+                  0.8,
+              }}
+            >
+              {topic}
+            </div>
+          ),
+        )}
+      </div>
+
+      <div
+        style={{
+          marginTop: 28,
+          fontSize: 20,
+          opacity: 0.5,
+        }}
+      >
+        {truncate(
+          analysis.audience,
+          120,
+        )}
       </div>
     </AbsoluteFill>
   );
 };
 
-const PostScene: React.FC<{
+/* =========================================================
+   POST CARD
+   7 - 17 seconds
+========================================================= */
+
+const PostCard: React.FC<{
   post: BlogPost;
   index: number;
-}> = ({post, index}) => {
+}> = ({
+  post,
+  index,
+}) => {
   const frame =
     useCurrentFrame();
 
   const opacity =
-    fadeIn(frame, 0, 12) *
-    fadeOut(frame, 120, 10);
+    sceneOpacity(
+      frame,
+      100,
+    );
 
-  const localImage =
-    post.localScreenshot;
+  const image =
+    post.localScreenshot
+      ? staticFile(
+          post.localScreenshot,
+        )
+      : staticFile(
+          "blog/home.png",
+        );
+
+  const scale =
+    interpolate(
+      frame,
+      [0, 100],
+      [1.04, 1],
+      {
+        extrapolateLeft:
+          "clamp",
+
+        extrapolateRight:
+          "clamp",
+      },
+    );
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: "#101010",
         opacity,
       }}
     >
-      {localImage ? (
-        <Img
-          src={staticFile(
-            localImage,
-          )}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            filter:
-              "brightness(0.42) saturate(0.75)",
-          }}
-        />
-      ) : (
-        <Img
-          src={staticFile(
-            "blog/home.png",
-          )}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            filter:
-              "brightness(0.35)",
-          }}
-        />
-      )}
+      <Img
+        src={image}
+        style={{
+          position:
+            "absolute",
+
+          inset: 0,
+
+          width:
+            "100%",
+
+          height:
+            "100%",
+
+          objectFit:
+            "cover",
+
+          transform:
+            `scale(${scale})`,
+
+          filter:
+            "brightness(0.34)",
+        }}
+      />
 
       <AbsoluteFill
         style={{
           background:
-            "linear-gradient(90deg, rgba(0,0,0,0.88), rgba(0,0,0,0.35), rgba(0,0,0,0.72))",
+            "linear-gradient(90deg, rgba(0,0,0,0.92), rgba(0,0,0,0.55), rgba(0,0,0,0.28))",
         }}
       />
 
       <div
         style={{
-          position: "absolute",
-          left: 110,
-          right: 110,
-          top: 100,
-          bottom: 100,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
+          position:
+            "absolute",
+
+          left: 115,
+
+          right: 115,
+
+          top: 95,
+
+          bottom: 95,
+
+          display:
+            "flex",
+
+          flexDirection:
+            "column",
+
+          justifyContent:
+            "center",
         }}
       >
         <div
           style={{
             fontSize: 20,
             letterSpacing: 5,
-            textTransform:
-              "uppercase",
-            opacity: 0.6,
-            marginBottom: 25,
+            opacity: 0.5,
+            marginBottom: 24,
           }}
         >
-          LATEST ARTICLE{" "}
+          FEATURED ARTICLE{" "}
           {index + 1}
         </div>
 
         <div
           style={{
-            fontSize: 58,
-            fontWeight: 800,
-            lineHeight: 1.1,
-            maxWidth: 1250,
+            fontSize: 60,
+            fontWeight: 900,
+            lineHeight: 1.08,
+            maxWidth: 1350,
           }}
         >
           {truncate(
-            safeText(
+            safe(
               post.title,
               "Featured article",
             ),
-            80,
+            82,
           )}
         </div>
 
-        {post.date && (
+        {post.date ? (
           <div
             style={{
-              marginTop: 20,
+              marginTop: 18,
               fontSize: 19,
-              opacity: 0.55,
+              opacity: 0.5,
             }}
           >
             {post.date}
           </div>
-        )}
-
-        {post.excerpt && (
-          <div
-            style={{
-              marginTop: 28,
-              fontSize: 24,
-              lineHeight: 1.45,
-              opacity: 0.72,
-              maxWidth: 1050,
-            }}
-          >
-            {truncate(
-              post.excerpt,
-              180,
-            )}
-          </div>
-        )}
+        ) : null}
 
         <div
           style={{
-            marginTop: 42,
-            fontSize: 19,
-            letterSpacing: 1,
-            opacity: 0.65,
+            marginTop: 28,
+            fontSize: 24,
+            lineHeight: 1.5,
+            maxWidth: 1100,
+            opacity: 0.72,
           }}
         >
-          READ THE FULL ARTICLE →
+          {truncate(
+            safe(
+              post.excerpt,
+              "Read the full article for more insights.",
+            ),
+            190,
+          )}
+        </div>
+
+        <div
+          style={{
+            marginTop: 38,
+            fontSize: 18,
+            letterSpacing: 2,
+            opacity: 0.55,
+          }}
+        >
+          READ MORE →
         </div>
       </div>
     </AbsoluteFill>
   );
 };
 
-const OutroScene: React.FC<{
+/* =========================================================
+   BLOG ANALYSIS
+   17 - 21 seconds
+========================================================= */
+
+const AnalysisScene: React.FC<{
   data: BlogData;
-}> = ({data}) => {
+  analysis: BlogAnalysis;
+}> = ({
+  data,
+  analysis,
+}) => {
   const frame =
     useCurrentFrame();
 
   const opacity =
-    fadeIn(frame, 0, 15);
+    sceneOpacity(
+      frame,
+      120,
+    );
 
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: "#0b0b0b",
         opacity,
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
+
+        padding:
+          "90px 120px",
+
+        justifyContent:
+          "center",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 22,
+          letterSpacing: 5,
+          opacity: 0.5,
+          marginBottom: 28,
+        }}
+      >
+        THE BLOG AT A GLANCE
+      </div>
+
+      <div
+        style={{
+          display:
+            "flex",
+
+          gap: 90,
+
+          alignItems:
+            "flex-start",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 25,
+              opacity: 0.55,
+              marginBottom: 15,
+            }}
+          >
+            CONTENT
+          </div>
+
+          <div
+            style={{
+              fontSize: 43,
+              fontWeight: 800,
+              lineHeight: 1.15,
+            }}
+          >
+            {truncate(
+              analysis.contentStyle,
+              70,
+            )}
+          </div>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 25,
+              opacity: 0.55,
+              marginBottom: 15,
+            }}
+          >
+            TOPICS
+          </div>
+
+          <div
+            style={{
+              fontSize: 31,
+              lineHeight: 1.5,
+              fontWeight: 700,
+            }}
+          >
+            {analysis.topics
+              .slice(
+                0,
+                3,
+              )
+              .join(
+                "  •  ",
+              )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 55,
+          fontSize: 21,
+          opacity: 0.5,
+        }}
+      >
+        {
+          data.postCount
+        }{" "}
+        recent articles analyzed
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/* =========================================================
+   OUTRO
+   21 - 24 seconds
+========================================================= */
+
+const Outro: React.FC<{
+  data: BlogData;
+}> = ({ data }) => {
+  const frame =
+    useCurrentFrame();
+
+  const opacity =
+    sceneOpacity(
+      frame,
+      90,
+    );
+
+  return (
+    <AbsoluteFill
+      style={{
+        opacity,
+
+        alignItems:
+          "center",
+
+        justifyContent:
+          "center",
+
+        textAlign:
+          "center",
+
         padding: 80,
       }}
     >
       <div
         style={{
-          fontSize: 26,
+          fontSize: 22,
           letterSpacing: 7,
-          textTransform:
-            "uppercase",
-          opacity: 0.55,
+          opacity: 0.5,
           marginBottom: 28,
         }}
       >
@@ -625,42 +905,47 @@ const OutroScene: React.FC<{
 
       <div
         style={{
-          fontSize: 72,
-          fontWeight: 800,
+          fontSize: 76,
+          fontWeight: 900,
           lineHeight: 1.05,
-          maxWidth: 1300,
+          maxWidth: 1400,
         }}
       >
         {truncate(
-          safeText(
+          safe(
             data.siteTitle,
-            "Your next story starts here.",
+            "Discover something new.",
           ),
-          50,
+          48,
         )}
       </div>
 
       <div
         style={{
-          marginTop: 32,
-          fontSize: 24,
-          opacity: 0.65,
+          marginTop: 28,
+          fontSize: 25,
+          opacity: 0.62,
         }}
       >
-        Visit the blog and discover
-        something new.
+        Visit the blog for the latest insights.
       </div>
 
       <div
         style={{
-          marginTop: 45,
-          padding:
-            "18px 34px",
+          marginTop: 42,
+
           border:
             "1px solid rgba(255,255,255,0.35)",
-          borderRadius: 999,
-          fontSize: 20,
-          letterSpacing: 1,
+
+          borderRadius:
+            999,
+
+          padding:
+            "16px 34px",
+
+          fontSize: 19,
+
+          letterSpacing: 2,
         }}
       >
         VISIT BLOG
