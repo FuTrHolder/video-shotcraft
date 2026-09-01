@@ -8,12 +8,6 @@ on:
         required: true
         type: string
 
-      blog_title:
-        description: "Optional blog title"
-        required: false
-        type: string
-        default: ""
-
 jobs:
   generate-blog-video:
     name: Generate Blog Promo
@@ -31,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: template/package.json
 
@@ -44,91 +38,59 @@ jobs:
           npm init -y
           npm install puppeteer@24
 
-      - name: Debug capture script
-        run: |
-          echo "Commit:"
-          git rev-parse HEAD
-      
-          echo "Branch:"
-          git branch --show-current
-      
-          echo "capture-blog.mjs:"
-          sed -n '1,40p' scripts/capture-blog.mjs
-          
-
       - name: Verify repository files
         run: |
-          echo "Current branch/ref:"
+          echo "=== Git ==="
           git branch --show-current
           git rev-parse HEAD
-
           echo ""
-          echo "Repository root:"
-          pwd
-
-          echo ""
-          echo "capture-blog.mjs:"
+          echo "=== Files ==="
+          test -f scripts/capture-blog.mjs
+          test -f template/src/blog/BlogPromo.tsx
+          test -f template/src/index.ts
           ls -lah scripts/capture-blog.mjs
-
-          echo ""
-          echo "BlogPromo:"
           ls -lah template/src/blog/BlogPromo.tsx
 
-          echo ""
-          echo "BlogRoot:"
-          ls -lah template/src/BlogRoot.tsx
-
-      - name: Capture blog homepage
+      - name: Capture and analyze blog
         env:
           BLOG_URL: ${{ inputs.blog_url }}
         run: |
           node scripts/capture-blog.mjs "$BLOG_URL"
 
-      - name: Check captured assets
+      - name: Validate blog analysis and captures
         run: |
-          echo "=== Blog capture directory ==="
-          find template/public/blog -maxdepth 3 -type f -print
-      
-          echo ""
-          echo "=== Blog directory ==="
-          ls -lah template/public/blog
-      
-          echo ""
-          echo "=== Posts directory ==="
-          if [ -d template/public/blog/posts ]; then
-            ls -lah template/public/blog/posts
-          else
-            echo "posts directory does not exist"
-          fi
-      
+          echo "=== Captured files ==="
+          find template/public/blog -maxdepth 3 -type f -print | sort
+
           echo ""
           echo "=== blog.json ==="
           cat template/public/blog/blog.json
-      
-          echo ""
-          echo "=== Required files ==="
-          test -f template/public/blog/home.png
-          test -f template/public/blog/blog.json
 
-      - name: Render blog promotional video
+          echo ""
+          echo "=== Post screenshots ==="
+          find template/public/blog/posts -type f -name '*.png' -print 2>/dev/null | sort || true
+
+          test -s template/public/blog/home.png
+          test -s template/public/blog/blog.json
+
+      - name: Render 24-second promotional video
         working-directory: template
-        env:
-          BLOG_TITLE: ${{ inputs.blog_title }}
-          BLOG_URL: ${{ inputs.blog_url }}
         run: |
+          rm -rf out
           mkdir -p out
-      
+
           npx remotion render \
-            src/index.tsx \
+            src/index.ts \
             BlogPromo \
             out/blog-promo.mp4 \
             --concurrency=1
 
-      - name: Check video output
+      - name: Verify video output
         working-directory: template
         run: |
+          test -s out/blog-promo.mp4
           ls -lh out/blog-promo.mp4
-          test -f out/blog-promo.mp4
+          file out/blog-promo.mp4
 
       - name: Upload promotional video
         uses: actions/upload-artifact@v4
@@ -136,10 +98,12 @@ jobs:
           name: blog-promotional-video
           path: template/out/blog-promo.mp4
           if-no-files-found: error
+          retention-days: 7
 
-      - name: Upload captured blog screenshot
+      - name: Upload blog analysis and captures
         uses: actions/upload-artifact@v4
         with:
           name: blog-capture
           path: template/public/blog
           if-no-files-found: error
+          retention-days: 7
