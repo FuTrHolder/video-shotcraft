@@ -19,8 +19,10 @@ type BlogPost = {
   title: string;
   url: string;
   date: string;
+  published?: string;
   excerpt: string;
   image: string;
+  categories?: string[];
   localScreenshot?: string;
 };
 
@@ -48,14 +50,20 @@ type BlogData = {
 
   postCount: number;
 
+  language?: string;
+
   analysis?: BlogAnalysis;
 };
 
+/* =========================================================
+   HELPERS
+========================================================= */
+
 const safe = (
   value: string | undefined,
-  fallback: string,
+  fallback = "",
 ) => {
-  const text = (value || "").trim();
+  const text = String(value || "").trim();
 
   return text || fallback;
 };
@@ -64,7 +72,11 @@ const truncate = (
   value: string | undefined,
   length: number,
 ) => {
-  const text = safe(value, "");
+  const text = safe(value);
+
+  if (!text) {
+    return "";
+  }
 
   if (text.length <= length) {
     return text;
@@ -78,14 +90,23 @@ const truncate = (
   );
 };
 
-const opacityIn = (
+const clamp = (
+  value: number,
+  min: number,
+  max: number,
+) =>
+  Math.min(
+    max,
+    Math.max(min, value),
+  );
+
+const fadeIn = (
   frame: number,
-  start: number,
   duration = 15,
 ) =>
   interpolate(
     frame,
-    [start, start + duration],
+    [0, duration],
     [0, 1],
     {
       extrapolateLeft: "clamp",
@@ -93,7 +114,7 @@ const opacityIn = (
     },
   );
 
-const opacityOut = (
+const fadeOut = (
   frame: number,
   end: number,
   duration = 15,
@@ -110,18 +131,85 @@ const opacityOut = (
 
 const sceneOpacity = (
   frame: number,
-  end: number,
+  duration: number,
 ) =>
-  opacityIn(
+  fadeIn(frame, 12) *
+  fadeOut(
     frame,
-    0,
-    12,
-  ) *
-  opacityOut(
-    frame,
-    end,
+    duration,
     12,
   );
+
+const slideUp = (
+  frame: number,
+  distance = 40,
+  duration = 18,
+) =>
+  interpolate(
+    frame,
+    [0, duration],
+    [distance, 0],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    },
+  );
+
+const slideLeft = (
+  frame: number,
+  distance = 60,
+  duration = 18,
+) =>
+  interpolate(
+    frame,
+    [0, duration],
+    [distance, 0],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    },
+  );
+
+const normalizeUrl = (
+  value: string,
+) => {
+  const url = safe(value);
+
+  if (!url) {
+    return "";
+  }
+
+  try {
+    return new URL(url).hostname.replace(
+      /^www\./,
+      "",
+    );
+  } catch {
+    return url;
+  }
+};
+
+const getImageSource = (
+  post: BlogPost,
+) => {
+  if (post.localScreenshot) {
+    return staticFile(
+      post.localScreenshot,
+    );
+  }
+
+  if (post.image) {
+    return post.image;
+  }
+
+  return staticFile(
+    "blog/home.png",
+  );
+};
+
+/* =========================================================
+   BLOG DATA LOADER
+========================================================= */
 
 const loadBlogData =
   async (): Promise<BlogData> => {
@@ -142,10 +230,11 @@ const loadBlogData =
     return response.json();
   };
 
-export const BlogPromo: React.FC = () => {
-  const frame =
-    useCurrentFrame();
+/* =========================================================
+   MAIN COMPOSITION
+========================================================= */
 
+export const BlogPromo: React.FC = () => {
   const [data, setData] =
     React.useState<BlogData | null>(
       null,
@@ -159,28 +248,25 @@ export const BlogPromo: React.FC = () => {
   React.useEffect(() => {
     loadBlogData()
       .then(setData)
-      .catch((err) =>
+      .catch((err) => {
         setError(
           err instanceof Error
             ? err.message
             : String(err),
-        ),
-      );
+        );
+      });
   }, []);
 
   if (error) {
     return (
       <AbsoluteFill
         style={{
-          background:
-            "#0b0b0b",
-          color: "white",
-          alignItems:
-            "center",
-          justifyContent:
-            "center",
+          background: "#080808",
+          color: "#ffffff",
+          alignItems: "center",
+          justifyContent: "center",
           fontFamily:
-            "Arial, sans-serif",
+            "Arial, Helvetica, sans-serif",
           padding: 80,
         }}
       >
@@ -197,7 +283,7 @@ export const BlogPromo: React.FC = () => {
           style={{
             marginTop: 20,
             fontSize: 22,
-            opacity: 0.7,
+            opacity: 0.65,
           }}
         >
           {error}
@@ -210,31 +296,36 @@ export const BlogPromo: React.FC = () => {
     return (
       <AbsoluteFill
         style={{
-          background:
-            "#0b0b0b",
-          color: "white",
-          alignItems:
-            "center",
-          justifyContent:
-            "center",
+          background: "#080808",
+          color: "#ffffff",
+          alignItems: "center",
+          justifyContent: "center",
           fontFamily:
-            "Arial, sans-serif",
-          fontSize: 34,
+            "Arial, Helvetica, sans-serif",
+          fontSize: 32,
         }}
       >
-        Analyzing blog…
+        Preparing blog story…
       </AbsoluteFill>
     );
   }
 
-  const posts =
-    (data.posts || [])
-      .slice(0, 3);
+  /*
+   * 반드시 최대 5개 사용.
+   *
+   * capture-blog.mjs에서 Blogger Feed의
+   * 최신 게시물 5개를 생성한다.
+   */
+  const posts = (
+    data.posts || []
+  ).slice(0, 5);
 
-  const analysis =
+  const analysis: BlogAnalysis =
     data.analysis || {
       topics: [
-        "General Insights",
+        "Insights",
+        "Analysis",
+        "Trends",
       ],
 
       audience:
@@ -244,81 +335,84 @@ export const BlogPromo: React.FC = () => {
         "Analysis and commentary",
 
       valueProposition:
-        "Useful ideas and insights in one place.",
+        "Useful ideas, insights and practical information in one place.",
     };
 
   return (
     <AbsoluteFill
       style={{
-        background:
-          "#090909",
-
-        color:
-          "#ffffff",
-
+        background: "#080808",
+        color: "#ffffff",
         fontFamily:
           "Arial, Helvetica, sans-serif",
-
-        overflow:
-          "hidden",
+        overflow: "hidden",
       }}
     >
-      {/* 0s - 4s */}
+      {/* =================================================
+          0–3s
+          HOOK
+      ================================================= */}
+
       <Sequence
         from={0}
-        durationInFrames={120}
-      >
-        <Intro
-          data={data}
-        />
-      </Sequence>
-
-      {/* 4s - 7s */}
-      <Sequence
-        from={120}
         durationInFrames={90}
       >
-        <Positioning
+        <Intro
           data={data}
           analysis={analysis}
         />
       </Sequence>
 
-      {/* 7s - 17s */}
+      {/* =================================================
+          3–6s
+          BLOG PROFILE
+      ================================================= */}
+
+      <Sequence
+        from={90}
+        durationInFrames={90}
+      >
+        <ProfileScene
+          data={data}
+          analysis={analysis}
+        />
+      </Sequence>
+
+      {/* =================================================
+          6–18s
+          FIVE POSTS
+          72 frames = 2.4 sec each
+      ================================================= */}
+
       {posts.map(
-        (
-          post,
-          index,
-        ) => (
+        (post, index) => (
           <Sequence
             key={
               post.url ||
-              "post-" +
-                index
+              `post-${index}`
             }
             from={
-              210 +
-              index *
-                100
+              180 +
+              index * 72
             }
-            durationInFrames={
-              100
-            }
+            durationInFrames={72}
           >
             <PostCard
               post={post}
-              index={
-                index
-              }
+              index={index}
             />
           </Sequence>
         ),
       )}
 
-      {/* 17s - 21s */}
+      {/* =================================================
+          18–21s
+          BLOG AT A GLANCE
+      ================================================= */}
+
       <Sequence
-        from={510}
-        durationInFrames={120}
+        from={540}
+        durationInFrames={90}
       >
         <AnalysisScene
           data={data}
@@ -326,7 +420,11 @@ export const BlogPromo: React.FC = () => {
         />
       </Sequence>
 
-      {/* 21s - 24s */}
+      {/* =================================================
+          21–24s
+          CTA
+      ================================================= */}
+
       <Sequence
         from={630}
         durationInFrames={90}
@@ -341,94 +439,10 @@ export const BlogPromo: React.FC = () => {
 
 /* =========================================================
    INTRO
-   0 - 4 seconds
+   0–3 seconds
 ========================================================= */
 
 const Intro: React.FC<{
-  data: BlogData;
-}> = ({ data }) => {
-  const frame =
-    useCurrentFrame();
-
-  const opacity =
-    sceneOpacity(
-      frame,
-      120,
-    );
-
-  return (
-    <AbsoluteFill
-      style={{
-        opacity,
-
-        alignItems:
-          "center",
-
-        justifyContent:
-          "center",
-
-        textAlign:
-          "center",
-
-        padding: 90,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 24,
-          letterSpacing: 8,
-          opacity: 0.55,
-          marginBottom: 28,
-        }}
-      >
-        DISCOVER
-      </div>
-
-      <div
-        style={{
-          fontSize: 88,
-          lineHeight: 1,
-          fontWeight: 900,
-          letterSpacing: -4,
-          maxWidth: 1500,
-        }}
-      >
-        {truncate(
-          safe(
-            data.siteTitle,
-            "This Blog",
-          ),
-          42,
-        )}
-      </div>
-
-      <div
-        style={{
-          marginTop: 32,
-          maxWidth: 1100,
-          fontSize: 28,
-          lineHeight: 1.45,
-          opacity: 0.7,
-        }}
-      >
-        {truncate(
-          safe(
-            data.description,
-            "Explore useful stories, ideas and insights.",
-          ),
-          150,
-        )}
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-/* =========================================================
-   POSITIONING
-   4 - 7 seconds
-========================================================= */
-
-const Positioning: React.FC<{
   data: BlogData;
   analysis: BlogAnalysis;
 }> = ({
@@ -444,102 +458,352 @@ const Positioning: React.FC<{
       90,
     );
 
-  const topics =
-    analysis.topics.slice(
-      0,
-      3,
+  const y =
+    slideUp(
+      frame,
+      45,
+      20,
     );
+
+  const scale =
+    interpolate(
+      frame,
+      [0, 90],
+      [1.04, 1],
+      {
+        extrapolateLeft:
+          "clamp",
+        extrapolateRight:
+          "clamp",
+      },
+    );
+
+  const primaryTopic =
+    safe(
+      analysis.topics?.[0],
+      "INSIGHTS",
+    ).toUpperCase();
 
   return (
     <AbsoluteFill
       style={{
         opacity,
+        background:
+          "radial-gradient(circle at 70% 35%, rgba(255,255,255,0.10), transparent 35%), #080808",
+      }}
+    >
+      {/* subtle grid */}
+      <AbsoluteFill
+        style={{
+          opacity: 0.08,
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
+          backgroundSize:
+            "80px 80px",
+        }}
+      />
 
+      <div
+        style={{
+          position: "absolute",
+          left: 110,
+          right: 110,
+          top: 100,
+          bottom: 90,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          transform:
+            `translateY(${y}px) scale(${scale})`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 20,
+            letterSpacing: 7,
+            fontWeight: 700,
+            opacity: 0.5,
+            marginBottom: 28,
+          }}
+        >
+          {primaryTopic}
+        </div>
+
+        <div
+          style={{
+            fontSize: 82,
+            lineHeight: 0.98,
+            fontWeight: 900,
+            letterSpacing: -4,
+            maxWidth: 1450,
+          }}
+        >
+          {truncate(
+            safe(
+              data.siteTitle,
+              "This Blog",
+            ),
+            42,
+          )}
+        </div>
+
+        <div
+          style={{
+            width: 130,
+            height: 5,
+            marginTop: 36,
+            background:
+              "#ffffff",
+            opacity: 0.75,
+          }}
+        />
+
+        <div
+          style={{
+            marginTop: 28,
+            maxWidth: 1100,
+            fontSize: 28,
+            lineHeight: 1.4,
+            opacity: 0.68,
+          }}
+        >
+          {truncate(
+            safe(
+              data.description,
+              analysis.valueProposition,
+            ),
+            135,
+          )}
+        </div>
+
+        <div
+          style={{
+            marginTop: 38,
+            fontSize: 18,
+            letterSpacing: 3,
+            opacity: 0.4,
+          }}
+        >
+          EXPLORE • READ • DISCOVER
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/* =========================================================
+   PROFILE SCENE
+   3–6 seconds
+========================================================= */
+
+const ProfileScene: React.FC<{
+  data: BlogData;
+  analysis: BlogAnalysis;
+}> = ({
+  data,
+  analysis,
+}) => {
+  const frame =
+    useCurrentFrame();
+
+  const opacity =
+    sceneOpacity(
+      frame,
+      90,
+    );
+
+  const topics = (
+    analysis.topics || []
+  )
+    .filter(Boolean)
+    .slice(0, 4);
+
+  const cards = [
+    {
+      label: "FOCUS",
+      value:
+        topics[0] ||
+        "Insights",
+    },
+    {
+      label: "STYLE",
+      value:
+        safe(
+          analysis.contentStyle,
+          "Analysis",
+        ),
+    },
+    {
+      label: "FOR",
+      value:
+        safe(
+          analysis.audience,
+          "Curious readers",
+        ),
+    },
+  ];
+
+  return (
+    <AbsoluteFill
+      style={{
+        opacity,
         padding:
-          "90px 120px",
-
+          "75px 110px",
         justifyContent:
           "center",
       }}
     >
       <div
         style={{
-          fontSize: 22,
-          letterSpacing: 5,
-          opacity: 0.5,
-          marginBottom: 25,
+          fontSize: 20,
+          letterSpacing: 6,
+          opacity: 0.42,
+          marginBottom: 22,
         }}
       >
-        WHY FOLLOW THIS BLOG
+        WHY FOLLOW
       </div>
 
       <div
         style={{
-          fontSize: 55,
-          lineHeight: 1.12,
+          fontSize: 58,
+          lineHeight: 1.08,
           fontWeight: 850,
-          maxWidth: 1300,
+          maxWidth: 1250,
+          transform:
+            `translateY(${slideUp(
+              frame,
+              35,
+              18,
+            )}px)`,
         }}
       >
         {truncate(
-          analysis.valueProposition,
-          170,
+          safe(
+            analysis.valueProposition,
+            "Useful insights in one place.",
+          ),
+          150,
         )}
       </div>
 
       <div
         style={{
-          display:
-            "flex",
-
-          gap: 16,
-
-          marginTop: 40,
-
-          flexWrap:
-            "wrap",
+          display: "flex",
+          gap: 18,
+          marginTop: 38,
+          flexWrap: "wrap",
         }}
       >
-        {topics.map(
-          (topic) => (
+        {cards.map(
+          (card, index) => (
             <div
-              key={
-                topic
-              }
+              key={card.label}
               style={{
+                width:
+                  index === 2
+                    ? 470
+                    : 330,
+                minHeight: 100,
                 border:
-                  "1px solid rgba(255,255,255,0.3)",
-
-                borderRadius:
-                  999,
-
+                  "1px solid rgba(255,255,255,0.18)",
+                background:
+                  "rgba(255,255,255,0.035)",
+                borderRadius: 10,
                 padding:
-                  "12px 22px",
-
-                fontSize:
-                  20,
-
-                opacity:
-                  0.8,
+                  "20px 22px",
+                transform:
+                  `translateY(${slideUp(
+                    frame -
+                      index * 4,
+                    25,
+                    18,
+                  )}px)`,
               }}
             >
-              {topic}
+              <div
+                style={{
+                  fontSize: 14,
+                  letterSpacing: 3,
+                  opacity: 0.42,
+                  marginBottom: 10,
+                }}
+              >
+                {card.label}
+              </div>
+
+              <div
+                style={{
+                  fontSize: 21,
+                  lineHeight: 1.25,
+                  fontWeight: 700,
+                  opacity: 0.88,
+                }}
+              >
+                {truncate(
+                  card.value,
+                  60,
+                )}
+              </div>
             </div>
           ),
         )}
       </div>
 
+      {topics.length > 0 ? (
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            marginTop: 26,
+            flexWrap: "wrap",
+          }}
+        >
+          {topics.map(
+            (topic, index) => (
+              <div
+                key={topic}
+                style={{
+                  fontSize: 17,
+                  letterSpacing: 1,
+                  padding:
+                    "9px 16px",
+                  borderRadius: 999,
+                  border:
+                    "1px solid rgba(255,255,255,0.22)",
+                  opacity:
+                    clamp(
+                      0.45 +
+                        index *
+                          0.1,
+                      0.45,
+                      0.85,
+                    ),
+                }}
+              >
+                {topic}
+              </div>
+            ),
+          )}
+        </div>
+      ) : null}
+
       <div
         style={{
-          marginTop: 28,
-          fontSize: 20,
-          opacity: 0.5,
+          position: "absolute",
+          right: 110,
+          top: 74,
+          fontSize: 15,
+          letterSpacing: 2,
+          opacity: 0.3,
         }}
       >
-        {truncate(
-          analysis.audience,
-          120,
-        )}
+        {safe(
+          normalizeUrl(
+            data.url,
+          ),
+          "BLOG",
+        ).toUpperCase()}
       </div>
     </AbsoluteFill>
   );
@@ -547,7 +811,7 @@ const Positioning: React.FC<{
 
 /* =========================================================
    POST CARD
-   7 - 17 seconds
+   2.4 seconds per post
 ========================================================= */
 
 const PostCard: React.FC<{
@@ -560,34 +824,78 @@ const PostCard: React.FC<{
   const frame =
     useCurrentFrame();
 
+  const duration = 72;
+
   const opacity =
     sceneOpacity(
       frame,
-      100,
+      duration,
     );
 
-  const image =
-    post.localScreenshot
-      ? staticFile(
-          post.localScreenshot,
-        )
-      : staticFile(
-          "blog/home.png",
-        );
+  /*
+   * Each article gets a slightly different
+   * camera direction.
+   */
+  const direction =
+    index % 2 === 0
+      ? 1
+      : -1;
 
   const scale =
     interpolate(
       frame,
-      [0, 100],
-      [1.04, 1],
+      [0, duration],
+      [1.08, 1.0],
       {
         extrapolateLeft:
           "clamp",
-
         extrapolateRight:
           "clamp",
       },
     );
+
+  const translateX =
+    interpolate(
+      frame,
+      [0, duration],
+      [
+        direction * 18,
+        direction * -18,
+      ],
+      {
+        extrapolateLeft:
+          "clamp",
+        extrapolateRight:
+          "clamp",
+      },
+    );
+
+  const image =
+    getImageSource(post);
+
+  const title =
+    truncate(
+      safe(
+        post.title,
+        "Featured article",
+      ),
+      78,
+    );
+
+  const excerpt =
+    truncate(
+      safe(
+        post.excerpt,
+        "Read the full article for more insights.",
+      ),
+      125,
+    );
+
+  const categories = (
+    post.categories || []
+  )
+    .filter(Boolean)
+    .slice(0, 2);
 
   return (
     <AbsoluteFill
@@ -595,96 +903,127 @@ const PostCard: React.FC<{
         opacity,
       }}
     >
+      {/* =================================================
+          BACKGROUND IMAGE
+      ================================================= */}
+
       <Img
         src={image}
         style={{
-          position:
-            "absolute",
-
+          position: "absolute",
           inset: 0,
-
-          width:
-            "100%",
-
-          height:
-            "100%",
-
-          objectFit:
-            "cover",
-
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
           transform:
-            `scale(${scale})`,
-
+            `translateX(${translateX}px) scale(${scale})`,
           filter:
-            "brightness(0.34)",
+            "brightness(0.38) saturate(0.85)",
         }}
       />
 
+      {/* dark overlay */}
       <AbsoluteFill
         style={{
           background:
-            "linear-gradient(90deg, rgba(0,0,0,0.92), rgba(0,0,0,0.55), rgba(0,0,0,0.28))",
+            "linear-gradient(90deg, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.78) 38%, rgba(0,0,0,0.30) 100%)",
         }}
       />
 
+      {/* bottom gradient */}
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(0deg, rgba(0,0,0,0.72), transparent 45%)",
+        }}
+      />
+
+      {/* =================================================
+          ARTICLE CONTENT
+      ================================================= */}
+
       <div
         style={{
-          position:
-            "absolute",
-
-          left: 115,
-
-          right: 115,
-
-          top: 95,
-
-          bottom: 95,
-
-          display:
-            "flex",
-
-          flexDirection:
-            "column",
-
-          justifyContent:
-            "center",
+          position: "absolute",
+          left: 105,
+          right: 105,
+          top: 90,
+          bottom: 80,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
         }}
       >
         <div
           style={{
-            fontSize: 20,
-            letterSpacing: 5,
-            opacity: 0.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
             marginBottom: 24,
+            transform:
+              `translateX(${slideLeft(
+                frame,
+                45,
+                16,
+              )}px)`,
           }}
         >
-          FEATURED ARTICLE{" "}
-          {index + 1}
+          <div
+            style={{
+              fontSize: 17,
+              letterSpacing: 4,
+              fontWeight: 700,
+              opacity: 0.55,
+            }}
+          >
+            LATEST STORY
+          </div>
+
+          <div
+            style={{
+              width: 45,
+              height: 1,
+              background:
+                "rgba(255,255,255,0.4)",
+            }}
+          />
+
+          <div
+            style={{
+              fontSize: 16,
+              opacity: 0.45,
+            }}
+          >
+            {String(
+              index + 1,
+            ).padStart(2, "0")}
+          </div>
         </div>
 
         <div
           style={{
-            fontSize: 60,
+            maxWidth: 1200,
+            fontSize: 55,
+            lineHeight: 1.05,
             fontWeight: 900,
-            lineHeight: 1.08,
-            maxWidth: 1350,
+            letterSpacing: -1.8,
+            transform:
+              `translateY(${slideUp(
+                frame,
+                45,
+                18,
+              )}px)`,
           }}
         >
-          {truncate(
-            safe(
-              post.title,
-              "Featured article",
-            ),
-            82,
-          )}
+          {title}
         </div>
 
         {post.date ? (
           <div
             style={{
-              marginTop: 18,
-              fontSize: 19,
-              opacity: 0.5,
+              marginTop: 16,
+              fontSize: 17,
+              opacity: 0.42,
             }}
           >
             {post.date}
@@ -693,40 +1032,122 @@ const PostCard: React.FC<{
 
         <div
           style={{
-            marginTop: 28,
-            fontSize: 24,
-            lineHeight: 1.5,
-            maxWidth: 1100,
-            opacity: 0.72,
+            marginTop: 20,
+            maxWidth: 850,
+            fontSize: 21,
+            lineHeight: 1.42,
+            opacity: 0.70,
+            transform:
+              `translateY(${slideUp(
+                frame - 4,
+                35,
+                18,
+              )}px)`,
           }}
         >
-          {truncate(
-            safe(
-              post.excerpt,
-              "Read the full article for more insights.",
-            ),
-            190,
-          )}
+          {excerpt}
         </div>
+
+        {categories.length > 0 ? (
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              marginTop: 20,
+            }}
+          >
+            {categories.map(
+              (category) => (
+                <div
+                  key={category}
+                  style={{
+                    fontSize: 14,
+                    letterSpacing: 1,
+                    padding:
+                      "7px 12px",
+                    border:
+                      "1px solid rgba(255,255,255,0.25)",
+                    borderRadius: 999,
+                    opacity: 0.55,
+                  }}
+                >
+                  {category}
+                </div>
+              ),
+            )}
+          </div>
+        ) : null}
 
         <div
           style={{
-            marginTop: 38,
-            fontSize: 18,
-            letterSpacing: 2,
-            opacity: 0.55,
+            marginTop: 25,
+            fontSize: 15,
+            letterSpacing: 2.5,
+            opacity: 0.48,
           }}
         >
-          READ MORE →
+          READ ARTICLE →
         </div>
+      </div>
+
+      {/* =================================================
+          ARTICLE NUMBER
+      ================================================= */}
+
+      <div
+        style={{
+          position: "absolute",
+          right: 100,
+          top: 75,
+          fontSize: 90,
+          fontWeight: 900,
+          lineHeight: 1,
+          opacity: 0.09,
+        }}
+      >
+        {String(
+          index + 1,
+        ).padStart(2, "0")}
+      </div>
+
+      {/* =================================================
+          PROGRESS BAR
+      ================================================= */}
+
+      <div
+        style={{
+          position: "absolute",
+          left: 105,
+          right: 105,
+          bottom: 38,
+          height: 2,
+          background:
+            "rgba(255,255,255,0.14)",
+        }}
+      >
+        <div
+          style={{
+            width:
+              `${clamp(
+                (frame /
+                  duration) *
+                  100,
+                0,
+                100,
+              )}%`,
+            height: "100%",
+            background:
+              "rgba(255,255,255,0.75)",
+          }}
+        />
       </div>
     </AbsoluteFill>
   );
 };
 
 /* =========================================================
-   BLOG ANALYSIS
-   17 - 21 seconds
+   BLOG AT A GLANCE
+   18–21 seconds
 ========================================================= */
 
 const AnalysisScene: React.FC<{
@@ -742,27 +1163,43 @@ const AnalysisScene: React.FC<{
   const opacity =
     sceneOpacity(
       frame,
-      120,
+      90,
+    );
+
+  const topics = (
+    analysis.topics || []
+  )
+    .filter(Boolean)
+    .slice(0, 5);
+
+  const postCount =
+    Math.max(
+      0,
+      Number(
+        data.postCount ||
+          data.posts?.length ||
+          0,
+      ),
     );
 
   return (
     <AbsoluteFill
       style={{
         opacity,
-
         padding:
-          "90px 120px",
-
+          "70px 110px",
         justifyContent:
           "center",
+        background:
+          "linear-gradient(135deg, #090909, #111111)",
       }}
     >
       <div
         style={{
-          fontSize: 22,
-          letterSpacing: 5,
-          opacity: 0.5,
-          marginBottom: 28,
+          fontSize: 19,
+          letterSpacing: 6,
+          opacity: 0.42,
+          marginBottom: 20,
         }}
       >
         THE BLOG AT A GLANCE
@@ -770,89 +1207,178 @@ const AnalysisScene: React.FC<{
 
       <div
         style={{
-          display:
-            "flex",
-
-          gap: 90,
-
-          alignItems:
-            "flex-start",
+          display: "flex",
+          gap: 70,
+          alignItems: "flex-start",
         }}
       >
+        {/* LEFT */}
         <div
           style={{
-            flex: 1,
+            flex: 1.15,
+            transform:
+              `translateY(${slideUp(
+                frame,
+                35,
+                18,
+              )}px)`,
           }}
         >
           <div
             style={{
-              fontSize: 25,
-              opacity: 0.55,
-              marginBottom: 15,
-            }}
-          >
-            CONTENT
-          </div>
-
-          <div
-            style={{
-              fontSize: 43,
-              fontWeight: 800,
-              lineHeight: 1.15,
+              fontSize: 48,
+              lineHeight: 1.08,
+              fontWeight: 900,
+              maxWidth: 850,
             }}
           >
             {truncate(
-              analysis.contentStyle,
-              70,
+              safe(
+                analysis.contentStyle,
+                "Insights and analysis",
+              ),
+              90,
             )}
+          </div>
+
+          <div
+            style={{
+              marginTop: 22,
+              maxWidth: 750,
+              fontSize: 20,
+              lineHeight: 1.45,
+              opacity: 0.58,
+            }}
+          >
+            {truncate(
+              safe(
+                analysis.audience,
+                "For readers looking for useful information.",
+              ),
+              130,
+            )}
+          </div>
+
+          <div
+            style={{
+              marginTop: 32,
+              display: "flex",
+              gap: 35,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 34,
+                  fontWeight: 800,
+                }}
+              >
+                {postCount}
+              </div>
+
+              <div
+                style={{
+                  fontSize: 13,
+                  letterSpacing: 2,
+                  opacity: 0.4,
+                  marginTop: 4,
+                }}
+              >
+                STORIES
+              </div>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontSize: 34,
+                  fontWeight: 800,
+                }}
+              >
+                {topics.length}
+              </div>
+
+              <div
+                style={{
+                  fontSize: 13,
+                  letterSpacing: 2,
+                  opacity: 0.4,
+                  marginTop: 4,
+                }}
+              >
+                TOPICS
+              </div>
+            </div>
           </div>
         </div>
 
+        {/* RIGHT */}
         <div
           style={{
-            flex: 1,
+            flex: 0.85,
+            paddingTop: 5,
           }}
         >
           <div
             style={{
-              fontSize: 25,
-              opacity: 0.55,
+              fontSize: 14,
+              letterSpacing: 3,
+              opacity: 0.38,
               marginBottom: 15,
             }}
           >
-            TOPICS
+            KEY TOPICS
           </div>
 
-          <div
-            style={{
-              fontSize: 31,
-              lineHeight: 1.5,
-              fontWeight: 700,
-            }}
-          >
-            {analysis.topics
-              .slice(
-                0,
-                3,
-              )
-              .join(
-                "  •  ",
-              )}
-          </div>
+          {topics.map(
+            (topic, index) => (
+              <div
+                key={topic}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 15,
+                  padding:
+                    "12px 0",
+                  borderBottom:
+                    "1px solid rgba(255,255,255,0.10)",
+                  transform:
+                    `translateX(${slideLeft(
+                      frame -
+                        index * 3,
+                      30,
+                      15,
+                    )}px)`,
+                }}
+              >
+                <div
+                  style={{
+                    width: 25,
+                    fontSize: 13,
+                    opacity: 0.3,
+                  }}
+                >
+                  {String(
+                    index + 1,
+                  ).padStart(2, "0")}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 21,
+                    fontWeight: 700,
+                    opacity: 0.82,
+                  }}
+                >
+                  {truncate(
+                    topic,
+                    38,
+                  )}
+                </div>
+              </div>
+            ),
+          )}
         </div>
-      </div>
-
-      <div
-        style={{
-          marginTop: 55,
-          fontSize: 21,
-          opacity: 0.5,
-        }}
-      >
-        {
-          data.postCount
-        }{" "}
-        recent articles analyzed
       </div>
     </AbsoluteFill>
   );
@@ -860,7 +1386,7 @@ const AnalysisScene: React.FC<{
 
 /* =========================================================
    OUTRO
-   21 - 24 seconds
+   21–24 seconds
 ========================================================= */
 
 const Outro: React.FC<{
@@ -875,29 +1401,44 @@ const Outro: React.FC<{
       90,
     );
 
+  const url =
+    safe(
+      data.url,
+      "",
+    );
+
+  const domain =
+    normalizeUrl(
+      url,
+    );
+
   return (
     <AbsoluteFill
       style={{
         opacity,
-
         alignItems:
           "center",
-
         justifyContent:
           "center",
-
         textAlign:
           "center",
-
+        background:
+          "radial-gradient(circle at center, rgba(255,255,255,0.08), transparent 40%), #080808",
         padding: 80,
       }}
     >
       <div
         style={{
-          fontSize: 22,
-          letterSpacing: 7,
-          opacity: 0.5,
-          marginBottom: 28,
+          fontSize: 18,
+          letterSpacing: 6,
+          opacity: 0.42,
+          marginBottom: 24,
+          transform:
+            `translateY(${slideUp(
+              frame,
+              30,
+              18,
+            )}px)`,
         }}
       >
         KEEP EXPLORING
@@ -905,50 +1446,99 @@ const Outro: React.FC<{
 
       <div
         style={{
-          fontSize: 76,
+          fontSize: 72,
+          lineHeight: 1,
           fontWeight: 900,
-          lineHeight: 1.05,
-          maxWidth: 1400,
+          letterSpacing: -3,
+          maxWidth: 1450,
+          transform:
+            `translateY(${slideUp(
+              frame - 3,
+              40,
+              18,
+            )}px)`,
         }}
       >
         {truncate(
           safe(
             data.siteTitle,
-            "Discover something new.",
+            "This Blog",
           ),
-          48,
+          42,
         )}
       </div>
 
       <div
         style={{
-          marginTop: 28,
-          fontSize: 25,
+          marginTop: 25,
+          fontSize: 24,
           opacity: 0.62,
         }}
       >
-        Visit the blog for the latest insights.
+        Discover more stories,
+        insights and ideas.
       </div>
 
       <div
         style={{
-          marginTop: 42,
-
-          border:
-            "1px solid rgba(255,255,255,0.35)",
-
-          borderRadius:
-            999,
-
-          padding:
-            "16px 34px",
-
-          fontSize: 19,
-
-          letterSpacing: 2,
+          marginTop: 30,
+          fontSize: 25,
+          fontWeight: 700,
+          letterSpacing: 1,
+          opacity: 0.88,
         }}
       >
-        VISIT BLOG
+        {domain ||
+          truncate(
+            url,
+            80,
+          )}
+      </div>
+
+      <div
+        style={{
+          marginTop: 28,
+          padding:
+            "12px 25px",
+          border:
+            "1px solid rgba(255,255,255,0.45)",
+          borderRadius: 999,
+          fontSize: 15,
+          fontWeight: 700,
+          letterSpacing: 3,
+          opacity: 0.82,
+        }}
+      >
+        VISIT BLOG →
+      </div>
+
+      <div
+        style={{
+          position:
+            "absolute",
+          left: 105,
+          right: 105,
+          bottom: 38,
+          height: 2,
+          background:
+            "rgba(255,255,255,0.16)",
+        }}
+      >
+        <div
+          style={{
+            width:
+              `${clamp(
+                (frame /
+                  90) *
+                  100,
+                0,
+                100,
+              )}%`,
+            height: "100%",
+            background:
+              "rgba(255,255,255,0.75)",
+          }}
+        />
       </div>
     </AbsoluteFill>
   );
