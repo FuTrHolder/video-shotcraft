@@ -8,12 +8,20 @@ import {
   useCurrentFrame,
 } from "remotion";
 
+/* =========================================================
+   VIDEO SETTINGS
+========================================================= */
+
 export const BLOG_PROMO_FPS = 30;
 
 export const BLOG_PROMO_SECONDS = 24;
 
 export const BLOG_PROMO_DURATION =
   BLOG_PROMO_FPS * BLOG_PROMO_SECONDS;
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type BlogPost = {
   title: string;
@@ -189,6 +197,10 @@ const normalizeUrl = (
   }
 };
 
+/* =========================================================
+   IMAGE SOURCE
+========================================================= */
+
 const getImageSource = (
   post: BlogPost,
 ) => {
@@ -232,6 +244,12 @@ const loadBlogData =
 
 /* =========================================================
    MAIN COMPOSITION
+
+   0–3s    INTRO
+   3–6s    PROFILE
+   6–18s   FIVE POSTS
+   18–21s  ANALYSIS
+   21–24s  CTA
 ========================================================= */
 
 export const BlogPromo: React.FC = () => {
@@ -310,12 +328,6 @@ export const BlogPromo: React.FC = () => {
     );
   }
 
-  /*
-   * 반드시 최대 5개 사용.
-   *
-   * capture-blog.mjs에서 Blogger Feed의
-   * 최신 게시물 5개를 생성한다.
-   */
   const posts = (
     data.posts || []
   ).slice(0, 5);
@@ -350,7 +362,7 @@ export const BlogPromo: React.FC = () => {
     >
       {/* =================================================
           0–3s
-          HOOK
+          INTRO
       ================================================= */}
 
       <Sequence
@@ -365,7 +377,7 @@ export const BlogPromo: React.FC = () => {
 
       {/* =================================================
           3–6s
-          BLOG PROFILE
+          PROFILE
       ================================================= */}
 
       <Sequence
@@ -381,7 +393,7 @@ export const BlogPromo: React.FC = () => {
       {/* =================================================
           6–18s
           FIVE POSTS
-          72 frames = 2.4 sec each
+          72 frames = 2.4 seconds each
       ================================================= */}
 
       {posts.map(
@@ -400,6 +412,9 @@ export const BlogPromo: React.FC = () => {
             <PostCard
               post={post}
               index={index}
+              totalPosts={
+                posts.length
+              }
             />
           </Sequence>
         ),
@@ -488,41 +503,84 @@ const Intro: React.FC<{
     <AbsoluteFill
       style={{
         opacity,
+
         background:
-          "radial-gradient(circle at 70% 35%, rgba(255,255,255,0.10), transparent 35%), #080808",
+          "radial-gradient(circle at 72% 35%, rgba(255,255,255,0.09), transparent 32%), #080808",
       }}
     >
-      {/* subtle grid */}
+      {/* Background grid */}
+
       <AbsoluteFill
         style={{
-          opacity: 0.08,
+          opacity: 0.07,
+
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+
           backgroundSize:
             "80px 80px",
+        }}
+      />
+
+      {/* Decorative circle */}
+
+      <div
+        style={{
+          position: "absolute",
+
+          width: 620,
+          height: 620,
+
+          right: -180,
+          top: -120,
+
+          border:
+            "1px solid rgba(255,255,255,0.08)",
+
+          borderRadius: "50%",
         }}
       />
 
       <div
         style={{
           position: "absolute",
+
+          width: 430,
+          height: 430,
+
+          right: -80,
+          top: -20,
+
+          border:
+            "1px solid rgba(255,255,255,0.06)",
+
+          borderRadius: "50%",
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+
           left: 110,
           right: 110,
           top: 100,
           bottom: 90,
+
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
+
           transform:
             `translateY(${y}px) scale(${scale})`,
         }}
       >
         <div
           style={{
-            fontSize: 20,
+            fontSize: 19,
             letterSpacing: 7,
             fontWeight: 700,
-            opacity: 0.5,
+            opacity: 0.48,
             marginBottom: 28,
           }}
         >
@@ -531,10 +589,11 @@ const Intro: React.FC<{
 
         <div
           style={{
-            fontSize: 82,
+            fontSize: 84,
             lineHeight: 0.98,
             fontWeight: 900,
             letterSpacing: -4,
+
             maxWidth: 1450,
           }}
         >
@@ -551,19 +610,25 @@ const Intro: React.FC<{
           style={{
             width: 130,
             height: 5,
+
             marginTop: 36,
+
             background:
               "#ffffff",
-            opacity: 0.75,
+
+            opacity: 0.72,
           }}
         />
 
         <div
           style={{
             marginTop: 28,
-            maxWidth: 1100,
-            fontSize: 28,
-            lineHeight: 1.4,
+
+            maxWidth: 1120,
+
+            fontSize: 27,
+            lineHeight: 1.42,
+
             opacity: 0.68,
           }}
         >
@@ -579,9 +644,12 @@ const Intro: React.FC<{
         <div
           style={{
             marginTop: 38,
-            fontSize: 18,
+
+            fontSize: 17,
+
             letterSpacing: 3,
-            opacity: 0.4,
+
+            opacity: 0.38,
           }}
         >
           EXPLORE • READ • DISCOVER
@@ -625,6 +693,7 @@ const ProfileScene: React.FC<{
         topics[0] ||
         "Insights",
     },
+
     {
       label: "STYLE",
       value:
@@ -633,6 +702,7 @@ const ProfileScene: React.FC<{
           "Analysis",
         ),
     },
+
     {
       label: "FOR",
       value:
@@ -647,15 +717,20 @@ const ProfileScene: React.FC<{
     <AbsoluteFill
       style={{
         opacity,
+
         padding:
-          "75px 110px",
+          "80px 110px",
+
         justifyContent:
           "center",
+
+        background:
+          "radial-gradient(circle at 75% 45%, rgba(255,255,255,0.055), transparent 34%), #0a0a0a",
       }}
     >
       <div
         style={{
-          fontSize: 20,
+          fontSize: 19,
           letterSpacing: 6,
           opacity: 0.42,
           marginBottom: 22,
@@ -666,10 +741,12 @@ const ProfileScene: React.FC<{
 
       <div
         style={{
-          fontSize: 58,
+          fontSize: 57,
           lineHeight: 1.08,
           fontWeight: 850,
-          maxWidth: 1250,
+
+          maxWidth: 1280,
+
           transform:
             `translateY(${slideUp(
               frame,
@@ -690,28 +767,34 @@ const ProfileScene: React.FC<{
       <div
         style={{
           display: "flex",
+
           gap: 18,
-          marginTop: 38,
-          flexWrap: "wrap",
+
+          marginTop: 40,
         }}
       >
         {cards.map(
           (card, index) => (
             <div
-              key={card.label}
+              key={
+                card.label
+              }
               style={{
-                width:
-                  index === 2
-                    ? 470
-                    : 330,
-                minHeight: 100,
+                flex: 1,
+
+                minHeight: 112,
+
                 border:
-                  "1px solid rgba(255,255,255,0.18)",
+                  "1px solid rgba(255,255,255,0.16)",
+
                 background:
                   "rgba(255,255,255,0.035)",
-                borderRadius: 10,
+
+                borderRadius: 12,
+
                 padding:
                   "20px 22px",
+
                 transform:
                   `translateY(${slideUp(
                     frame -
@@ -723,10 +806,13 @@ const ProfileScene: React.FC<{
             >
               <div
                 style={{
-                  fontSize: 14,
+                  fontSize: 13,
+
                   letterSpacing: 3,
-                  opacity: 0.42,
-                  marginBottom: 10,
+
+                  opacity: 0.4,
+
+                  marginBottom: 11,
                 }}
               >
                 {card.label}
@@ -735,14 +821,17 @@ const ProfileScene: React.FC<{
               <div
                 style={{
                   fontSize: 21,
+
                   lineHeight: 1.25,
+
                   fontWeight: 700,
-                  opacity: 0.88,
+
+                  opacity: 0.9,
                 }}
               >
                 {truncate(
                   card.value,
-                  60,
+                  58,
                 )}
               </div>
             </div>
@@ -750,60 +839,37 @@ const ProfileScene: React.FC<{
         )}
       </div>
 
-      {topics.length > 0 ? (
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            marginTop: 26,
-            flexWrap: "wrap",
-          }}
-        >
-          {topics.map(
-            (topic, index) => (
-              <div
-                key={topic}
-                style={{
-                  fontSize: 17,
-                  letterSpacing: 1,
-                  padding:
-                    "9px 16px",
-                  borderRadius: 999,
-                  border:
-                    "1px solid rgba(255,255,255,0.22)",
-                  opacity:
-                    clamp(
-                      0.45 +
-                        index *
-                          0.1,
-                      0.45,
-                      0.85,
-                    ),
-                }}
-              >
-                {topic}
-              </div>
-            ),
-          )}
-        </div>
-      ) : null}
-
       <div
         style={{
-          position: "absolute",
-          right: 110,
-          top: 74,
-          fontSize: 15,
-          letterSpacing: 2,
-          opacity: 0.3,
+          marginTop: 28,
+
+          display: "flex",
+
+          gap: 10,
         }}
       >
-        {safe(
-          normalizeUrl(
-            data.url,
+        {topics.map(
+          (topic) => (
+            <div
+              key={topic}
+              style={{
+                padding:
+                  "8px 15px",
+
+                border:
+                  "1px solid rgba(255,255,255,0.12)",
+
+                borderRadius: 20,
+
+                fontSize: 14,
+
+                opacity: 0.55,
+              }}
+            >
+              {topic}
+            </div>
           ),
-          "BLOG",
-        ).toUpperCase()}
+        )}
       </div>
     </AbsoluteFill>
   );
@@ -811,41 +877,50 @@ const ProfileScene: React.FC<{
 
 /* =========================================================
    POST CARD
-   2.4 seconds per post
+   6–18 seconds
+
+   IMPORTANT:
+   The image is intentionally kept large and bright.
+
+   Layout:
+
+   ┌───────────────────────────────┬───────────────────────┐
+   │                               │                       │
+   │                               │  01 / 05              │
+   │       BLOG IMAGE              │                       │
+   │                               │  CATEGORY             │
+   │                               │                       │
+   │                               │  POST TITLE           │
+   │                               │                       │
+   │                               │  EXCERPT              │
+   │                               │                       │
+   │                               │  READ ARTICLE →       │
+   └───────────────────────────────┴───────────────────────┘
 ========================================================= */
 
 const PostCard: React.FC<{
   post: BlogPost;
   index: number;
+  totalPosts: number;
 }> = ({
   post,
   index,
+  totalPosts,
 }) => {
   const frame =
     useCurrentFrame();
 
-  const duration = 72;
-
   const opacity =
     sceneOpacity(
       frame,
-      duration,
+      72,
     );
 
-  /*
-   * Each article gets a slightly different
-   * camera direction.
-   */
-  const direction =
-    index % 2 === 0
-      ? 1
-      : -1;
-
-  const scale =
+  const imageScale =
     interpolate(
       frame,
-      [0, duration],
-      [1.08, 1.0],
+      [0, 72],
+      [1.015, 1.055],
       {
         extrapolateLeft:
           "clamp",
@@ -854,14 +929,11 @@ const PostCard: React.FC<{
       },
     );
 
-  const translateX =
+  const imageX =
     interpolate(
       frame,
-      [0, duration],
-      [
-        direction * 18,
-        direction * -18,
-      ],
+      [0, 72],
+      [0, -12],
       {
         extrapolateLeft:
           "clamp",
@@ -870,25 +942,18 @@ const PostCard: React.FC<{
       },
     );
 
-  const image =
-    getImageSource(post);
-
-  const title =
-    truncate(
-      safe(
-        post.title,
-        "Featured article",
-      ),
-      78,
+  const contentX =
+    slideLeft(
+      frame,
+      50,
+      20,
     );
 
-  const excerpt =
-    truncate(
-      safe(
-        post.excerpt,
-        "Read the full article for more insights.",
-      ),
-      125,
+  const contentY =
+    slideUp(
+      frame,
+      25,
+      18,
     );
 
   const categories = (
@@ -897,256 +962,372 @@ const PostCard: React.FC<{
     .filter(Boolean)
     .slice(0, 2);
 
+  const categoryText =
+    categories.length > 0
+      ? categories.join(
+          "  •  ",
+        )
+      : "LATEST STORY";
+
+  const title =
+    truncate(
+      safe(
+        post.title,
+        "Untitled story",
+      ),
+      92,
+    );
+
+  const excerpt =
+    truncate(
+      safe(
+        post.excerpt,
+        "Discover the latest story and insights from this blog.",
+      ),
+      175,
+    );
+
+  const date =
+    safe(
+      post.date,
+      post.published
+        ? new Date(
+            post.published,
+          ).toLocaleDateString(
+            "en-US",
+            {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            },
+          )
+        : "",
+    );
+
   return (
     <AbsoluteFill
       style={{
         opacity,
+
+        background:
+          "#090909",
       }}
     >
       {/* =================================================
-          BACKGROUND IMAGE
-      ================================================= */}
-
-      <Img
-        src={image}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          transform:
-            `translateX(${translateX}px) scale(${scale})`,
-          filter:
-            "brightness(0.38) saturate(0.85)",
-        }}
-      />
-
-      {/* dark overlay */}
-      <AbsoluteFill
-        style={{
-          background:
-            "linear-gradient(90deg, rgba(0,0,0,0.94) 0%, rgba(0,0,0,0.78) 38%, rgba(0,0,0,0.30) 100%)",
-        }}
-      />
-
-      {/* bottom gradient */}
-      <AbsoluteFill
-        style={{
-          background:
-            "linear-gradient(0deg, rgba(0,0,0,0.72), transparent 45%)",
-        }}
-      />
-
-      {/* =================================================
-          ARTICLE CONTENT
+          LEFT IMAGE AREA
       ================================================= */}
 
       <div
         style={{
           position: "absolute",
-          left: 105,
-          right: 105,
-          top: 90,
-          bottom: 80,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
+
+          left: 56,
+          top: 56,
+          bottom: 56,
+
+          width: 1055,
+
+          overflow: "hidden",
+
+          borderRadius: 18,
+
+          background:
+            "#151515",
+
+          boxShadow:
+            "0 25px 70px rgba(0,0,0,0.45)",
         }}
       >
+        <Img
+          src={getImageSource(
+            post,
+          )}
+          style={{
+            width: "100%",
+            height: "100%",
+
+            objectFit: "cover",
+
+            objectPosition:
+              "center center",
+
+            transform:
+              `translateX(${imageX}px) scale(${imageScale})`,
+          }}
+        />
+
+        {/* Very light image protection gradient.
+            This is deliberately much weaker than
+            the previous full-screen overlay. */}
+
+        <AbsoluteFill
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.04) 65%, rgba(0,0,0,0.16) 100%)",
+          }}
+        />
+
+        <AbsoluteFill
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.03) 0%, transparent 55%, rgba(0,0,0,0.12) 100%)",
+          }}
+        />
+
+        {/* Image number badge */}
+
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 18,
-            marginBottom: 24,
-            transform:
-              `translateX(${slideLeft(
-                frame,
-                45,
-                16,
-              )}px)`,
+            position: "absolute",
+
+            left: 24,
+            top: 24,
+
+            padding:
+              "9px 14px",
+
+            borderRadius: 8,
+
+            background:
+              "rgba(0,0,0,0.58)",
+
+            border:
+              "1px solid rgba(255,255,255,0.18)",
+
+            backdropFilter:
+              "blur(8px)",
+
+            fontSize: 14,
+
+            fontWeight: 700,
+
+            letterSpacing: 2,
           }}
         >
-          <div
-            style={{
-              fontSize: 17,
-              letterSpacing: 4,
-              fontWeight: 700,
-              opacity: 0.55,
-            }}
-          >
-            LATEST STORY
-          </div>
-
-          <div
-            style={{
-              width: 45,
-              height: 1,
-              background:
-                "rgba(255,255,255,0.4)",
-            }}
-          />
-
-          <div
-            style={{
-              fontSize: 16,
-              opacity: 0.45,
-            }}
-          >
-            {String(
-              index + 1,
-            ).padStart(2, "0")}
-          </div>
+          {String(
+            index + 1,
+          ).padStart(2, "0")}
+          {"  "}
+          /{"  "}
+          {String(
+            totalPosts,
+          ).padStart(2, "0")}
         </div>
+      </div>
+
+      {/* =================================================
+          RIGHT INFORMATION PANEL
+      ================================================= */}
+
+      <div
+        style={{
+          position: "absolute",
+
+          left: 1150,
+          right: 65,
+
+          top: 56,
+          bottom: 56,
+
+          display: "flex",
+
+          flexDirection:
+            "column",
+
+          justifyContent:
+            "center",
+
+          transform:
+            `translateX(${contentX}px)`,
+        }}
+      >
+        {/* Small section label */}
 
         <div
           style={{
-            maxWidth: 1200,
-            fontSize: 55,
-            lineHeight: 1.05,
-            fontWeight: 900,
-            letterSpacing: -1.8,
+            fontSize: 15,
+
+            letterSpacing: 4,
+
+            fontWeight: 700,
+
+            opacity: 0.42,
+
+            marginBottom: 25,
+          }}
+        >
+          {categoryText.toUpperCase()}
+        </div>
+
+        {/* Title */}
+
+        <div
+          style={{
+            fontSize: 43,
+
+            lineHeight: 1.08,
+
+            fontWeight: 850,
+
+            letterSpacing: -1.5,
+
+            maxWidth: 680,
+
             transform:
-              `translateY(${slideUp(
-                frame,
-                45,
-                18,
-              )}px)`,
+              `translateY(${contentY}px)`,
           }}
         >
           {title}
         </div>
 
-        {post.date ? (
-          <div
-            style={{
-              marginTop: 16,
-              fontSize: 17,
-              opacity: 0.42,
-            }}
-          >
-            {post.date}
-          </div>
-        ) : null}
+        {/* Divider */}
 
         <div
           style={{
-            marginTop: 20,
-            maxWidth: 850,
-            fontSize: 21,
-            lineHeight: 1.42,
-            opacity: 0.70,
-            transform:
-              `translateY(${slideUp(
-                frame - 4,
-                35,
-                18,
-              )}px)`,
+            width: 74,
+
+            height: 3,
+
+            background:
+              "#ffffff",
+
+            opacity: 0.65,
+
+            marginTop: 28,
+
+            marginBottom: 22,
+          }}
+        />
+
+        {/* Date */}
+
+        {date && (
+          <div
+            style={{
+              fontSize: 15,
+
+              letterSpacing: 1.2,
+
+              opacity: 0.38,
+
+              marginBottom: 20,
+            }}
+          >
+            {date}
+          </div>
+        )}
+
+        {/* Excerpt */}
+
+        <div
+          style={{
+            fontSize: 19,
+
+            lineHeight: 1.5,
+
+            opacity: 0.58,
+
+            maxWidth: 650,
           }}
         >
           {excerpt}
         </div>
 
-        {categories.length > 0 ? (
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              marginTop: 20,
-            }}
-          >
-            {categories.map(
-              (category) => (
-                <div
-                  key={category}
-                  style={{
-                    fontSize: 14,
-                    letterSpacing: 1,
-                    padding:
-                      "7px 12px",
-                    border:
-                      "1px solid rgba(255,255,255,0.25)",
-                    borderRadius: 999,
-                    opacity: 0.55,
-                  }}
-                >
-                  {category}
-                </div>
-              ),
-            )}
-          </div>
-        ) : null}
+        {/* CTA */}
 
         <div
           style={{
-            marginTop: 25,
-            fontSize: 15,
-            letterSpacing: 2.5,
-            opacity: 0.48,
+            marginTop: 34,
+
+            display: "flex",
+
+            alignItems: "center",
+
+            gap: 14,
           }}
         >
-          READ ARTICLE →
+          <div
+            style={{
+              fontSize: 15,
+
+              letterSpacing: 2.5,
+
+              fontWeight: 700,
+
+              opacity: 0.72,
+            }}
+          >
+            READ ARTICLE
+          </div>
+
+          <div
+            style={{
+              fontSize: 22,
+
+              opacity: 0.72,
+            }}
+          >
+            →
+          </div>
+        </div>
+
+        {/* Bottom URL */}
+
+        <div
+          style={{
+            position: "absolute",
+
+            left: 0,
+            bottom: 0,
+
+            fontSize: 13,
+
+            letterSpacing: 1.2,
+
+            opacity: 0.28,
+
+            maxWidth: 620,
+
+            overflow: "hidden",
+
+            whiteSpace:
+              "nowrap",
+
+            textOverflow:
+              "ellipsis",
+          }}
+        >
+          {normalizeUrl(
+            post.url,
+          )}
         </div>
       </div>
 
       {/* =================================================
-          ARTICLE NUMBER
+          THIN DIVIDER BETWEEN IMAGE / CONTENT
       ================================================= */}
 
       <div
         style={{
           position: "absolute",
-          right: 100,
-          top: 75,
-          fontSize: 90,
-          fontWeight: 900,
-          lineHeight: 1,
-          opacity: 0.09,
-        }}
-      >
-        {String(
-          index + 1,
-        ).padStart(2, "0")}
-      </div>
 
-      {/* =================================================
-          PROGRESS BAR
-      ================================================= */}
+          left: 1134,
 
-      <div
-        style={{
-          position: "absolute",
-          left: 105,
-          right: 105,
-          bottom: 38,
-          height: 2,
+          top: 110,
+          bottom: 110,
+
+          width: 1,
+
           background:
-            "rgba(255,255,255,0.14)",
+            "rgba(255,255,255,0.08)",
         }}
-      >
-        <div
-          style={{
-            width:
-              `${clamp(
-                (frame /
-                  duration) *
-                  100,
-                0,
-                100,
-              )}%`,
-            height: "100%",
-            background:
-              "rgba(255,255,255,0.75)",
-          }}
-        />
-      </div>
+      />
     </AbsoluteFill>
   );
 };
 
 /* =========================================================
-   BLOG AT A GLANCE
+   ANALYSIS SCENE
    18–21 seconds
 ========================================================= */
 
@@ -1170,90 +1351,82 @@ const AnalysisScene: React.FC<{
     analysis.topics || []
   )
     .filter(Boolean)
-    .slice(0, 5);
+    .slice(0, 4);
 
   const postCount =
-    Math.max(
-      0,
-      Number(
-        data.postCount ||
-          data.posts?.length ||
-          0,
-      ),
-    );
+    data.postCount ||
+    data.posts?.length ||
+    0;
 
   return (
     <AbsoluteFill
       style={{
         opacity,
+
         padding:
-          "70px 110px",
+          "75px 110px",
+
         justifyContent:
           "center",
+
         background:
-          "linear-gradient(135deg, #090909, #111111)",
+          "radial-gradient(circle at 70% 35%, rgba(255,255,255,0.06), transparent 35%), #080808",
       }}
     >
       <div
         style={{
-          fontSize: 19,
+          fontSize: 18,
+
           letterSpacing: 6,
-          opacity: 0.42,
-          marginBottom: 20,
+
+          opacity: 0.4,
+
+          marginBottom: 24,
         }}
       >
-        THE BLOG AT A GLANCE
+        BLOG AT A GLANCE
       </div>
 
       <div
         style={{
           display: "flex",
-          gap: 70,
-          alignItems: "flex-start",
+
+          alignItems:
+            "flex-end",
+
+          justifyContent:
+            "space-between",
+
+          gap: 80,
         }}
       >
-        {/* LEFT */}
         <div
           style={{
-            flex: 1.15,
+            maxWidth: 1120,
+
             transform:
               `translateY(${slideUp(
                 frame,
                 35,
-                18,
+                20,
               )}px)`,
           }}
         >
           <div
             style={{
-              fontSize: 48,
-              lineHeight: 1.08,
-              fontWeight: 900,
-              maxWidth: 850,
-            }}
-          >
-            {truncate(
-              safe(
-                analysis.contentStyle,
-                "Insights and analysis",
-              ),
-              90,
-            )}
-          </div>
+              fontSize: 58,
 
-          <div
-            style={{
-              marginTop: 22,
-              maxWidth: 750,
-              fontSize: 20,
-              lineHeight: 1.45,
-              opacity: 0.58,
+              lineHeight: 1.05,
+
+              fontWeight: 850,
+
+              letterSpacing: -2,
             }}
           >
             {truncate(
               safe(
-                analysis.audience,
-                "For readers looking for useful information.",
+                analysis.valueProposition,
+                "Ideas, insights and useful information.",
               ),
               130,
             )}
@@ -1261,124 +1434,128 @@ const AnalysisScene: React.FC<{
 
           <div
             style={{
-              marginTop: 32,
-              display: "flex",
-              gap: 35,
+              marginTop: 26,
+
+              fontSize: 20,
+
+              lineHeight: 1.45,
+
+              opacity: 0.5,
+
+              maxWidth: 980,
             }}
           >
-            <div>
-              <div
-                style={{
-                  fontSize: 34,
-                  fontWeight: 800,
-                }}
-              >
-                {postCount}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 13,
-                  letterSpacing: 2,
-                  opacity: 0.4,
-                  marginTop: 4,
-                }}
-              >
-                STORIES
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: 34,
-                  fontWeight: 800,
-                }}
-              >
-                {topics.length}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 13,
-                  letterSpacing: 2,
-                  opacity: 0.4,
-                  marginTop: 4,
-                }}
-              >
-                TOPICS
-              </div>
-            </div>
+            {truncate(
+              safe(
+                analysis.contentStyle,
+                "Curated stories and practical insights.",
+              ),
+              130,
+            )}
           </div>
         </div>
 
-        {/* RIGHT */}
+        {/* Post count */}
+
         <div
           style={{
-            flex: 0.85,
-            paddingTop: 5,
+            minWidth: 220,
+
+            padding:
+              "25px 28px",
+
+            border:
+              "1px solid rgba(255,255,255,0.14)",
+
+            borderRadius: 14,
+
+            background:
+              "rgba(255,255,255,0.035)",
+
+            transform:
+              `translateY(${slideUp(
+                frame,
+                25,
+                18,
+              )}px)`,
           }}
         >
           <div
             style={{
-              fontSize: 14,
+              fontSize: 13,
+
               letterSpacing: 3,
+
               opacity: 0.38,
-              marginBottom: 15,
+
+              marginBottom: 8,
             }}
           >
-            KEY TOPICS
+            RECENT STORIES
           </div>
 
-          {topics.map(
-            (topic, index) => (
-              <div
-                key={topic}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 15,
-                  padding:
-                    "12px 0",
-                  borderBottom:
-                    "1px solid rgba(255,255,255,0.10)",
-                  transform:
-                    `translateX(${slideLeft(
-                      frame -
-                        index * 3,
-                      30,
-                      15,
-                    )}px)`,
-                }}
-              >
-                <div
-                  style={{
-                    width: 25,
-                    fontSize: 13,
-                    opacity: 0.3,
-                  }}
-                >
-                  {String(
-                    index + 1,
-                  ).padStart(2, "0")}
-                </div>
+          <div
+            style={{
+              fontSize: 52,
 
-                <div
-                  style={{
-                    fontSize: 21,
-                    fontWeight: 700,
-                    opacity: 0.82,
-                  }}
-                >
-                  {truncate(
-                    topic,
-                    38,
-                  )}
-                </div>
-              </div>
-            ),
-          )}
+              lineHeight: 1,
+
+              fontWeight: 900,
+            }}
+          >
+            {postCount}
+          </div>
         </div>
+      </div>
+
+      {/* Topics */}
+
+      <div
+        style={{
+          display: "flex",
+
+          gap: 12,
+
+          marginTop: 38,
+        }}
+      >
+        {topics.map(
+          (topic, index) => (
+            <div
+              key={topic}
+              style={{
+                padding:
+                  "11px 18px",
+
+                border:
+                  "1px solid rgba(255,255,255,0.13)",
+
+                borderRadius: 24,
+
+                fontSize: 15,
+
+                opacity:
+                  clamp(
+                    0.42 +
+                      index *
+                        0.05,
+                    0.42,
+                    0.65,
+                  ),
+
+                transform:
+                  `translateY(${slideUp(
+                    frame -
+                      index * 3,
+                    20,
+                    16,
+                  )}px)`,
+              }}
+            >
+              {topic}
+            </div>
+          ),
+        )}
       </div>
     </AbsoluteFill>
   );
@@ -1391,7 +1568,9 @@ const AnalysisScene: React.FC<{
 
 const Outro: React.FC<{
   data: BlogData;
-}> = ({ data }) => {
+}> = ({
+  data,
+}) => {
   const frame =
     useCurrentFrame();
 
@@ -1401,144 +1580,173 @@ const Outro: React.FC<{
       90,
     );
 
-  const url =
-    safe(
-      data.url,
-      "",
+  const y =
+    slideUp(
+      frame,
+      35,
+      20,
     );
 
-  const domain =
+  const hostname =
     normalizeUrl(
-      url,
+      data.url,
     );
 
   return (
     <AbsoluteFill
       style={{
         opacity,
-        alignItems:
-          "center",
-        justifyContent:
-          "center",
-        textAlign:
-          "center",
+
         background:
-          "radial-gradient(circle at center, rgba(255,255,255,0.08), transparent 40%), #080808",
-        padding: 80,
+          "radial-gradient(circle at 50% 40%, rgba(255,255,255,0.08), transparent 32%), #080808",
       }}
     >
+      {/* Background grid */}
+
+      <AbsoluteFill
+        style={{
+          opacity: 0.06,
+
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+
+          backgroundSize:
+            "80px 80px",
+        }}
+      />
+
       <div
         style={{
-          fontSize: 18,
-          letterSpacing: 6,
-          opacity: 0.42,
-          marginBottom: 24,
+          position: "absolute",
+
+          left: 100,
+          right: 100,
+          top: 80,
+          bottom: 80,
+
+          display: "flex",
+
+          flexDirection:
+            "column",
+
+          alignItems:
+            "center",
+
+          justifyContent:
+            "center",
+
+          textAlign:
+            "center",
+
           transform:
-            `translateY(${slideUp(
-              frame,
-              30,
-              18,
-            )}px)`,
-        }}
-      >
-        KEEP EXPLORING
-      </div>
-
-      <div
-        style={{
-          fontSize: 72,
-          lineHeight: 1,
-          fontWeight: 900,
-          letterSpacing: -3,
-          maxWidth: 1450,
-          transform:
-            `translateY(${slideUp(
-              frame - 3,
-              40,
-              18,
-            )}px)`,
-        }}
-      >
-        {truncate(
-          safe(
-            data.siteTitle,
-            "This Blog",
-          ),
-          42,
-        )}
-      </div>
-
-      <div
-        style={{
-          marginTop: 25,
-          fontSize: 24,
-          opacity: 0.62,
-        }}
-      >
-        Discover more stories,
-        insights and ideas.
-      </div>
-
-      <div
-        style={{
-          marginTop: 30,
-          fontSize: 25,
-          fontWeight: 700,
-          letterSpacing: 1,
-          opacity: 0.88,
-        }}
-      >
-        {domain ||
-          truncate(
-            url,
-            80,
-          )}
-      </div>
-
-      <div
-        style={{
-          marginTop: 28,
-          padding:
-            "12px 25px",
-          border:
-            "1px solid rgba(255,255,255,0.45)",
-          borderRadius: 999,
-          fontSize: 15,
-          fontWeight: 700,
-          letterSpacing: 3,
-          opacity: 0.82,
-        }}
-      >
-        VISIT BLOG →
-      </div>
-
-      <div
-        style={{
-          position:
-            "absolute",
-          left: 105,
-          right: 105,
-          bottom: 38,
-          height: 2,
-          background:
-            "rgba(255,255,255,0.16)",
+            `translateY(${y}px)`,
         }}
       >
         <div
           style={{
-            width:
-              `${clamp(
-                (frame /
-                  90) *
-                  100,
-                0,
-                100,
-              )}%`,
-            height: "100%",
+            fontSize: 17,
+
+            letterSpacing: 6,
+
+            opacity: 0.4,
+
+            marginBottom: 24,
+          }}
+        >
+          DISCOVER MORE
+        </div>
+
+        <div
+          style={{
+            fontSize: 78,
+
+            lineHeight: 1,
+
+            fontWeight: 900,
+
+            letterSpacing: -3,
+
+            maxWidth: 1500,
+          }}
+        >
+          {truncate(
+            safe(
+              data.siteTitle,
+              "This Blog",
+            ),
+            42,
+          )}
+        </div>
+
+        <div
+          style={{
+            width: 100,
+
+            height: 4,
+
             background:
-              "rgba(255,255,255,0.75)",
+              "#ffffff",
+
+            opacity: 0.65,
+
+            marginTop: 34,
           }}
         />
+
+        <div
+          style={{
+            marginTop: 28,
+
+            fontSize: 25,
+
+            opacity: 0.58,
+
+            maxWidth: 900,
+          }}
+        >
+          Discover more stories,
+          {" "}
+          insights and ideas.
+        </div>
+
+        <div
+          style={{
+            marginTop: 36,
+
+            padding:
+              "15px 27px",
+
+            border:
+              "1px solid rgba(255,255,255,0.18)",
+
+            borderRadius: 8,
+
+            background:
+              "rgba(255,255,255,0.045)",
+
+            fontSize: 19,
+
+            letterSpacing: 1.2,
+
+            opacity: 0.78,
+          }}
+        >
+          {hostname}
+        </div>
+
+        <div
+          style={{
+            marginTop: 30,
+
+            fontSize: 14,
+
+            letterSpacing: 3,
+
+            opacity: 0.28,
+          }}
+        >
+          READ • EXPLORE • FOLLOW
+        </div>
       </div>
     </AbsoluteFill>
   );
