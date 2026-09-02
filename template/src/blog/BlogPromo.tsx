@@ -64,6 +64,21 @@ type BlogData = {
 };
 
 /* =========================================================
+   CONSTANTS
+========================================================= */
+
+const COLORS = {
+  background: "#080808",
+  panel: "#101010",
+  panelSoft: "#151515",
+  white: "#ffffff",
+  muted: "rgba(255,255,255,0.62)",
+  dim: "rgba(255,255,255,0.38)",
+  faint: "rgba(255,255,255,0.18)",
+  border: "rgba(255,255,255,0.12)",
+};
+
+/* =========================================================
    HELPERS
 ========================================================= */
 
@@ -102,17 +117,18 @@ const clamp = (
   value: number,
   min: number,
   max: number,
-) =>
-  Math.min(
+) => {
+  return Math.min(
     max,
     Math.max(min, value),
   );
+};
 
 const fadeIn = (
   frame: number,
   duration = 15,
-) =>
-  interpolate(
+) => {
+  return interpolate(
     frame,
     [0, duration],
     [0, 1],
@@ -121,13 +137,14 @@ const fadeIn = (
       extrapolateRight: "clamp",
     },
   );
+};
 
 const fadeOut = (
   frame: number,
   end: number,
   duration = 15,
-) =>
-  interpolate(
+) => {
+  return interpolate(
     frame,
     [end - duration, end],
     [1, 0],
@@ -136,24 +153,24 @@ const fadeOut = (
       extrapolateRight: "clamp",
     },
   );
+};
 
 const sceneOpacity = (
   frame: number,
   duration: number,
-) =>
-  fadeIn(frame, 12) *
-  fadeOut(
-    frame,
-    duration,
-    12,
+) => {
+  return (
+    fadeIn(frame, 14) *
+    fadeOut(frame, duration, 14)
   );
+};
 
 const slideUp = (
   frame: number,
   distance = 40,
   duration = 18,
-) =>
-  interpolate(
+) => {
+  return interpolate(
     frame,
     [0, duration],
     [distance, 0],
@@ -162,13 +179,14 @@ const slideUp = (
       extrapolateRight: "clamp",
     },
   );
+};
 
 const slideLeft = (
   frame: number,
   distance = 60,
   duration = 18,
-) =>
-  interpolate(
+) => {
+  return interpolate(
     frame,
     [0, duration],
     [distance, 0],
@@ -177,6 +195,7 @@ const slideLeft = (
       extrapolateRight: "clamp",
     },
   );
+};
 
 const normalizeUrl = (
   value: string,
@@ -194,6 +213,39 @@ const normalizeUrl = (
     );
   } catch {
     return url;
+  }
+};
+
+const formatDate = (
+  post: BlogPost,
+) => {
+  const directDate = safe(post.date);
+
+  if (directDate) {
+    return directDate;
+  }
+
+  const published = safe(
+    post.published,
+  );
+
+  if (!published) {
+    return "";
+  }
+
+  try {
+    return new Date(
+      published,
+    ).toLocaleDateString(
+      "en-US",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      },
+    );
+  } catch {
+    return "";
   }
 };
 
@@ -250,6 +302,8 @@ const loadBlogData =
    6–18s   FIVE POSTS
    18–21s  ANALYSIS
    21–24s  CTA
+
+   TOTAL = 24 seconds / 720 frames
 ========================================================= */
 
 export const BlogPromo: React.FC = () => {
@@ -275,12 +329,17 @@ export const BlogPromo: React.FC = () => {
       });
   }, []);
 
+  /* =======================================================
+     ERROR
+  ======================================================= */
+
   if (error) {
     return (
       <AbsoluteFill
         style={{
-          background: "#080808",
-          color: "#ffffff",
+          background:
+            COLORS.background,
+          color: COLORS.white,
           alignItems: "center",
           justifyContent: "center",
           fontFamily:
@@ -302,6 +361,8 @@ export const BlogPromo: React.FC = () => {
             marginTop: 20,
             fontSize: 22,
             opacity: 0.65,
+            maxWidth: 1200,
+            textAlign: "center",
           }}
         >
           {error}
@@ -310,12 +371,17 @@ export const BlogPromo: React.FC = () => {
     );
   }
 
+  /* =======================================================
+     LOADING
+  ======================================================= */
+
   if (!data) {
     return (
       <AbsoluteFill
         style={{
-          background: "#080808",
-          color: "#ffffff",
+          background:
+            COLORS.background,
+          color: COLORS.white,
           alignItems: "center",
           justifyContent: "center",
           fontFamily:
@@ -328,9 +394,17 @@ export const BlogPromo: React.FC = () => {
     );
   }
 
+  /* =======================================================
+     POSTS
+  ======================================================= */
+
   const posts = (
     data.posts || []
   ).slice(0, 5);
+
+  /* =======================================================
+     ANALYSIS FALLBACK
+  ======================================================= */
 
   const analysis: BlogAnalysis =
     data.analysis || {
@@ -353,8 +427,9 @@ export const BlogPromo: React.FC = () => {
   return (
     <AbsoluteFill
       style={{
-        background: "#080808",
-        color: "#ffffff",
+        background:
+          COLORS.background,
+        color: COLORS.white,
         fontFamily:
           "Arial, Helvetica, sans-serif",
         overflow: "hidden",
@@ -385,7 +460,6 @@ export const BlogPromo: React.FC = () => {
         durationInFrames={90}
       >
         <ProfileScene
-          data={data}
           analysis={analysis}
         />
       </Sequence>
@@ -393,7 +467,8 @@ export const BlogPromo: React.FC = () => {
       {/* =================================================
           6–18s
           FIVE POSTS
-          72 frames = 2.4 seconds each
+
+          72 frames = 2.4 seconds
       ================================================= */}
 
       {posts.map(
@@ -477,14 +552,14 @@ const Intro: React.FC<{
     slideUp(
       frame,
       45,
-      20,
+      22,
     );
 
   const scale =
     interpolate(
       frame,
       [0, 90],
-      [1.04, 1],
+      [1.035, 1],
       {
         extrapolateLeft:
           "clamp",
@@ -503,40 +578,35 @@ const Intro: React.FC<{
     <AbsoluteFill
       style={{
         opacity,
-
         background:
-          "radial-gradient(circle at 72% 35%, rgba(255,255,255,0.09), transparent 32%), #080808",
+          "radial-gradient(circle at 76% 35%, rgba(255,255,255,0.09), transparent 30%), #080808",
       }}
     >
       {/* Background grid */}
 
       <AbsoluteFill
         style={{
-          opacity: 0.07,
+          opacity: 0.055,
 
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
 
           backgroundSize:
             "80px 80px",
         }}
       />
 
-      {/* Decorative circle */}
+      {/* Decorative circles */}
 
       <div
         style={{
           position: "absolute",
-
-          width: 620,
-          height: 620,
-
-          right: -180,
-          top: -120,
-
+          width: 680,
+          height: 680,
+          right: -230,
+          top: -150,
           border:
             "1px solid rgba(255,255,255,0.08)",
-
           borderRadius: "50%",
         }}
       />
@@ -544,16 +614,12 @@ const Intro: React.FC<{
       <div
         style={{
           position: "absolute",
-
-          width: 430,
-          height: 430,
-
-          right: -80,
-          top: -20,
-
+          width: 470,
+          height: 470,
+          right: -90,
+          top: -10,
           border:
-            "1px solid rgba(255,255,255,0.06)",
-
+            "1px solid rgba(255,255,255,0.055)",
           borderRadius: "50%",
         }}
       />
@@ -561,11 +627,10 @@ const Intro: React.FC<{
       <div
         style={{
           position: "absolute",
-
           left: 110,
           right: 110,
-          top: 100,
-          bottom: 90,
+          top: 90,
+          bottom: 80,
 
           display: "flex",
           flexDirection: "column",
@@ -577,7 +642,7 @@ const Intro: React.FC<{
       >
         <div
           style={{
-            fontSize: 19,
+            fontSize: 18,
             letterSpacing: 7,
             fontWeight: 700,
             opacity: 0.48,
@@ -593,8 +658,7 @@ const Intro: React.FC<{
             lineHeight: 0.98,
             fontWeight: 900,
             letterSpacing: -4,
-
-            maxWidth: 1450,
+            maxWidth: 1500,
           }}
         >
           {truncate(
@@ -608,28 +672,22 @@ const Intro: React.FC<{
 
         <div
           style={{
-            width: 130,
-            height: 5,
-
-            marginTop: 36,
-
+            width: 125,
+            height: 4,
+            marginTop: 34,
             background:
-              "#ffffff",
-
+              COLORS.white,
             opacity: 0.72,
           }}
         />
 
         <div
           style={{
-            marginTop: 28,
-
+            marginTop: 26,
             maxWidth: 1120,
-
             fontSize: 27,
             lineHeight: 1.42,
-
-            opacity: 0.68,
+            opacity: 0.65,
           }}
         >
           {truncate(
@@ -643,13 +701,10 @@ const Intro: React.FC<{
 
         <div
           style={{
-            marginTop: 38,
-
-            fontSize: 17,
-
+            marginTop: 34,
+            fontSize: 15,
             letterSpacing: 3,
-
-            opacity: 0.38,
+            opacity: 0.34,
           }}
         >
           EXPLORE • READ • DISCOVER
@@ -660,15 +715,13 @@ const Intro: React.FC<{
 };
 
 /* =========================================================
-   PROFILE SCENE
+   PROFILE
    3–6 seconds
 ========================================================= */
 
 const ProfileScene: React.FC<{
-  data: BlogData;
   analysis: BlogAnalysis;
 }> = ({
-  data,
   analysis,
 }) => {
   const frame =
@@ -725,14 +778,14 @@ const ProfileScene: React.FC<{
           "center",
 
         background:
-          "radial-gradient(circle at 75% 45%, rgba(255,255,255,0.055), transparent 34%), #0a0a0a",
+          "radial-gradient(circle at 76% 45%, rgba(255,255,255,0.055), transparent 32%), #0a0a0a",
       }}
     >
       <div
         style={{
-          fontSize: 19,
+          fontSize: 18,
           letterSpacing: 6,
-          opacity: 0.42,
+          opacity: 0.4,
           marginBottom: 22,
         }}
       >
@@ -741,11 +794,10 @@ const ProfileScene: React.FC<{
 
       <div
         style={{
-          fontSize: 57,
+          fontSize: 56,
           lineHeight: 1.08,
           fontWeight: 850,
-
-          maxWidth: 1280,
+          maxWidth: 1300,
 
           transform:
             `translateY(${slideUp(
@@ -764,12 +816,12 @@ const ProfileScene: React.FC<{
         )}
       </div>
 
+      {/* Profile cards */}
+
       <div
         style={{
           display: "flex",
-
           gap: 18,
-
           marginTop: 40,
         }}
       >
@@ -781,11 +833,10 @@ const ProfileScene: React.FC<{
               }
               style={{
                 flex: 1,
-
                 minHeight: 112,
 
                 border:
-                  "1px solid rgba(255,255,255,0.16)",
+                  "1px solid rgba(255,255,255,0.13)",
 
                 background:
                   "rgba(255,255,255,0.035)",
@@ -807,12 +858,9 @@ const ProfileScene: React.FC<{
               <div
                 style={{
                   fontSize: 13,
-
                   letterSpacing: 3,
-
-                  opacity: 0.4,
-
-                  marginBottom: 11,
+                  opacity: 0.38,
+                  marginBottom: 10,
                 }}
               >
                 {card.label}
@@ -821,11 +869,8 @@ const ProfileScene: React.FC<{
               <div
                 style={{
                   fontSize: 21,
-
                   lineHeight: 1.25,
-
                   fontWeight: 700,
-
                   opacity: 0.9,
                 }}
               >
@@ -839,17 +884,17 @@ const ProfileScene: React.FC<{
         )}
       </div>
 
+      {/* Topic pills */}
+
       <div
         style={{
-          marginTop: 28,
-
           display: "flex",
-
           gap: 10,
+          marginTop: 28,
         }}
       >
         {topics.map(
-          (topic) => (
+          (topic, index) => (
             <div
               key={topic}
               style={{
@@ -863,7 +908,21 @@ const ProfileScene: React.FC<{
 
                 fontSize: 14,
 
-                opacity: 0.55,
+                opacity:
+                  clamp(
+                    0.42 +
+                      index * 0.05,
+                    0.42,
+                    0.65,
+                  ),
+
+                transform:
+                  `translateY(${slideUp(
+                    frame -
+                      index * 3,
+                    20,
+                    16,
+                  )}px)`,
               }}
             >
               {topic}
@@ -879,23 +938,24 @@ const ProfileScene: React.FC<{
    POST CARD
    6–18 seconds
 
-   IMPORTANT:
-   The image is intentionally kept large and bright.
+   IMPORTANT DESIGN CHANGE
 
-   Layout:
+   The post image itself is NOT covered by a large title.
 
-   ┌───────────────────────────────┬───────────────────────┐
-   │                               │                       │
-   │                               │  01 / 05              │
-   │       BLOG IMAGE              │                       │
-   │                               │  CATEGORY             │
-   │                               │                       │
-   │                               │  POST TITLE           │
-   │                               │                       │
-   │                               │  EXCERPT              │
-   │                               │                       │
-   │                               │  READ ARTICLE →       │
-   └───────────────────────────────┴───────────────────────┘
+   Instead:
+
+   ┌──────────────────────────────┬──────────────────────┐
+   │                              │ 01 / 05              │
+   │                              │                      │
+   │        FULL IMAGE            │ CATEGORY             │
+   │                              │                      │
+   │                              │ TITLE                │
+   │                              │                      │
+   │                              │ DATE                 │
+   │                              │ EXCERPT              │
+   │                              │                      │
+   │                              │ READ ARTICLE →       │
+   └──────────────────────────────┴──────────────────────┘
 ========================================================= */
 
 const PostCard: React.FC<{
@@ -916,11 +976,17 @@ const PostCard: React.FC<{
       72,
     );
 
+  /* =======================================================
+     IMAGE MOTION
+
+     Very subtle Ken Burns effect.
+  ======================================================= */
+
   const imageScale =
     interpolate(
       frame,
       [0, 72],
-      [1.015, 1.055],
+      [1.0, 1.045],
       {
         extrapolateLeft:
           "clamp",
@@ -933,7 +999,7 @@ const PostCard: React.FC<{
     interpolate(
       frame,
       [0, 72],
-      [0, -12],
+      [0, -10],
       {
         extrapolateLeft:
           "clamp",
@@ -942,19 +1008,40 @@ const PostCard: React.FC<{
       },
     );
 
+  const imageY =
+    interpolate(
+      frame,
+      [0, 72],
+      [0, -5],
+      {
+        extrapolateLeft:
+          "clamp",
+        extrapolateRight:
+          "clamp",
+      },
+    );
+
+  /* =======================================================
+     CONTENT MOTION
+  ======================================================= */
+
   const contentX =
     slideLeft(
       frame,
-      50,
+      45,
       20,
     );
 
   const contentY =
     slideUp(
       frame,
-      25,
+      24,
       18,
     );
+
+  /* =======================================================
+     DATA
+  ======================================================= */
 
   const categories = (
     post.categories || []
@@ -975,7 +1062,7 @@ const PostCard: React.FC<{
         post.title,
         "Untitled story",
       ),
-      92,
+      88,
     );
 
   const excerpt =
@@ -984,104 +1071,172 @@ const PostCard: React.FC<{
         post.excerpt,
         "Discover the latest story and insights from this blog.",
       ),
-      175,
+      155,
     );
 
   const date =
-    safe(
-      post.date,
-      post.published
-        ? new Date(
-            post.published,
-          ).toLocaleDateString(
-            "en-US",
-            {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            },
-          )
-        : "",
-    );
+    formatDate(post);
+
+  const imageSource =
+    getImageSource(post);
 
   return (
     <AbsoluteFill
       style={{
         opacity,
-
         background:
-          "#090909",
+          COLORS.background,
       }}
     >
       {/* =================================================
-          LEFT IMAGE AREA
+          IMAGE CONTAINER
       ================================================= */}
 
       <div
         style={{
           position: "absolute",
 
-          left: 56,
-          top: 56,
-          bottom: 56,
+          left: 58,
+          top: 58,
+          bottom: 58,
 
-          width: 1055,
+          width: 1035,
 
           overflow: "hidden",
 
-          borderRadius: 18,
+          borderRadius: 20,
 
           background:
-            "#151515",
+            "#111111",
+
+          border:
+            "1px solid rgba(255,255,255,0.10)",
 
           boxShadow:
-            "0 25px 70px rgba(0,0,0,0.45)",
+            "0 30px 80px rgba(0,0,0,0.45)",
         }}
       >
+        {/* =================================================
+            BLURRED BACKGROUND
+
+            This makes the full image look premium even
+            when the original image ratio is not 16:9.
+        ================================================= */}
+
         <Img
-          src={getImageSource(
-            post,
-          )}
+          src={imageSource}
           style={{
+            position: "absolute",
+
             width: "100%",
             height: "100%",
 
             objectFit: "cover",
 
-            objectPosition:
-              "center center",
+            filter:
+              "blur(24px) brightness(0.58)",
 
             transform:
-              `translateX(${imageX}px) scale(${imageScale})`,
+              `scale(1.10) translate(${imageX}px, ${imageY}px)`,
           }}
         />
 
-        {/* Very light image protection gradient.
-            This is deliberately much weaker than
-            the previous full-screen overlay. */}
+        {/* Dark glass layer */}
 
         <AbsoluteFill
           style={{
             background:
-              "linear-gradient(90deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.04) 65%, rgba(0,0,0,0.16) 100%)",
+              "rgba(0,0,0,0.18)",
           }}
         />
 
-        <AbsoluteFill
-          style={{
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.03) 0%, transparent 55%, rgba(0,0,0,0.12) 100%)",
-          }}
-        />
+        {/* =================================================
+            MAIN IMAGE
 
-        {/* Image number badge */}
+            CONTAIN = original image remains visible
+            without aggressive cropping.
+        ================================================= */}
 
         <div
           style={{
             position: "absolute",
 
-            left: 24,
-            top: 24,
+            left: 22,
+            right: 22,
+            top: 22,
+            bottom: 22,
+
+            display: "flex",
+
+            alignItems: "center",
+
+            justifyContent:
+              "center",
+
+            overflow: "hidden",
+
+            borderRadius: 14,
+
+            background:
+              "rgba(0,0,0,0.16)",
+          }}
+        >
+          <Img
+            src={imageSource}
+            style={{
+              width: "100%",
+              height: "100%",
+
+              objectFit: "contain",
+
+              objectPosition:
+                "center center",
+
+              transform:
+                `translate(${imageX}px, ${imageY}px) scale(${imageScale})`,
+
+              filter:
+                "brightness(1.08) contrast(1.02) saturate(1.04)",
+
+              display: "block",
+            }}
+          />
+        </div>
+
+        {/* =================================================
+            VERY LIGHT EDGE VIGNETTE
+
+            Deliberately weak.
+        ================================================= */}
+
+        <AbsoluteFill
+          style={{
+            pointerEvents: "none",
+
+            background:
+              "linear-gradient(90deg, rgba(0,0,0,0.06) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.12) 100%)",
+          }}
+        />
+
+        <AbsoluteFill
+          style={{
+            pointerEvents: "none",
+
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.08) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.10) 100%)",
+          }}
+        />
+
+        {/* =================================================
+            POST NUMBER
+        ================================================= */}
+
+        <div
+          style={{
+            position: "absolute",
+
+            left: 22,
+            top: 22,
 
             padding:
               "9px 14px",
@@ -1092,7 +1247,7 @@ const PostCard: React.FC<{
               "rgba(0,0,0,0.58)",
 
             border:
-              "1px solid rgba(255,255,255,0.18)",
+              "1px solid rgba(255,255,255,0.20)",
 
             backdropFilter:
               "blur(8px)",
@@ -1107,8 +1262,9 @@ const PostCard: React.FC<{
           {String(
             index + 1,
           ).padStart(2, "0")}
-          {"  "}
-          /{"  "}
+
+          {"  /  "}
+
           {String(
             totalPosts,
           ).padStart(2, "0")}
@@ -1123,11 +1279,11 @@ const PostCard: React.FC<{
         style={{
           position: "absolute",
 
-          left: 1150,
-          right: 65,
+          left: 1155,
+          right: 62,
 
-          top: 56,
-          bottom: 56,
+          top: 58,
+          bottom: 58,
 
           display: "flex",
 
@@ -1141,37 +1297,72 @@ const PostCard: React.FC<{
             `translateX(${contentX}px)`,
         }}
       >
-        {/* Small section label */}
+        {/* =================================================
+            POST NUMBER / SECTION
+        ================================================= */}
 
         <div
           style={{
-            fontSize: 15,
+            fontSize: 13,
 
             letterSpacing: 4,
 
-            fontWeight: 700,
+            opacity: 0.34,
 
-            opacity: 0.42,
-
-            marginBottom: 25,
+            marginBottom: 18,
           }}
         >
-          {categoryText.toUpperCase()}
+          STORY{" "}
+          {String(
+            index + 1,
+          ).padStart(2, "0")}
+          {"  /  "}
+          {String(
+            totalPosts,
+          ).padStart(2, "0")}
         </div>
 
-        {/* Title */}
+        {/* =================================================
+            CATEGORY
+        ================================================= */}
 
         <div
           style={{
-            fontSize: 43,
+            fontSize: 14,
+
+            letterSpacing: 3.5,
+
+            fontWeight: 700,
+
+            opacity: 0.50,
+
+            marginBottom: 22,
+
+            textTransform:
+              "uppercase",
+          }}
+        >
+          {categoryText}
+        </div>
+
+        {/* =================================================
+            TITLE
+
+            This is now the ONLY large title.
+            Nothing is rendered over the image.
+        ================================================= */}
+
+        <div
+          style={{
+            fontSize: 41,
 
             lineHeight: 1.08,
 
             fontWeight: 850,
 
-            letterSpacing: -1.5,
+            letterSpacing: -1.2,
 
-            maxWidth: 680,
+            maxWidth: 690,
 
             transform:
               `translateY(${contentY}px)`,
@@ -1184,48 +1375,52 @@ const PostCard: React.FC<{
 
         <div
           style={{
-            width: 74,
+            width: 70,
 
             height: 3,
 
             background:
-              "#ffffff",
+              COLORS.white,
 
-            opacity: 0.65,
+            opacity: 0.62,
 
-            marginTop: 28,
+            marginTop: 26,
 
-            marginBottom: 22,
+            marginBottom: 20,
           }}
         />
 
-        {/* Date */}
+        {/* =================================================
+            DATE
+        ================================================= */}
 
         {date && (
           <div
             style={{
-              fontSize: 15,
+              fontSize: 14,
 
               letterSpacing: 1.2,
 
-              opacity: 0.38,
+              opacity: 0.36,
 
-              marginBottom: 20,
+              marginBottom: 18,
             }}
           >
             {date}
           </div>
         )}
 
-        {/* Excerpt */}
+        {/* =================================================
+            EXCERPT
+        ================================================= */}
 
         <div
           style={{
-            fontSize: 19,
+            fontSize: 18,
 
-            lineHeight: 1.5,
+            lineHeight: 1.48,
 
-            opacity: 0.58,
+            opacity: 0.56,
 
             maxWidth: 650,
           }}
@@ -1233,28 +1428,30 @@ const PostCard: React.FC<{
           {excerpt}
         </div>
 
-        {/* CTA */}
+        {/* =================================================
+            CTA
+        ================================================= */}
 
         <div
           style={{
-            marginTop: 34,
+            marginTop: 30,
 
             display: "flex",
 
             alignItems: "center",
 
-            gap: 14,
+            gap: 13,
           }}
         >
           <div
             style={{
-              fontSize: 15,
+              fontSize: 14,
 
               letterSpacing: 2.5,
 
               fontWeight: 700,
 
-              opacity: 0.72,
+              opacity: 0.76,
             }}
           >
             READ ARTICLE
@@ -1262,31 +1459,48 @@ const PostCard: React.FC<{
 
           <div
             style={{
-              fontSize: 22,
+              fontSize: 21,
 
               opacity: 0.72,
+
+              transform:
+                `translateX(${interpolate(
+                  frame,
+                  [0, 72],
+                  [0, 5],
+                  {
+                    extrapolateLeft:
+                      "clamp",
+                    extrapolateRight:
+                      "clamp",
+                  },
+                )}px)`,
             }}
           >
             →
           </div>
         </div>
 
-        {/* Bottom URL */}
+        {/* =================================================
+            POST URL
+        ================================================= */}
 
         <div
           style={{
-            position: "absolute",
+            position:
+              "absolute",
 
             left: 0,
+
             bottom: 0,
 
-            fontSize: 13,
+            fontSize: 12,
 
             letterSpacing: 1.2,
 
-            opacity: 0.28,
+            opacity: 0.25,
 
-            maxWidth: 620,
+            maxWidth: 650,
 
             overflow: "hidden",
 
@@ -1304,16 +1518,17 @@ const PostCard: React.FC<{
       </div>
 
       {/* =================================================
-          THIN DIVIDER BETWEEN IMAGE / CONTENT
+          IMAGE / INFORMATION DIVIDER
       ================================================= */}
 
       <div
         style={{
           position: "absolute",
 
-          left: 1134,
+          left: 1135,
 
           top: 110,
+
           bottom: 110,
 
           width: 1,
@@ -1322,6 +1537,38 @@ const PostCard: React.FC<{
             "rgba(255,255,255,0.08)",
         }}
       />
+
+      {/* =================================================
+          TOP PROGRESS LINE
+      ================================================= */}
+
+      <div
+        style={{
+          position: "absolute",
+
+          left: 58,
+          right: 62,
+
+          top: 25,
+
+          height: 2,
+
+          background:
+            "rgba(255,255,255,0.08)",
+        }}
+      >
+        <div
+          style={{
+            width:
+              `${((index + 1) / totalPosts) * 100}%`,
+
+            height: "100%",
+
+            background:
+              "rgba(255,255,255,0.55)",
+          }}
+        />
+      </div>
     </AbsoluteFill>
   );
 };
@@ -1370,7 +1617,7 @@ const AnalysisScene: React.FC<{
           "center",
 
         background:
-          "radial-gradient(circle at 70% 35%, rgba(255,255,255,0.06), transparent 35%), #080808",
+          "radial-gradient(circle at 72% 35%, rgba(255,255,255,0.065), transparent 34%), #080808",
       }}
     >
       <div
@@ -1400,6 +1647,8 @@ const AnalysisScene: React.FC<{
           gap: 80,
         }}
       >
+        {/* Main analysis */}
+
         <div
           style={{
             maxWidth: 1120,
@@ -1414,7 +1663,7 @@ const AnalysisScene: React.FC<{
         >
           <div
             style={{
-              fontSize: 58,
+              fontSize: 57,
 
               lineHeight: 1.05,
 
@@ -1434,13 +1683,13 @@ const AnalysisScene: React.FC<{
 
           <div
             style={{
-              marginTop: 26,
+              marginTop: 24,
 
               fontSize: 20,
 
               lineHeight: 1.45,
 
-              opacity: 0.5,
+              opacity: 0.50,
 
               maxWidth: 980,
             }}
@@ -1455,7 +1704,9 @@ const AnalysisScene: React.FC<{
           </div>
         </div>
 
-        {/* Post count */}
+        {/* =================================================
+            RECENT STORIES COUNTER
+        ================================================= */}
 
         <div
           style={{
@@ -1508,7 +1759,9 @@ const AnalysisScene: React.FC<{
         </div>
       </div>
 
-      {/* Topics */}
+      {/* =================================================
+          TOPICS
+      ================================================= */}
 
       <div
         style={{
@@ -1537,8 +1790,7 @@ const AnalysisScene: React.FC<{
                 opacity:
                   clamp(
                     0.42 +
-                      index *
-                        0.05,
+                      index * 0.05,
                     0.42,
                     0.65,
                   ),
@@ -1592,26 +1844,87 @@ const Outro: React.FC<{
       data.url,
     );
 
+  const scale =
+    interpolate(
+      frame,
+      [0, 90],
+      [1.025, 1],
+      {
+        extrapolateLeft:
+          "clamp",
+        extrapolateRight:
+          "clamp",
+      },
+    );
+
   return (
     <AbsoluteFill
       style={{
         opacity,
 
         background:
-          "radial-gradient(circle at 50% 40%, rgba(255,255,255,0.08), transparent 32%), #080808",
+          "radial-gradient(circle at 50% 40%, rgba(255,255,255,0.085), transparent 32%), #080808",
       }}
     >
       {/* Background grid */}
 
       <AbsoluteFill
         style={{
-          opacity: 0.06,
+          opacity: 0.055,
 
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
 
           backgroundSize:
             "80px 80px",
+        }}
+      />
+
+      {/* Decorative circles */}
+
+      <div
+        style={{
+          position: "absolute",
+
+          width: 720,
+          height: 720,
+
+          left:
+            "50%",
+
+          top:
+            "50%",
+
+          transform:
+            "translate(-50%, -50%)",
+
+          border:
+            "1px solid rgba(255,255,255,0.06)",
+
+          borderRadius: "50%",
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+
+          width: 520,
+          height: 520,
+
+          left:
+            "50%",
+
+          top:
+            "50%",
+
+          transform:
+            "translate(-50%, -50%)",
+
+          border:
+            "1px solid rgba(255,255,255,0.045)",
+
+          borderRadius: "50%",
         }}
       />
 
@@ -1639,7 +1952,7 @@ const Outro: React.FC<{
             "center",
 
           transform:
-            `translateY(${y}px)`,
+            `translateY(${y}px) scale(${scale})`,
         }}
       >
         <div
@@ -1685,7 +1998,7 @@ const Outro: React.FC<{
             height: 4,
 
             background:
-              "#ffffff",
+              COLORS.white,
 
             opacity: 0.65,
 
@@ -1708,6 +2021,10 @@ const Outro: React.FC<{
           {" "}
           insights and ideas.
         </div>
+
+        {/* =================================================
+            WEBSITE URL
+        ================================================= */}
 
         <div
           style={{
