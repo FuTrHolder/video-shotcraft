@@ -1,4 +1,5 @@
 import React from "react";
+
 import {
   AbsoluteFill,
   Img,
@@ -8,107 +9,154 @@ import {
   useCurrentFrame,
 } from "remotion";
 
-/* =========================================================
-   VIDEO SETTINGS
-========================================================= */
+/*
+=========================================================
+BLOG PROMO
+---------------------------------------------------------
+0–3s    BLOG IDENTITY
+3–6s    CORE FIELDS
+6–18s   FIVE RECENT POSTS
+18–21s  BLOG VALUE
+21–24s  CTA
+
+1920 × 1080
+30 FPS
+720 FRAMES
+=========================================================
+*/
 
 export const BLOG_PROMO_FPS = 30;
 
 export const BLOG_PROMO_SECONDS = 24;
 
 export const BLOG_PROMO_DURATION =
-  BLOG_PROMO_FPS * BLOG_PROMO_SECONDS;
+  BLOG_PROMO_FPS *
+  BLOG_PROMO_SECONDS;
 
-/* =========================================================
+/* ======================================================
    TYPES
-========================================================= */
+====================================================== */
 
 type BlogPost = {
+  index?: number;
   title: string;
   url: string;
-  date: string;
+  date?: string;
   published?: string;
-  excerpt: string;
-  image: string;
+  excerpt?: string;
+  image?: string;
+  localImage?: string;
+  imageSource?: string;
   categories?: string[];
-  localScreenshot?: string;
 };
 
 type BlogAnalysis = {
-  topics: string[];
-  audience: string;
-  contentStyle: string;
-  valueProposition: string;
+  identity?: string;
+  topics?: string[];
+  audience?: string;
+  contentStyle?: string;
+  valueProposition?: string;
 };
 
 type BlogData = {
   version?: number;
+  capturedAt?: string;
 
   url: string;
 
+  hostname?: string;
+
   siteTitle: string;
 
-  description: string;
+  description?: string;
 
-  pageHeading: string;
+  pageHeading?: string;
 
-  ogImage: string;
-
-  posts: BlogPost[];
-
-  postCount: number;
+  ogImage?: string;
 
   language?: string;
 
+  postCount?: number;
+
   analysis?: BlogAnalysis;
+
+  posts: BlogPost[];
 };
 
-/* =========================================================
-   CONSTANTS
-========================================================= */
+/* ======================================================
+   DESIGN SYSTEM
+====================================================== */
 
 const COLORS = {
-  background: "#080808",
-  panel: "#101010",
-  panelSoft: "#151515",
+  background: "#08090b",
+  background2: "#101318",
+
   white: "#ffffff",
-  muted: "rgba(255,255,255,0.62)",
-  dim: "rgba(255,255,255,0.38)",
-  faint: "rgba(255,255,255,0.18)",
-  border: "rgba(255,255,255,0.12)",
+
+  text: "#f5f7fa",
+
+  muted:
+    "rgba(245,247,250,0.68)",
+
+  soft:
+    "rgba(245,247,250,0.48)",
+
+  faint:
+    "rgba(245,247,250,0.22)",
+
+  line:
+    "rgba(255,255,255,0.13)",
+
+  panel:
+    "rgba(18,21,27,0.94)",
+
+  accent:
+    "#6ea8ff",
 };
 
-/* =========================================================
+/* ======================================================
    HELPERS
-========================================================= */
+====================================================== */
 
 const safe = (
-  value: string | undefined,
+  value:
+    | string
+    | undefined,
   fallback = "",
 ) => {
-  const text = String(value || "").trim();
+  const text =
+    String(
+      value || "",
+    ).trim();
 
-  return text || fallback;
+  return (
+    text || fallback
+  );
 };
 
 const truncate = (
-  value: string | undefined,
+  value:
+    | string
+    | undefined,
   length: number,
 ) => {
-  const text = safe(value);
+  const text =
+    safe(value);
 
-  if (!text) {
-    return "";
-  }
-
-  if (text.length <= length) {
+  if (
+    text.length <=
+    length
+  ) {
     return text;
   }
 
   return (
     text.slice(
       0,
-      Math.max(1, length - 1),
+      Math.max(
+        1,
+        length - 1,
+      ),
     ) + "…"
   );
 };
@@ -117,163 +165,101 @@ const clamp = (
   value: number,
   min: number,
   max: number,
-) => {
-  return Math.min(
+) =>
+  Math.min(
     max,
-    Math.max(min, value),
+    Math.max(
+      min,
+      value,
+    ),
   );
-};
 
 const fadeIn = (
   frame: number,
-  duration = 15,
-) => {
-  return interpolate(
+  duration = 16,
+) =>
+  interpolate(
     frame,
     [0, duration],
     [0, 1],
     {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
+      extrapolateLeft:
+        "clamp",
+      extrapolateRight:
+        "clamp",
     },
   );
-};
 
 const fadeOut = (
   frame: number,
   end: number,
-  duration = 15,
-) => {
-  return interpolate(
+  duration = 16,
+) =>
+  interpolate(
     frame,
-    [end - duration, end],
+    [
+      Math.max(
+        0,
+        end - duration,
+      ),
+      end,
+    ],
     [1, 0],
     {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
+      extrapolateLeft:
+        "clamp",
+      extrapolateRight:
+        "clamp",
     },
   );
-};
 
 const sceneOpacity = (
   frame: number,
   duration: number,
-) => {
-  return (
-    fadeIn(frame, 14) *
-    fadeOut(frame, duration, 14)
+) =>
+  fadeIn(frame) *
+  fadeOut(
+    frame,
+    duration,
   );
-};
 
 const slideUp = (
   frame: number,
-  distance = 40,
-  duration = 18,
-) => {
-  return interpolate(
+  distance = 45,
+  duration = 20,
+) =>
+  interpolate(
     frame,
     [0, duration],
     [distance, 0],
     {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
+      extrapolateLeft:
+        "clamp",
+      extrapolateRight:
+        "clamp",
     },
   );
-};
 
 const slideLeft = (
   frame: number,
   distance = 60,
-  duration = 18,
-) => {
-  return interpolate(
+  duration = 20,
+) =>
+  interpolate(
     frame,
     [0, duration],
     [distance, 0],
     {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
+      extrapolateLeft:
+        "clamp",
+      extrapolateRight:
+        "clamp",
     },
   );
-};
 
-const normalizeUrl = (
-  value: string,
-) => {
-  const url = safe(value);
-
-  if (!url) {
-    return "";
-  }
-
-  try {
-    return new URL(url).hostname.replace(
-      /^www\./,
-      "",
-    );
-  } catch {
-    return url;
-  }
-};
-
-const formatDate = (
-  post: BlogPost,
-) => {
-  const directDate = safe(post.date);
-
-  if (directDate) {
-    return directDate;
-  }
-
-  const published = safe(
-    post.published,
-  );
-
-  if (!published) {
-    return "";
-  }
-
-  try {
-    return new Date(
-      published,
-    ).toLocaleDateString(
-      "en-US",
-      {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      },
-    );
-  } catch {
-    return "";
-  }
-};
-
-/* =========================================================
-   IMAGE SOURCE
-========================================================= */
-
-const getImageSource = (
-  post: BlogPost,
-) => {
-  if (post.localScreenshot) {
-    return staticFile(
-      post.localScreenshot,
-    );
-  }
-
-  if (post.image) {
-    return post.image;
-  }
-
-  return staticFile(
-    "blog/home.png",
-  );
-};
-
-/* =========================================================
-   BLOG DATA LOADER
-========================================================= */
+/* ======================================================
+   DATA LOADER
+====================================================== */
 
 const loadBlogData =
   async (): Promise<BlogData> => {
@@ -286,253 +272,363 @@ const loadBlogData =
 
     if (!response.ok) {
       throw new Error(
-        "Unable to load blog/blog.json: " +
-          response.status,
+        `Unable to load blog/blog.json (${response.status})`,
       );
     }
 
     return response.json();
   };
 
-/* =========================================================
-   MAIN COMPOSITION
+/* ======================================================
+   IMAGE SOURCE
+====================================================== */
 
-   0–3s    INTRO
-   3–6s    PROFILE
-   6–18s   FIVE POSTS
-   18–21s  ANALYSIS
-   21–24s  CTA
-
-   TOTAL = 24 seconds / 720 frames
-========================================================= */
-
-export const BlogPromo: React.FC = () => {
-  const [data, setData] =
-    React.useState<BlogData | null>(
-      null,
-    );
-
-  const [error, setError] =
-    React.useState<string | null>(
-      null,
-    );
-
-  React.useEffect(() => {
-    loadBlogData()
-      .then(setData)
-      .catch((err) => {
-        setError(
-          err instanceof Error
-            ? err.message
-            : String(err),
-        );
-      });
-  }, []);
-
-  /* =======================================================
-     ERROR
-  ======================================================= */
-
-  if (error) {
-    return (
-      <AbsoluteFill
-        style={{
-          background:
-            COLORS.background,
-          color: COLORS.white,
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily:
-            "Arial, Helvetica, sans-serif",
-          padding: 80,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 42,
-            fontWeight: 800,
-          }}
-        >
-          Blog data error
-        </div>
-
-        <div
-          style={{
-            marginTop: 20,
-            fontSize: 22,
-            opacity: 0.65,
-            maxWidth: 1200,
-            textAlign: "center",
-          }}
-        >
-          {error}
-        </div>
-      </AbsoluteFill>
+const getImageSource = (
+  post: BlogPost,
+) => {
+  if (
+    post.localImage
+  ) {
+    return staticFile(
+      post.localImage,
     );
   }
 
-  /* =======================================================
-     LOADING
-  ======================================================= */
-
-  if (!data) {
-    return (
-      <AbsoluteFill
-        style={{
-          background:
-            COLORS.background,
-          color: COLORS.white,
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily:
-            "Arial, Helvetica, sans-serif",
-          fontSize: 32,
-        }}
-      >
-        Preparing blog story…
-      </AbsoluteFill>
-    );
+  if (
+    post.image
+  ) {
+    return post.image;
   }
 
-  /* =======================================================
-     POSTS
-  ======================================================= */
-
-  const posts = (
-    data.posts || []
-  ).slice(0, 5);
-
-  /* =======================================================
-     ANALYSIS FALLBACK
-  ======================================================= */
-
-  const analysis: BlogAnalysis =
-    data.analysis || {
-      topics: [
-        "Insights",
-        "Analysis",
-        "Trends",
-      ],
-
-      audience:
-        "Readers looking for useful insights",
-
-      contentStyle:
-        "Analysis and commentary",
-
-      valueProposition:
-        "Useful ideas, insights and practical information in one place.",
-    };
-
-  return (
-    <AbsoluteFill
-      style={{
-        background:
-          COLORS.background,
-        color: COLORS.white,
-        fontFamily:
-          "Arial, Helvetica, sans-serif",
-        overflow: "hidden",
-      }}
-    >
-      {/* =================================================
-          0–3s
-          INTRO
-      ================================================= */}
-
-      <Sequence
-        from={0}
-        durationInFrames={90}
-      >
-        <Intro
-          data={data}
-          analysis={analysis}
-        />
-      </Sequence>
-
-      {/* =================================================
-          3–6s
-          PROFILE
-      ================================================= */}
-
-      <Sequence
-        from={90}
-        durationInFrames={90}
-      >
-        <ProfileScene
-          analysis={analysis}
-        />
-      </Sequence>
-
-      {/* =================================================
-          6–18s
-          FIVE POSTS
-
-          72 frames = 2.4 seconds
-      ================================================= */}
-
-      {posts.map(
-        (post, index) => (
-          <Sequence
-            key={
-              post.url ||
-              `post-${index}`
-            }
-            from={
-              180 +
-              index * 72
-            }
-            durationInFrames={72}
-          >
-            <PostCard
-              post={post}
-              index={index}
-              totalPosts={
-                posts.length
-              }
-            />
-          </Sequence>
-        ),
-      )}
-
-      {/* =================================================
-          18–21s
-          BLOG AT A GLANCE
-      ================================================= */}
-
-      <Sequence
-        from={540}
-        durationInFrames={90}
-      >
-        <AnalysisScene
-          data={data}
-          analysis={analysis}
-        />
-      </Sequence>
-
-      {/* =================================================
-          21–24s
-          CTA
-      ================================================= */}
-
-      <Sequence
-        from={630}
-        durationInFrames={90}
-      >
-        <Outro
-          data={data}
-        />
-      </Sequence>
-    </AbsoluteFill>
+  return staticFile(
+    "blog/home.png",
   );
 };
 
-/* =========================================================
-   INTRO
-   0–3 seconds
-========================================================= */
+/* ======================================================
+   ROOT
+====================================================== */
 
-const Intro: React.FC<{
+export const BlogPromo: React.FC =
+  () => {
+    const [
+      data,
+      setData,
+    ] =
+      React.useState<BlogData | null>(
+        null,
+      );
+
+    const [
+      error,
+      setError,
+    ] =
+      React.useState<
+        string | null
+      >(null);
+
+    React.useEffect(
+      () => {
+        loadBlogData()
+          .then(
+            setData,
+          )
+          .catch(
+            (err) => {
+              setError(
+                err instanceof
+                  Error
+                  ? err.message
+                  : String(
+                      err,
+                    ),
+              );
+            },
+          );
+      },
+      [],
+    );
+
+    if (error) {
+      return (
+        <AbsoluteFill
+          style={{
+            background:
+              COLORS.background,
+            color:
+              COLORS.white,
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
+            fontFamily:
+              "Arial, Helvetica, sans-serif",
+            padding: 80,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 44,
+              fontWeight: 800,
+            }}
+          >
+            Blog data error
+          </div>
+
+          <div
+            style={{
+              marginTop: 20,
+              fontSize: 22,
+              color:
+                COLORS.muted,
+              textAlign:
+                "center",
+              maxWidth: 1200,
+            }}
+          >
+            {error}
+          </div>
+        </AbsoluteFill>
+      );
+    }
+
+    if (!data) {
+      return (
+        <AbsoluteFill
+          style={{
+            background:
+              COLORS.background,
+            color:
+              COLORS.white,
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
+            fontFamily:
+              "Arial, Helvetica, sans-serif",
+            fontSize: 32,
+          }}
+        >
+          Preparing blog story…
+        </AbsoluteFill>
+      );
+    }
+
+    const posts =
+      (
+        data.posts ||
+        []
+      ).slice(0, 5);
+
+    const analysis =
+      data.analysis ||
+      {};
+
+    const topics =
+      (
+        analysis.topics ||
+        [
+          "Insights",
+          "Analysis",
+          "Trends",
+        ]
+      )
+        .filter(Boolean)
+        .slice(0, 4);
+
+    return (
+      <AbsoluteFill
+        style={{
+          background:
+            COLORS.background,
+          color:
+            COLORS.white,
+          fontFamily:
+            "Arial, Helvetica, sans-serif",
+          overflow:
+            "hidden",
+        }}
+      >
+        {/* ============================================
+            0–3s
+            IDENTITY
+        ============================================ */}
+
+        <Sequence
+          from={0}
+          durationInFrames={90}
+        >
+          <IdentityScene
+            data={data}
+            analysis={
+              analysis
+            }
+          />
+        </Sequence>
+
+        {/* ============================================
+            3–6s
+            CORE FIELDS
+        ============================================ */}
+
+        <Sequence
+          from={90}
+          durationInFrames={90}
+        >
+          <TopicsScene
+            topics={topics}
+            analysis={
+              analysis
+            }
+          />
+        </Sequence>
+
+        {/* ============================================
+            6–18s
+            POSTS
+        ============================================ */}
+
+        {posts.map(
+          (
+            post,
+            index,
+          ) => (
+            <Sequence
+              key={
+                post.url ||
+                `post-${index}`
+              }
+              from={
+                180 +
+                index * 72
+              }
+              durationInFrames={
+                72
+              }
+            >
+              <PostScene
+                post={post}
+                index={
+                  index
+                }
+                total={
+                  posts.length
+                }
+              />
+            </Sequence>
+          ),
+        )}
+
+        {/* ============================================
+            18–21s
+            VALUE
+        ============================================ */}
+
+        <Sequence
+          from={540}
+          durationInFrames={90}
+        >
+          <ValueScene
+            data={data}
+            analysis={
+              analysis
+            }
+            topics={
+              topics
+            }
+          />
+        </Sequence>
+
+        {/* ============================================
+            21–24s
+            CTA
+        ============================================ */}
+
+        <Sequence
+          from={630}
+          durationInFrames={90}
+        >
+          <CtaScene
+            data={data}
+          />
+        </Sequence>
+      </AbsoluteFill>
+    );
+  };
+
+/* ======================================================
+   COMMON BACKGROUND
+====================================================== */
+
+const PremiumBackground: React.FC<{
+  image?: string;
+  imageOpacity?: number;
+}> = ({
+  image,
+  imageOpacity = 0.18,
+}) => {
+  return (
+    <>
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(135deg, #07080a 0%, #11151c 48%, #08090b 100%)",
+        }}
+      />
+
+      {image && (
+        <AbsoluteFill
+          style={{
+            opacity:
+              imageOpacity,
+            overflow:
+              "hidden",
+          }}
+        >
+          <Img
+            src={image}
+            style={{
+              width:
+                "100%",
+              height:
+                "100%",
+              objectFit:
+                "cover",
+              filter:
+                "blur(2px)",
+              transform:
+                "scale(1.06)",
+            }}
+          />
+        </AbsoluteFill>
+      )}
+
+      <AbsoluteFill
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(8,9,11,0.97) 0%, rgba(8,9,11,0.80) 48%, rgba(8,9,11,0.40) 100%)",
+        }}
+      />
+
+      <AbsoluteFill
+        style={{
+          opacity: 0.06,
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+          backgroundSize:
+            "80px 80px",
+        }}
+      />
+    </>
+  );
+};
+
+/* ======================================================
+   IDENTITY SCENE
+   0–3s
+====================================================== */
+
+const IdentityScene: React.FC<{
   data: BlogData;
   analysis: BlogAnalysis;
 }> = ({
@@ -551,7 +647,7 @@ const Intro: React.FC<{
   const y =
     slideUp(
       frame,
-      45,
+      55,
       22,
     );
 
@@ -559,7 +655,7 @@ const Intro: React.FC<{
     interpolate(
       frame,
       [0, 90],
-      [1.035, 1],
+      [1.04, 1],
       {
         extrapolateLeft:
           "clamp",
@@ -574,68 +670,37 @@ const Intro: React.FC<{
       "INSIGHTS",
     ).toUpperCase();
 
+  const identity =
+    safe(
+      analysis.identity,
+      safe(
+        data.description,
+        `${data.siteTitle} delivers useful insights and information.`,
+      ),
+    );
+
   return (
     <AbsoluteFill
       style={{
         opacity,
-        background:
-          "radial-gradient(circle at 76% 35%, rgba(255,255,255,0.09), transparent 30%), #080808",
       }}
     >
-      {/* Background grid */}
-
-      <AbsoluteFill
-        style={{
-          opacity: 0.055,
-
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
-
-          backgroundSize:
-            "80px 80px",
-        }}
-      />
-
-      {/* Decorative circles */}
+      <PremiumBackground />
 
       <div
         style={{
-          position: "absolute",
-          width: 680,
-          height: 680,
-          right: -230,
-          top: -150,
-          border:
-            "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "50%",
-        }}
-      />
-
-      <div
-        style={{
-          position: "absolute",
-          width: 470,
-          height: 470,
-          right: -90,
-          top: -10,
-          border:
-            "1px solid rgba(255,255,255,0.055)",
-          borderRadius: "50%",
-        }}
-      />
-
-      <div
-        style={{
-          position: "absolute",
-          left: 110,
-          right: 110,
-          top: 90,
+          position:
+            "absolute",
+          left: 120,
+          right: 120,
+          top: 100,
           bottom: 80,
-
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-
+          display:
+            "flex",
+          flexDirection:
+            "column",
+          justifyContent:
+            "center",
           transform:
             `translateY(${y}px) scale(${scale})`,
         }}
@@ -645,8 +710,9 @@ const Intro: React.FC<{
             fontSize: 18,
             letterSpacing: 7,
             fontWeight: 700,
-            opacity: 0.48,
-            marginBottom: 28,
+            color:
+              COLORS.soft,
+            marginBottom: 26,
           }}
         >
           {primaryTopic}
@@ -654,7 +720,7 @@ const Intro: React.FC<{
 
         <div
           style={{
-            fontSize: 84,
+            fontSize: 88,
             lineHeight: 0.98,
             fontWeight: 900,
             letterSpacing: -4,
@@ -662,40 +728,34 @@ const Intro: React.FC<{
           }}
         >
           {truncate(
-            safe(
-              data.siteTitle,
-              "This Blog",
-            ),
+            data.siteTitle,
             42,
           )}
         </div>
 
         <div
           style={{
-            width: 125,
+            width: 120,
             height: 4,
-            marginTop: 34,
+            marginTop: 32,
             background:
               COLORS.white,
-            opacity: 0.72,
           }}
         />
 
         <div
           style={{
             marginTop: 26,
-            maxWidth: 1120,
-            fontSize: 27,
-            lineHeight: 1.42,
-            opacity: 0.65,
+            maxWidth: 1200,
+            fontSize: 28,
+            lineHeight: 1.4,
+            color:
+              COLORS.muted,
           }}
         >
           {truncate(
-            safe(
-              data.description,
-              analysis.valueProposition,
-            ),
-            135,
+            identity,
+            150,
           )}
         </div>
 
@@ -703,25 +763,28 @@ const Intro: React.FC<{
           style={{
             marginTop: 34,
             fontSize: 15,
-            letterSpacing: 3,
-            opacity: 0.34,
+            letterSpacing: 4,
+            color:
+              COLORS.soft,
           }}
         >
-          EXPLORE • READ • DISCOVER
+          DISCOVER THE BLOG
         </div>
       </div>
     </AbsoluteFill>
   );
 };
 
-/* =========================================================
-   PROFILE
-   3–6 seconds
-========================================================= */
+/* ======================================================
+   TOPICS SCENE
+   3–6s
+====================================================== */
 
-const ProfileScene: React.FC<{
+const TopicsScene: React.FC<{
+  topics: string[];
   analysis: BlogAnalysis;
 }> = ({
+  topics,
   analysis,
 }) => {
   const frame =
@@ -733,239 +796,171 @@ const ProfileScene: React.FC<{
       90,
     );
 
-  const topics = (
-    analysis.topics || []
-  )
-    .filter(Boolean)
-    .slice(0, 4);
-
-  const cards = [
-    {
-      label: "FOCUS",
-      value:
-        topics[0] ||
-        "Insights",
-    },
-
-    {
-      label: "STYLE",
-      value:
-        safe(
-          analysis.contentStyle,
-          "Analysis",
-        ),
-    },
-
-    {
-      label: "FOR",
-      value:
-        safe(
-          analysis.audience,
-          "Curious readers",
-        ),
-    },
-  ];
-
   return (
     <AbsoluteFill
       style={{
         opacity,
-
-        padding:
-          "80px 110px",
-
-        justifyContent:
-          "center",
-
         background:
-          "radial-gradient(circle at 76% 45%, rgba(255,255,255,0.055), transparent 32%), #0a0a0a",
+          COLORS.background,
       }}
     >
-      <div
-        style={{
-          fontSize: 18,
-          letterSpacing: 6,
-          opacity: 0.4,
-          marginBottom: 22,
-        }}
-      >
-        WHY FOLLOW
-      </div>
+      <PremiumBackground />
 
       <div
         style={{
-          fontSize: 56,
-          lineHeight: 1.08,
-          fontWeight: 850,
-          maxWidth: 1300,
-
-          transform:
-            `translateY(${slideUp(
-              frame,
-              35,
-              18,
-            )}px)`,
+          position:
+            "absolute",
+          left: 120,
+          top: 120,
+          right: 120,
+          bottom: 100,
         }}
       >
-        {truncate(
-          safe(
-            analysis.valueProposition,
-            "Useful insights in one place.",
-          ),
-          150,
-        )}
-      </div>
+        <div
+          style={{
+            fontSize: 16,
+            letterSpacing: 6,
+            color:
+              COLORS.soft,
+            fontWeight: 700,
+          }}
+        >
+          CORE FIELDS
+        </div>
 
-      {/* Profile cards */}
+        <div
+          style={{
+            marginTop: 22,
+            fontSize: 64,
+            fontWeight: 900,
+            letterSpacing: -2,
+          }}
+        >
+          What this blog covers
+        </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 18,
-          marginTop: 40,
-        }}
-      >
-        {cards.map(
-          (card, index) => (
-            <div
-              key={
-                card.label
-              }
-              style={{
-                flex: 1,
-                minHeight: 112,
+        <div
+          style={{
+            marginTop: 55,
+            display:
+              "flex",
+            gap: 20,
+            flexWrap:
+              "wrap",
+            maxWidth: 1500,
+          }}
+        >
+          {topics.map(
+            (
+              topic,
+              index,
+            ) => {
+              const localFrame =
+                frame -
+                index * 5;
 
-                border:
-                  "1px solid rgba(255,255,255,0.13)",
+              const itemOpacity =
+                fadeIn(
+                  localFrame,
+                  14,
+                );
 
-                background:
-                  "rgba(255,255,255,0.035)",
+              const x =
+                slideLeft(
+                  localFrame,
+                  55,
+                  18,
+                );
 
-                borderRadius: 12,
+              return (
+                <div
+                  key={topic}
+                  style={{
+                    opacity:
+                      itemOpacity,
+                    transform:
+                      `translateX(${x}px)`,
+                    padding:
+                      "22px 30px",
+                    border:
+                      `1px solid ${COLORS.line}`,
+                    borderRadius:
+                      18,
+                    background:
+                      "rgba(255,255,255,0.045)",
+                    minWidth:
+                      280,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 15,
+                      color:
+                        COLORS.soft,
+                      letterSpacing: 3,
+                    }}
+                  >
+                    0
+                    {index +
+                      1}
+                  </div>
 
-                padding:
-                  "20px 22px",
+                  <div
+                    style={{
+                      marginTop: 14,
+                      fontSize: 30,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {topic}
+                  </div>
+                </div>
+              );
+            },
+          )}
+        </div>
 
-                transform:
-                  `translateY(${slideUp(
-                    frame -
-                      index * 4,
-                    25,
-                    18,
-                  )}px)`,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 13,
-                  letterSpacing: 3,
-                  opacity: 0.38,
-                  marginBottom: 10,
-                }}
-              >
-                {card.label}
-              </div>
-
-              <div
-                style={{
-                  fontSize: 21,
-                  lineHeight: 1.25,
-                  fontWeight: 700,
-                  opacity: 0.9,
-                }}
-              >
-                {truncate(
-                  card.value,
-                  58,
-                )}
-              </div>
-            </div>
-          ),
-        )}
-      </div>
-
-      {/* Topic pills */}
-
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          marginTop: 28,
-        }}
-      >
-        {topics.map(
-          (topic, index) => (
-            <div
-              key={topic}
-              style={{
-                padding:
-                  "8px 15px",
-
-                border:
-                  "1px solid rgba(255,255,255,0.12)",
-
-                borderRadius: 20,
-
-                fontSize: 14,
-
-                opacity:
-                  clamp(
-                    0.42 +
-                      index * 0.05,
-                    0.42,
-                    0.65,
-                  ),
-
-                transform:
-                  `translateY(${slideUp(
-                    frame -
-                      index * 3,
-                    20,
-                    16,
-                  )}px)`,
-              }}
-            >
-              {topic}
-            </div>
-          ),
-        )}
+        <div
+          style={{
+            position:
+              "absolute",
+            left: 0,
+            bottom: 0,
+            fontSize: 22,
+            color:
+              COLORS.muted,
+            maxWidth: 1250,
+          }}
+        >
+          {truncate(
+            safe(
+              analysis.audience,
+              "For readers looking for useful insights.",
+            ),
+            125,
+          )}
+        </div>
       </div>
     </AbsoluteFill>
   );
 };
 
-/* =========================================================
-   POST CARD
-   6–18 seconds
+/* ======================================================
+   POST SCENE
+   6–18s
+---------------------------------------------------------
+Each post gets 72 frames = 2.4 seconds.
+Image is intentionally large.
+====================================================== */
 
-   IMPORTANT DESIGN CHANGE
-
-   The post image itself is NOT covered by a large title.
-
-   Instead:
-
-   ┌──────────────────────────────┬──────────────────────┐
-   │                              │ 01 / 05              │
-   │                              │                      │
-   │        FULL IMAGE            │ CATEGORY             │
-   │                              │                      │
-   │                              │ TITLE                │
-   │                              │                      │
-   │                              │ DATE                 │
-   │                              │ EXCERPT              │
-   │                              │                      │
-   │                              │ READ ARTICLE →       │
-   └──────────────────────────────┴──────────────────────┘
-========================================================= */
-
-const PostCard: React.FC<{
+const PostScene: React.FC<{
   post: BlogPost;
   index: number;
-  totalPosts: number;
+  total: number;
 }> = ({
   post,
   index,
-  totalPosts,
+  total,
 }) => {
   const frame =
     useCurrentFrame();
@@ -976,17 +971,19 @@ const PostCard: React.FC<{
       72,
     );
 
-  /* =======================================================
-     IMAGE MOTION
-
-     Very subtle Ken Burns effect.
-  ======================================================= */
+  const image =
+    getImageSource(
+      post,
+    );
 
   const imageScale =
     interpolate(
       frame,
       [0, 72],
-      [1.0, 1.045],
+      [
+        1.02,
+        1.08,
+      ],
       {
         extrapolateLeft:
           "clamp",
@@ -996,576 +993,284 @@ const PostCard: React.FC<{
     );
 
   const imageX =
-    interpolate(
-      frame,
-      [0, 72],
-      [0, -10],
-      {
-        extrapolateLeft:
-          "clamp",
-        extrapolateRight:
-          "clamp",
-      },
-    );
+    index % 2 === 0
+      ? interpolate(
+          frame,
+          [0, 72],
+          [0, -18],
+          {
+            extrapolateLeft:
+              "clamp",
+            extrapolateRight:
+              "clamp",
+          },
+        )
+      : interpolate(
+          frame,
+          [0, 72],
+          [18, 0],
+          {
+            extrapolateLeft:
+              "clamp",
+            extrapolateRight:
+              "clamp",
+          },
+        );
 
-  const imageY =
-    interpolate(
-      frame,
-      [0, 72],
-      [0, -5],
-      {
-        extrapolateLeft:
-          "clamp",
-        extrapolateRight:
-          "clamp",
-      },
-    );
-
-  /* =======================================================
-     CONTENT MOTION
-  ======================================================= */
-
-  const contentX =
-    slideLeft(
-      frame,
-      45,
-      20,
-    );
-
-  const contentY =
+  const titleY =
     slideUp(
       frame,
-      24,
-      18,
+      35,
+      17,
     );
 
-  /* =======================================================
-     DATA
-  ======================================================= */
-
-  const categories = (
-    post.categories || []
-  )
-    .filter(Boolean)
-    .slice(0, 2);
-
-  const categoryText =
-    categories.length > 0
-      ? categories.join(
-          "  •  ",
-        )
-      : "LATEST STORY";
-
-  const title =
-    truncate(
-      safe(
-        post.title,
-        "Untitled story",
+  const excerptY =
+    slideUp(
+      Math.max(
+        0,
+        frame - 7,
       ),
-      88,
+      30,
+      17,
     );
-
-  const excerpt =
-    truncate(
-      safe(
-        post.excerpt,
-        "Discover the latest story and insights from this blog.",
-      ),
-      155,
-    );
-
-  const date =
-    formatDate(post);
-
-  const imageSource =
-    getImageSource(post);
 
   return (
     <AbsoluteFill
       style={{
         opacity,
-        background:
-          COLORS.background,
       }}
     >
-      {/* =================================================
-          IMAGE CONTAINER
-      ================================================= */}
+      <AbsoluteFill
+        style={{
+          background:
+            COLORS.background,
+        }}
+      />
+
+      {/* ============================================
+          LARGE IMAGE
+      ============================================ */}
 
       <div
         style={{
-          position: "absolute",
-
-          left: 58,
-          top: 58,
-          bottom: 58,
-
-          width: 1035,
-
-          overflow: "hidden",
-
-          borderRadius: 20,
-
-          background:
-            "#111111",
-
+          position:
+            "absolute",
+          left: 70,
+          top: 70,
+          width: 1120,
+          height: 940,
+          overflow:
+            "hidden",
+          borderRadius:
+            24,
           border:
-            "1px solid rgba(255,255,255,0.10)",
-
-          boxShadow:
-            "0 30px 80px rgba(0,0,0,0.45)",
+            `1px solid ${COLORS.line}`,
+          background:
+            "#111",
         }}
       >
-        {/* =================================================
-            BLURRED BACKGROUND
-
-            This makes the full image look premium even
-            when the original image ratio is not 16:9.
-        ================================================= */}
-
         <Img
-          src={imageSource}
+          src={image}
           style={{
-            position: "absolute",
-
-            width: "100%",
-            height: "100%",
-
-            objectFit: "cover",
-
-            filter:
-              "blur(24px) brightness(0.58)",
-
+            width:
+              "100%",
+            height:
+              "100%",
+            objectFit:
+              "cover",
             transform:
-              `scale(1.10) translate(${imageX}px, ${imageY}px)`,
+              `translateX(${imageX}px) scale(${imageScale})`,
           }}
         />
 
-        {/* Dark glass layer */}
-
+        {/* Subtle image protection */}
         <AbsoluteFill
           style={{
             background:
-              "rgba(0,0,0,0.18)",
+              "linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.32) 100%)",
           }}
         />
-
-        {/* =================================================
-            MAIN IMAGE
-
-            CONTAIN = original image remains visible
-            without aggressive cropping.
-        ================================================= */}
-
-        <div
-          style={{
-            position: "absolute",
-
-            left: 22,
-            right: 22,
-            top: 22,
-            bottom: 22,
-
-            display: "flex",
-
-            alignItems: "center",
-
-            justifyContent:
-              "center",
-
-            overflow: "hidden",
-
-            borderRadius: 14,
-
-            background:
-              "rgba(0,0,0,0.16)",
-          }}
-        >
-          <Img
-            src={imageSource}
-            style={{
-              width: "100%",
-              height: "100%",
-
-              objectFit: "contain",
-
-              objectPosition:
-                "center center",
-
-              transform:
-                `translate(${imageX}px, ${imageY}px) scale(${imageScale})`,
-
-              filter:
-                "brightness(1.08) contrast(1.02) saturate(1.04)",
-
-              display: "block",
-            }}
-          />
-        </div>
-
-        {/* =================================================
-            VERY LIGHT EDGE VIGNETTE
-
-            Deliberately weak.
-        ================================================= */}
-
-        <AbsoluteFill
-          style={{
-            pointerEvents: "none",
-
-            background:
-              "linear-gradient(90deg, rgba(0,0,0,0.06) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.12) 100%)",
-          }}
-        />
-
-        <AbsoluteFill
-          style={{
-            pointerEvents: "none",
-
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.08) 0%, transparent 18%, transparent 82%, rgba(0,0,0,0.10) 100%)",
-          }}
-        />
-
-        {/* =================================================
-            POST NUMBER
-        ================================================= */}
-
-        <div
-          style={{
-            position: "absolute",
-
-            left: 22,
-            top: 22,
-
-            padding:
-              "9px 14px",
-
-            borderRadius: 8,
-
-            background:
-              "rgba(0,0,0,0.58)",
-
-            border:
-              "1px solid rgba(255,255,255,0.20)",
-
-            backdropFilter:
-              "blur(8px)",
-
-            fontSize: 14,
-
-            fontWeight: 700,
-
-            letterSpacing: 2,
-          }}
-        >
-          {String(
-            index + 1,
-          ).padStart(2, "0")}
-
-          {"  /  "}
-
-          {String(
-            totalPosts,
-          ).padStart(2, "0")}
-        </div>
       </div>
 
-      {/* =================================================
+      {/* ============================================
           RIGHT INFORMATION PANEL
-      ================================================= */}
+      ============================================ */}
 
       <div
         style={{
-          position: "absolute",
-
-          left: 1155,
-          right: 62,
-
-          top: 58,
-          bottom: 58,
-
-          display: "flex",
-
+          position:
+            "absolute",
+          left: 1240,
+          top: 100,
+          right: 95,
+          bottom: 100,
+          display:
+            "flex",
           flexDirection:
             "column",
-
           justifyContent:
             "center",
-
-          transform:
-            `translateX(${contentX}px)`,
         }}
       >
-        {/* =================================================
-            POST NUMBER / SECTION
-        ================================================= */}
-
         <div
           style={{
-            fontSize: 13,
-
+            fontSize: 15,
             letterSpacing: 4,
-
-            opacity: 0.34,
-
-            marginBottom: 18,
+            color:
+              COLORS.soft,
+            fontWeight: 700,
           }}
         >
-          STORY{" "}
+          FEATURE
+          {"  "}
           {String(
             index + 1,
           ).padStart(2, "0")}
-          {"  /  "}
+          {" / "}
           {String(
-            totalPosts,
+            total,
           ).padStart(2, "0")}
         </div>
 
-        {/* =================================================
-            CATEGORY
-        ================================================= */}
-
         <div
           style={{
-            fontSize: 14,
-
-            letterSpacing: 3.5,
-
-            fontWeight: 700,
-
-            opacity: 0.50,
-
-            marginBottom: 22,
-
-            textTransform:
-              "uppercase",
-          }}
-        >
-          {categoryText}
-        </div>
-
-        {/* =================================================
-            TITLE
-
-            This is now the ONLY large title.
-            Nothing is rendered over the image.
-        ================================================= */}
-
-        <div
-          style={{
-            fontSize: 41,
-
-            lineHeight: 1.08,
-
-            fontWeight: 850,
-
-            letterSpacing: -1.2,
-
-            maxWidth: 690,
-
+            marginTop: 22,
+            opacity:
+              fadeIn(
+                frame,
+                14,
+              ),
             transform:
-              `translateY(${contentY}px)`,
+              `translateY(${titleY}px)`,
+            fontSize: 48,
+            lineHeight: 1.08,
+            fontWeight: 900,
+            letterSpacing: -1.5,
           }}
         >
-          {title}
+          {truncate(
+            post.title,
+            95,
+          )}
         </div>
 
-        {/* Divider */}
-
-        <div
-          style={{
-            width: 70,
-
-            height: 3,
-
-            background:
-              COLORS.white,
-
-            opacity: 0.62,
-
-            marginTop: 26,
-
-            marginBottom: 20,
-          }}
-        />
-
-        {/* =================================================
-            DATE
-        ================================================= */}
-
-        {date && (
+        {post.date && (
           <div
             style={{
-              fontSize: 14,
-
-              letterSpacing: 1.2,
-
-              opacity: 0.36,
-
-              marginBottom: 18,
+              marginTop: 20,
+              fontSize: 17,
+              color:
+                COLORS.soft,
+              letterSpacing: 1,
             }}
           >
-            {date}
+            {post.date}
           </div>
         )}
 
-        {/* =================================================
-            EXCERPT
-        ================================================= */}
+        <div
+          style={{
+            marginTop: 25,
+            height: 1,
+            width: "100%",
+            background:
+              COLORS.line,
+          }}
+        />
 
         <div
           style={{
-            fontSize: 18,
-
-            lineHeight: 1.48,
-
-            opacity: 0.56,
-
-            maxWidth: 650,
+            marginTop: 25,
+            opacity:
+              fadeIn(
+                Math.max(
+                  0,
+                  frame - 7,
+                ),
+                15,
+              ),
+            transform:
+              `translateY(${excerptY}px)`,
+            fontSize: 20,
+            lineHeight: 1.45,
+            color:
+              COLORS.muted,
           }}
         >
-          {excerpt}
+          {truncate(
+            post.excerpt,
+            190,
+          )}
         </div>
-
-        {/* =================================================
-            CTA
-        ================================================= */}
 
         <div
           style={{
             marginTop: 30,
-
-            display: "flex",
-
-            alignItems: "center",
-
-            gap: 13,
+            display:
+              "flex",
+            gap: 9,
+            flexWrap:
+              "wrap",
           }}
         >
-          <div
-            style={{
-              fontSize: 14,
-
-              letterSpacing: 2.5,
-
-              fontWeight: 700,
-
-              opacity: 0.76,
-            }}
-          >
-            READ ARTICLE
-          </div>
-
-          <div
-            style={{
-              fontSize: 21,
-
-              opacity: 0.72,
-
-              transform:
-                `translateX(${interpolate(
-                  frame,
-                  [0, 72],
-                  [0, 5],
-                  {
-                    extrapolateLeft:
-                      "clamp",
-                    extrapolateRight:
-                      "clamp",
-                  },
-                )}px)`,
-            }}
-          >
-            →
-          </div>
-        </div>
-
-        {/* =================================================
-            POST URL
-        ================================================= */}
-
-        <div
-          style={{
-            position:
-              "absolute",
-
-            left: 0,
-
-            bottom: 0,
-
-            fontSize: 12,
-
-            letterSpacing: 1.2,
-
-            opacity: 0.25,
-
-            maxWidth: 650,
-
-            overflow: "hidden",
-
-            whiteSpace:
-              "nowrap",
-
-            textOverflow:
-              "ellipsis",
-          }}
-        >
-          {normalizeUrl(
-            post.url,
-          )}
+          {(
+            post.categories ||
+            []
+          )
+            .slice(0, 3)
+            .map(
+              (
+                category,
+              ) => (
+                <div
+                  key={
+                    category
+                  }
+                  style={{
+                    fontSize: 13,
+                    padding:
+                      "8px 12px",
+                    border:
+                      `1px solid ${COLORS.line}`,
+                    borderRadius:
+                      999,
+                    color:
+                      COLORS.soft,
+                  }}
+                >
+                  {category}
+                </div>
+              ),
+            )}
         </div>
       </div>
 
-      {/* =================================================
-          IMAGE / INFORMATION DIVIDER
-      ================================================= */}
+      {/* ============================================
+          PROGRESS
+      ============================================ */}
 
       <div
         style={{
-          position: "absolute",
-
-          left: 1135,
-
-          top: 110,
-
-          bottom: 110,
-
-          width: 1,
-
+          position:
+            "absolute",
+          left: 70,
+          right: 95,
+          bottom: 38,
+          height: 3,
           background:
-            "rgba(255,255,255,0.08)",
-        }}
-      />
-
-      {/* =================================================
-          TOP PROGRESS LINE
-      ================================================= */}
-
-      <div
-        style={{
-          position: "absolute",
-
-          left: 58,
-          right: 62,
-
-          top: 25,
-
-          height: 2,
-
-          background:
-            "rgba(255,255,255,0.08)",
+            "rgba(255,255,255,0.12)",
         }}
       >
         <div
           style={{
-            width:
-              `${((index + 1) / totalPosts) * 100}%`,
-
+            width: `${
+              ((index + 1) /
+                total) *
+              100
+            }%`,
             height: "100%",
-
             background:
-              "rgba(255,255,255,0.55)",
+              COLORS.white,
           }}
         />
       </div>
@@ -1573,255 +1278,19 @@ const PostCard: React.FC<{
   );
 };
 
-/* =========================================================
-   ANALYSIS SCENE
-   18–21 seconds
-========================================================= */
+/* ======================================================
+   VALUE SCENE
+   18–21s
+====================================================== */
 
-const AnalysisScene: React.FC<{
+const ValueScene: React.FC<{
   data: BlogData;
   analysis: BlogAnalysis;
+  topics: string[];
 }> = ({
   data,
   analysis,
-}) => {
-  const frame =
-    useCurrentFrame();
-
-  const opacity =
-    sceneOpacity(
-      frame,
-      90,
-    );
-
-  const topics = (
-    analysis.topics || []
-  )
-    .filter(Boolean)
-    .slice(0, 4);
-
-  const postCount =
-    data.postCount ||
-    data.posts?.length ||
-    0;
-
-  return (
-    <AbsoluteFill
-      style={{
-        opacity,
-
-        padding:
-          "75px 110px",
-
-        justifyContent:
-          "center",
-
-        background:
-          "radial-gradient(circle at 72% 35%, rgba(255,255,255,0.065), transparent 34%), #080808",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 18,
-
-          letterSpacing: 6,
-
-          opacity: 0.4,
-
-          marginBottom: 24,
-        }}
-      >
-        BLOG AT A GLANCE
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-
-          alignItems:
-            "flex-end",
-
-          justifyContent:
-            "space-between",
-
-          gap: 80,
-        }}
-      >
-        {/* Main analysis */}
-
-        <div
-          style={{
-            maxWidth: 1120,
-
-            transform:
-              `translateY(${slideUp(
-                frame,
-                35,
-                20,
-              )}px)`,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 57,
-
-              lineHeight: 1.05,
-
-              fontWeight: 850,
-
-              letterSpacing: -2,
-            }}
-          >
-            {truncate(
-              safe(
-                analysis.valueProposition,
-                "Ideas, insights and useful information.",
-              ),
-              130,
-            )}
-          </div>
-
-          <div
-            style={{
-              marginTop: 24,
-
-              fontSize: 20,
-
-              lineHeight: 1.45,
-
-              opacity: 0.50,
-
-              maxWidth: 980,
-            }}
-          >
-            {truncate(
-              safe(
-                analysis.contentStyle,
-                "Curated stories and practical insights.",
-              ),
-              130,
-            )}
-          </div>
-        </div>
-
-        {/* =================================================
-            RECENT STORIES COUNTER
-        ================================================= */}
-
-        <div
-          style={{
-            minWidth: 220,
-
-            padding:
-              "25px 28px",
-
-            border:
-              "1px solid rgba(255,255,255,0.14)",
-
-            borderRadius: 14,
-
-            background:
-              "rgba(255,255,255,0.035)",
-
-            transform:
-              `translateY(${slideUp(
-                frame,
-                25,
-                18,
-              )}px)`,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 13,
-
-              letterSpacing: 3,
-
-              opacity: 0.38,
-
-              marginBottom: 8,
-            }}
-          >
-            RECENT STORIES
-          </div>
-
-          <div
-            style={{
-              fontSize: 52,
-
-              lineHeight: 1,
-
-              fontWeight: 900,
-            }}
-          >
-            {postCount}
-          </div>
-        </div>
-      </div>
-
-      {/* =================================================
-          TOPICS
-      ================================================= */}
-
-      <div
-        style={{
-          display: "flex",
-
-          gap: 12,
-
-          marginTop: 38,
-        }}
-      >
-        {topics.map(
-          (topic, index) => (
-            <div
-              key={topic}
-              style={{
-                padding:
-                  "11px 18px",
-
-                border:
-                  "1px solid rgba(255,255,255,0.13)",
-
-                borderRadius: 24,
-
-                fontSize: 15,
-
-                opacity:
-                  clamp(
-                    0.42 +
-                      index * 0.05,
-                    0.42,
-                    0.65,
-                  ),
-
-                transform:
-                  `translateY(${slideUp(
-                    frame -
-                      index * 3,
-                    20,
-                    16,
-                  )}px)`,
-              }}
-            >
-              {topic}
-            </div>
-          ),
-        )}
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-/* =========================================================
-   OUTRO
-   21–24 seconds
-========================================================= */
-
-const Outro: React.FC<{
-  data: BlogData;
-}> = ({
-  data,
+  topics,
 }) => {
   const frame =
     useCurrentFrame();
@@ -1835,20 +1304,169 @@ const Outro: React.FC<{
   const y =
     slideUp(
       frame,
-      35,
+      40,
       20,
     );
 
-  const hostname =
-    normalizeUrl(
-      data.url,
+  const primary =
+    topics[0] ||
+    "Insights";
+
+  return (
+    <AbsoluteFill
+      style={{
+        opacity,
+      }}
+    >
+      <PremiumBackground />
+
+      <div
+        style={{
+          position:
+            "absolute",
+          left: 120,
+          right: 120,
+          top: 100,
+          bottom: 100,
+          display:
+            "flex",
+          flexDirection:
+            "column",
+          justifyContent:
+            "center",
+          transform:
+            `translateY(${y}px)`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 16,
+            letterSpacing: 6,
+            color:
+              COLORS.soft,
+            fontWeight: 700,
+          }}
+        >
+          WHY FOLLOW
+        </div>
+
+        <div
+          style={{
+            marginTop: 25,
+            fontSize: 68,
+            fontWeight: 900,
+            letterSpacing: -2,
+          }}
+        >
+          {truncate(
+            safe(
+              analysis.valueProposition,
+              `Clear ${primary.toLowerCase()} insights and practical information.`,
+            ),
+            105,
+          )}
+        </div>
+
+        <div
+          style={{
+            marginTop: 40,
+            display:
+              "flex",
+            gap: 50,
+          }}
+        >
+          <Stat
+            label="FOCUS"
+            value={
+              primary
+            }
+          />
+
+          <Stat
+            label="STYLE"
+            value={truncate(
+              safe(
+                analysis.contentStyle,
+                "Analysis",
+              ),
+              28,
+            )}
+          />
+
+          <Stat
+            label="POSTS"
+            value={String(
+              data.postCount ||
+                data.posts
+                  ?.length ||
+                0,
+            )}
+          />
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const Stat: React.FC<{
+  label: string;
+  value: string;
+}> = ({
+  label,
+  value,
+}) => (
+  <div
+    style={{
+      minWidth: 250,
+    }}
+  >
+    <div
+      style={{
+        fontSize: 13,
+        letterSpacing: 4,
+        color:
+          COLORS.soft,
+      }}
+    >
+      {label}
+    </div>
+
+    <div
+      style={{
+        marginTop: 12,
+        fontSize: 25,
+        fontWeight: 800,
+      }}
+    >
+      {value}
+    </div>
+  </div>
+);
+
+/* ======================================================
+   CTA
+   21–24s
+====================================================== */
+
+const CtaScene: React.FC<{
+  data: BlogData;
+}> = ({
+  data,
+}) => {
+  const frame =
+    useCurrentFrame();
+
+  const opacity =
+    sceneOpacity(
+      frame,
+      90,
     );
 
   const scale =
     interpolate(
       frame,
       [0, 90],
-      [1.025, 1],
+      [0.96, 1],
       {
         extrapolateLeft:
           "clamp",
@@ -1857,195 +1475,50 @@ const Outro: React.FC<{
       },
     );
 
+  const hostname =
+    safe(
+      data.hostname,
+      (() => {
+        try {
+          return new URL(
+            data.url,
+          ).hostname.replace(
+            /^www\./,
+            "",
+          );
+        } catch {
+          return "";
+        }
+      })(),
+    );
+
   return (
     <AbsoluteFill
       style={{
         opacity,
-
         background:
-          "radial-gradient(circle at 50% 40%, rgba(255,255,255,0.085), transparent 32%), #080808",
+          "radial-gradient(circle at 50% 45%, #1b2431 0%, #0b0d10 55%, #050607 100%)",
+        alignItems:
+          "center",
+        justifyContent:
+          "center",
       }}
     >
-      {/* Background grid */}
-
-      <AbsoluteFill
-        style={{
-          opacity: 0.055,
-
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px)",
-
-          backgroundSize:
-            "80px 80px",
-        }}
-      />
-
-      {/* Decorative circles */}
-
       <div
         style={{
-          position: "absolute",
-
-          width: 720,
-          height: 720,
-
-          left:
-            "50%",
-
-          top:
-            "50%",
-
-          transform:
-            "translate(-50%, -50%)",
-
-          border:
-            "1px solid rgba(255,255,255,0.06)",
-
-          borderRadius: "50%",
-        }}
-      />
-
-      <div
-        style={{
-          position: "absolute",
-
-          width: 520,
-          height: 520,
-
-          left:
-            "50%",
-
-          top:
-            "50%",
-
-          transform:
-            "translate(-50%, -50%)",
-
-          border:
-            "1px solid rgba(255,255,255,0.045)",
-
-          borderRadius: "50%",
-        }}
-      />
-
-      <div
-        style={{
-          position: "absolute",
-
-          left: 100,
-          right: 100,
-          top: 80,
-          bottom: 80,
-
-          display: "flex",
-
-          flexDirection:
-            "column",
-
-          alignItems:
-            "center",
-
-          justifyContent:
-            "center",
-
           textAlign:
             "center",
-
           transform:
-            `translateY(${y}px) scale(${scale})`,
+            `scale(${scale})`,
         }}
       >
         <div
           style={{
             fontSize: 17,
-
-            letterSpacing: 6,
-
-            opacity: 0.4,
-
-            marginBottom: 24,
-          }}
-        >
-          DISCOVER MORE
-        </div>
-
-        <div
-          style={{
-            fontSize: 78,
-
-            lineHeight: 1,
-
-            fontWeight: 900,
-
-            letterSpacing: -3,
-
-            maxWidth: 1500,
-          }}
-        >
-          {truncate(
-            safe(
-              data.siteTitle,
-              "This Blog",
-            ),
-            42,
-          )}
-        </div>
-
-        <div
-          style={{
-            width: 100,
-
-            height: 4,
-
-            background:
-              COLORS.white,
-
-            opacity: 0.65,
-
-            marginTop: 34,
-          }}
-        />
-
-        <div
-          style={{
-            marginTop: 28,
-
-            fontSize: 25,
-
-            opacity: 0.58,
-
-            maxWidth: 900,
-          }}
-        >
-          Discover more stories,
-          {" "}
-          insights and ideas.
-        </div>
-
-        {/* =================================================
-            WEBSITE URL
-        ================================================= */}
-
-        <div
-          style={{
-            marginTop: 36,
-
-            padding:
-              "15px 27px",
-
-            border:
-              "1px solid rgba(255,255,255,0.18)",
-
-            borderRadius: 8,
-
-            background:
-              "rgba(255,255,255,0.045)",
-
-            fontSize: 19,
-
-            letterSpacing: 1.2,
-
-            opacity: 0.78,
+            letterSpacing: 7,
+            color:
+              COLORS.soft,
+            fontWeight: 700,
           }}
         >
           {hostname}
@@ -2053,16 +1526,68 @@ const Outro: React.FC<{
 
         <div
           style={{
-            marginTop: 30,
-
-            fontSize: 14,
-
-            letterSpacing: 3,
-
-            opacity: 0.28,
+            marginTop: 24,
+            fontSize: 78,
+            fontWeight: 900,
+            letterSpacing: -3,
           }}
         >
-          READ • EXPLORE • FOLLOW
+          {truncate(
+            data.siteTitle,
+            40,
+          )}
+        </div>
+
+        <div
+          style={{
+            marginTop: 25,
+            fontSize: 31,
+            color:
+              COLORS.muted,
+          }}
+        >
+          Stay informed.
+          {" "}
+          Explore what matters.
+        </div>
+
+        <div
+          style={{
+            display:
+              "inline-flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
+            marginTop: 45,
+            padding:
+              "18px 34px",
+            border:
+              "1px solid rgba(255,255,255,0.32)",
+            borderRadius:
+              999,
+            fontSize: 18,
+            fontWeight: 800,
+            letterSpacing: 3,
+            background:
+              "rgba(255,255,255,0.07)",
+          }}
+        >
+          VISIT THE BLOG
+        </div>
+
+        <div
+          style={{
+            marginTop: 28,
+            fontSize: 15,
+            color:
+              COLORS.soft,
+          }}
+        >
+          {truncate(
+            data.url,
+            90,
+          )}
         </div>
       </div>
     </AbsoluteFill>
