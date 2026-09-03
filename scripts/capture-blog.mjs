@@ -1,39 +1,31 @@
 import fs from "node:fs";
 import path from "node:path";
-import puppeteer from "puppeteer";
 
 /*
 =========================================================
-BLOG VIDEO CONTENT CAPTURE
----------------------------------------------------------
+BLOG VIDEO CAPTURE
+=========================================================
+
 Input:
   node scripts/capture-blog.mjs <blog-url>
 
 Output:
   template/public/blog/
     ├── blog.json
-    ├── home.png
     └── posts/
-        ├── post-1.jpg
-        ├── post-2.jpg
-        ├── post-3.jpg
-        ├── post-4.jpg
-        └── post-5.jpg
+        ├── post-1.webp / jpg / png / ...
+        ├── post-2.webp / jpg / png / ...
+        ├── post-3.webp / jpg / png / ...
+        ├── post-4.webp / jpg / png / ...
+        └── post-5.webp / jpg / png / ...
 
-Design goal:
-  BLOG URL
-      ↓
-  Blogger Feed
-      ↓
-  Recent Posts
-      ↓
-  Images + Titles + Excerpts
-      ↓
-  Content Analysis
-      ↓
-  blog.json
-      ↓
-  Remotion BlogPromo
+Data source:
+  Blogger JSON Feed
+
+No Puppeteer.
+No homepage screenshot.
+No Base64 image inside blog.json.
+
 =========================================================
 */
 
@@ -53,19 +45,11 @@ let parsedUrl;
 try {
   parsedUrl = new URL(BLOG_URL);
 
-  if (
-    !["http:", "https:"].includes(
-      parsedUrl.protocol,
-    )
-  ) {
-    throw new Error(
-      "Unsupported protocol",
-    );
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    throw new Error("Unsupported protocol");
   }
 } catch {
-  console.error(
-    `Invalid blog URL: ${BLOG_URL}`,
-  );
+  console.error(`Invalid blog URL: ${BLOG_URL}`);
   process.exit(1);
 }
 
@@ -125,6 +109,67 @@ const truncate = (
   );
 };
 
+const decodeHtml = (value = "") =>
+  String(value)
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(
+      /&#(\d+);/g,
+      (_, code) =>
+        String.fromCharCode(Number(code)),
+    )
+    .replace(
+      /&#x([0-9a-f]+);/gi,
+      (_, code) =>
+        String.fromCharCode(
+          parseInt(code, 16),
+        ),
+    );
+
+const htmlToText = (html = "") => {
+  const stripped = String(html)
+    .replace(
+      /<script[\s\S]*?<\/script>/gi,
+      " ",
+    )
+    .replace(
+      /<style[\s\S]*?<\/style>/gi,
+      " ",
+    )
+    .replace(
+      /<noscript[\s\S]*?<\/noscript>/gi,
+      " ",
+    )
+    .replace(
+      /<br\s*\/?>/gi,
+      "\n",
+    )
+    .replace(
+      /<\/p>/gi,
+      "\n",
+    )
+    .replace(
+      /<\/div>/gi,
+      "\n",
+    )
+    .replace(
+      /<[^>]+>/g,
+      " ",
+    );
+
+  return clean(
+    decodeHtml(stripped),
+  );
+};
+
+/* ======================================================
+   URL HELPERS
+====================================================== */
+
 const absoluteUrl = (value = "") => {
   if (!value) {
     return "";
@@ -140,66 +185,8 @@ const absoluteUrl = (value = "") => {
   }
 };
 
-const decodeHtml = (value = "") =>
-  String(value)
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(
-      /&#(\d+);/g,
-      (_, code) =>
-        String.fromCharCode(
-          Number(code),
-        ),
-    )
-    .replace(
-      /&#x([0-9a-f]+);/gi,
-      (_, code) =>
-        String.fromCharCode(
-          parseInt(code, 16),
-        ),
-    );
-
-const htmlToText = (html = "") =>
-  clean(
-    decodeHtml(
-      String(html)
-        .replace(
-          /<script[\s\S]*?<\/script>/gi,
-          " ",
-        )
-        .replace(
-          /<style[\s\S]*?<\/style>/gi,
-          " ",
-        )
-        .replace(
-          /<noscript[\s\S]*?<\/noscript>/gi,
-          " ",
-        )
-        .replace(
-          /<br\s*\/?>/gi,
-          "\n",
-        )
-        .replace(
-          /<\/p>/gi,
-          "\n",
-        )
-        .replace(
-          /<\/div>/gi,
-          "\n",
-        )
-        .replace(
-          /<[^>]+>/g,
-          " ",
-        ),
-    ),
-  );
-
 /* ======================================================
-   HTML IMAGE EXTRACTION
+   BLOGGER IMAGE EXTRACTION
 ====================================================== */
 
 const extractImageFromHtml = (
@@ -215,82 +202,22 @@ const extractImageFromHtml = (
   ];
 
   for (const pattern of patterns) {
-    const match =
-      source.match(pattern);
+    const match = source.match(pattern);
 
     if (match?.[1]) {
-      return match[1];
+      const candidate = match[1];
+
+      if (
+        !candidate.startsWith("data:") &&
+        !candidate.startsWith("blob:")
+      ) {
+        return candidate;
+      }
     }
   }
 
   return "";
 };
-
-/* ======================================================
-   BLOGGER ENTRY HELPERS
-====================================================== */
-
-const getEntryHtml = (entry) =>
-  entry?.content?.$t ||
-  entry?.summary?.$t ||
-  "";
-
-const getEntryUrl = (entry) => {
-  const links = Array.isArray(
-    entry?.link,
-  )
-    ? entry.link
-    : [];
-
-  const alternate =
-    links.find(
-      (link) =>
-        link?.rel === "alternate" &&
-        link?.href,
-    );
-
-  if (alternate?.href) {
-    return alternate.href;
-  }
-
-  return (
-    links.find(
-      (link) => link?.href,
-    )?.href || ""
-  );
-};
-
-const getEntryImage = (entry) => {
-  const thumbnail =
-    entry?.media$thumbnail?.url;
-
-  if (thumbnail) {
-    return thumbnail;
-  }
-
-  return extractImageFromHtml(
-    getEntryHtml(entry),
-  );
-};
-
-const getEntryDate = (entry) =>
-  entry?.published?.$t ||
-  entry?.updated?.$t ||
-  "";
-
-/* ======================================================
-   IMAGE URL QUALITY
----------------------------------------------------------
-Blogger thumbnails often look like:
-
-  .../s72-c/image.jpg
-
-Upgrade them where possible to:
-
-  .../s1600/image.jpg
-
-This gives Remotion a much better source image.
-====================================================== */
 
 const upgradeBloggerImageUrl = (
   value = "",
@@ -301,17 +228,110 @@ const upgradeBloggerImageUrl = (
     return "";
   }
 
+  /*
+  Blogger thumbnail examples:
+
+  /s72-c/
+  /s1600/
+  /w400-h300/
+  /w640-h360-p-k-no/
+  */
+
   url = url.replace(
     /\/s\d+(?:-c)?\//i,
     "/s1600/",
   );
 
   url = url.replace(
-    /\/w\d+-h\d+(?:-p-k-no)?\//i,
+    /\/w\d+-h\d+(?:-[^/]+)?\//i,
     "/s1600/",
   );
 
   return url;
+};
+
+/* ======================================================
+   BLOGGER ENTRY HELPERS
+====================================================== */
+
+const getEntryHtml = (
+  entry,
+) =>
+  entry?.content?.$t ||
+  entry?.summary?.$t ||
+  "";
+
+const getEntryUrl = (
+  entry,
+) => {
+  const links = Array.isArray(
+    entry?.link,
+  )
+    ? entry.link
+    : [];
+
+  const alternate = links.find(
+    (link) =>
+      link?.rel === "alternate" &&
+      link?.href,
+  );
+
+  return alternate?.href || "";
+};
+
+const getEntryDate = (
+  entry,
+) =>
+  entry?.published?.$t ||
+  entry?.updated?.$t ||
+  "";
+
+const getEntryTitle = (
+  entry,
+) =>
+  clean(
+    entry?.title?.$t ||
+    "Untitled Post",
+  );
+
+const getEntryCategories = (
+  entry,
+) => {
+  const categories = Array.isArray(
+    entry?.category,
+  )
+    ? entry.category
+    : [];
+
+  return [
+    ...new Set(
+      categories
+        .map(
+          (item) =>
+            clean(item?.term),
+        )
+        .filter(Boolean),
+    ),
+  ];
+};
+
+const getEntryImage = (
+  entry,
+) => {
+  const thumbnail =
+    entry?.media$thumbnail?.url;
+
+  if (thumbnail) {
+    return upgradeBloggerImageUrl(
+      thumbnail,
+    );
+  }
+
+  return upgradeBloggerImageUrl(
+    extractImageFromHtml(
+      getEntryHtml(entry),
+    ),
+  );
 };
 
 /* ======================================================
@@ -320,19 +340,16 @@ const upgradeBloggerImageUrl = (
 
 const fetchText = async (
   url,
-  options = {},
 ) => {
   const response = await fetch(
     url,
     {
       redirect: "follow",
-      ...options,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (compatible; BlogVideoGenerator/2.0)",
+          "Mozilla/5.0 (compatible; BlogVideoGenerator/3.0)",
         Accept:
           "application/json,text/plain,*/*",
-        ...(options.headers || {}),
       },
     },
   );
@@ -346,7 +363,9 @@ const fetchText = async (
   return response.text();
 };
 
-const fetchJson = async (url) => {
+const fetchJson = async (
+  url,
+) => {
   const text =
     await fetchText(url);
 
@@ -354,7 +373,7 @@ const fetchJson = async (url) => {
     return JSON.parse(text);
   } catch {
     throw new Error(
-      `Response was not valid JSON from ${url}`,
+      `Response was not valid JSON: ${url}`,
     );
   }
 };
@@ -371,23 +390,26 @@ const extensionFromContentType = (
     .trim()
     .toLowerCase();
 
-  if (type === "image/png") {
-    return ".png";
-  }
+  switch (type) {
+    case "image/png":
+      return ".png";
 
-  if (type === "image/webp") {
-    return ".webp";
-  }
+    case "image/webp":
+      return ".webp";
 
-  if (type === "image/gif") {
-    return ".gif";
-  }
+    case "image/gif":
+      return ".gif";
 
-  if (type === "image/avif") {
-    return ".avif";
-  }
+    case "image/avif":
+      return ".avif";
 
-  return ".jpg";
+    case "image/jpeg":
+    case "image/jpg":
+      return ".jpg";
+
+    default:
+      return ".jpg";
+  }
 };
 
 const downloadImage = async (
@@ -406,7 +428,7 @@ const downloadImage = async (
           redirect: "follow",
           headers: {
             "User-Agent":
-              "Mozilla/5.0 (compatible; BlogVideoGenerator/2.0)",
+              "Mozilla/5.0 (compatible; BlogVideoGenerator/3.0)",
             Accept:
               "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
           },
@@ -470,6 +492,7 @@ const downloadImage = async (
         `blog/posts/${filename}`,
       bytes: buffer.length,
       sourceUrl: imageUrl,
+      contentType,
     };
   } catch (error) {
     console.warn(
@@ -485,95 +508,17 @@ const downloadImage = async (
 };
 
 /* ======================================================
-   FALLBACK IMAGE
+   FALLBACK SVG
 ====================================================== */
-
-const createFallbackPostImage = (
-  index,
-  title,
-) => {
-  const filename =
-    `post-${index}.svg`;
-
-  const outputPath =
-    path.join(
-      POSTS_DIR,
-      filename,
-    );
-
-  const safeTitle =
-    String(title || "Blog Post")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg"
-     width="1600"
-     height="900"
-     viewBox="0 0 1600 900">
-  <rect width="1600"
-        height="900"
-        fill="#101010"/>
-
-  <rect x="80"
-        y="80"
-        width="1440"
-        height="740"
-        rx="32"
-        fill="#171717"
-        stroke="#3a3a3a"/>
-
-  <text x="120"
-        y="170"
-        fill="#ffffff"
-        font-size="34"
-        font-family="Arial, Helvetica, sans-serif"
-        letter-spacing="6">
-    BLOG FEATURE
-  </text>
-
-  <text x="120"
-        y="310"
-        fill="#ffffff"
-        font-size="64"
-        font-weight="700"
-        font-family="Arial, Helvetica, sans-serif">
-    ${safeTitle}
-  </text>
-
-  <text x="120"
-        y="730"
-        fill="#888888"
-        font-size="28"
-        font-family="Arial, Helvetica, sans-serif">
-    ${escapeXml(parsedUrl.hostname)}
-  </text>
-</svg>
-`;
-
-  fs.writeFileSync(
-    outputPath,
-    svg,
-    "utf8",
-  );
-
-  return {
-    filename,
-    localPath:
-      `blog/posts/${filename}`,
-    bytes: Buffer.byteLength(svg),
-    sourceUrl: "",
-    fallback: true,
-  };
-};
 
 const escapeXml = (
   value = "",
 ) =>
   String(value)
-    .replace(/&/g, "&amp;")
+    .replace(
+      /&/g,
+      "&amp;",
+    )
     .replace(
       /</g,
       "&lt;",
@@ -590,6 +535,100 @@ const escapeXml = (
       /'/g,
       "&apos;",
     );
+
+const createFallbackPostImage = (
+  index,
+  title,
+) => {
+  const filename =
+    `post-${index}.svg`;
+
+  const outputPath =
+    path.join(
+      POSTS_DIR,
+      filename,
+    );
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1600"
+     height="900"
+     viewBox="0 0 1600 900">
+
+  <rect
+    width="1600"
+    height="900"
+    fill="#111318"
+  />
+
+  <rect
+    x="70"
+    y="70"
+    width="1460"
+    height="760"
+    rx="36"
+    fill="#191d24"
+    stroke="#353b45"
+    stroke-width="2"
+  />
+
+  <text
+    x="120"
+    y="180"
+    fill="#8ea4c7"
+    font-size="30"
+    font-family="Arial, Helvetica, sans-serif"
+    letter-spacing="7"
+  >
+    BLOG FEATURE
+  </text>
+
+  <text
+    x="120"
+    y="340"
+    fill="#ffffff"
+    font-size="60"
+    font-weight="700"
+    font-family="Arial, Helvetica, sans-serif"
+  >
+    ${escapeXml(
+      truncate(title, 48),
+    )}
+  </text>
+
+  <text
+    x="120"
+    y="750"
+    fill="#89919e"
+    font-size="26"
+    font-family="Arial, Helvetica, sans-serif"
+  >
+    ${escapeXml(
+      parsedUrl.hostname,
+    )}
+  </text>
+
+</svg>
+`;
+
+  fs.writeFileSync(
+    outputPath,
+    svg,
+    "utf8",
+  );
+
+  return {
+    filename,
+    localPath:
+      `blog/posts/${filename}`,
+    bytes:
+      Buffer.byteLength(svg),
+    sourceUrl: "",
+    contentType:
+      "image/svg+xml",
+    fallback: true,
+  };
+};
 
 /* ======================================================
    TOPIC ANALYSIS
@@ -609,9 +648,9 @@ const TOPIC_RULES = [
       "nyse",
       "russell",
       "us market",
-      "american market",
-      "stocks",
+      "us stock",
       "stock market",
+      "stocks",
     ],
   },
 
@@ -620,15 +659,15 @@ const TOPIC_RULES = [
     keywords: [
       "hong kong",
       "hang seng",
-      "taiwan",
       "china",
       "japan",
       "nikkei",
+      "taiwan",
       "asia",
       "europe",
       "european",
       "global market",
-      "world market",
+      "global markets",
     ],
   },
 
@@ -656,30 +695,14 @@ const TOPIC_RULES = [
   },
 
   {
-    label: "Investing",
-    keywords: [
-      "investing",
-      "investor",
-      "investment",
-      "portfolio",
-      "dollar-cost",
-      "dca",
-      "dividend",
-      "valuation",
-      "risk",
-      "asset allocation",
-      "long-term",
-    ],
-  },
-
-  {
     label: "Technology",
     keywords: [
       "technology",
       "tech",
-      "ai",
       "artificial intelligence",
+      "ai",
       "semiconductor",
+      "semiconductors",
       "chip",
       "chips",
       "software",
@@ -693,170 +716,98 @@ const TOPIC_RULES = [
   },
 
   {
-    label: "Commodities",
+    label: "Investing",
     keywords: [
-      "oil",
-      "wti",
-      "brent",
-      "gold",
-      "silver",
-      "commodity",
-      "commodities",
-      "energy",
+      "investing",
+      "investor",
+      "investment",
+      "portfolio",
+      "valuation",
+      "dividend",
+      "risk",
+      "asset allocation",
+      "long-term",
+      "trading",
+      "day trading",
     ],
   },
 
   {
-    label: "Crypto",
+    label: "Commodities",
     keywords: [
-      "bitcoin",
-      "ethereum",
-      "crypto",
-      "cryptocurrency",
-      "btc",
-      "eth",
-      "defi",
-      "blockchain",
+      "oil",
+      "crude",
+      "gold",
+      "silver",
+      "commodity",
+      "commodities",
+      "natural gas",
     ],
   },
 ];
 
-const STOP_WORDS = new Set([
-  "the",
-  "and",
-  "for",
-  "with",
-  "from",
-  "that",
-  "this",
-  "what",
-  "how",
-  "why",
-  "when",
-  "into",
-  "your",
-  "about",
-  "after",
-  "before",
-  "will",
-  "are",
-  "was",
-  "were",
-  "has",
-  "have",
-  "had",
-  "their",
-  "they",
-  "them",
-  "than",
-  "then",
-  "its",
-  "our",
-  "you",
-  "not",
-  "but",
-  "can",
-  "may",
-  "all",
-  "new",
-  "more",
-  "key",
-  "guide",
-  "explained",
-  "latest",
-  "update",
-  "updates",
-]);
-
-const tokenize = (value = "") =>
-  clean(value)
-    .toLowerCase()
-    .replace(
-      /[^a-z0-9\s&.-]/g,
-      " ",
-    )
-    .split(/\s+/)
-    .filter(
-      (token) =>
-        token.length >= 3 &&
-        !STOP_WORDS.has(token),
-    );
-
 const analyzeTopics = (
-  siteDescription,
   posts,
 ) => {
-  const source = [
-    siteDescription,
-    ...posts.map(
-      (post) =>
-        `${post.title} ${post.excerpt} ${(
-          post.categories || []
-        ).join(" ")}`,
-    ),
-  ]
-    .join(" ")
-    .toLowerCase();
+  const scores = new Map();
 
-  const scored =
-    TOPIC_RULES.map(
-      (rule) => {
-        let score = 0;
-
-        for (
-          const keyword of rule.keywords
-        ) {
-          const occurrences =
-            source
-              .split(keyword)
-              .length - 1;
-
-          score +=
-            Math.min(
-              occurrences,
-              8,
-            );
-        }
-
-        return {
-          label: rule.label,
-          score,
-        };
-      },
-    )
-      .filter(
-        (item) =>
-          item.score > 0,
-      )
-      .sort(
-        (a, b) =>
-          b.score - a.score,
-      );
-
-  const topics =
-    scored
-      .slice(0, 4)
-      .map(
-        (item) =>
-          item.label,
-      );
-
-  if (topics.length === 0) {
-    topics.push(
-      "Insights",
-      "Analysis",
-      "Trends",
+  for (const rule of TOPIC_RULES) {
+    scores.set(
+      rule.label,
+      0,
     );
   }
 
-  return topics;
+  for (const post of posts) {
+    const source = [
+      post.title,
+      post.excerpt,
+      ...(post.categories || []),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    for (const rule of TOPIC_RULES) {
+      let score = 0;
+
+      for (const keyword of rule.keywords) {
+        if (
+          source.includes(
+            keyword.toLowerCase(),
+          )
+        ) {
+          score += 1;
+        }
+      }
+
+      scores.set(
+        rule.label,
+        scores.get(rule.label) + score,
+      );
+    }
+  }
+
+  return [...scores.entries()]
+    .sort(
+      (a, b) =>
+        b[1] - a[1],
+    )
+    .filter(
+      ([, score]) =>
+        score > 0,
+    )
+    .slice(0, 4)
+    .map(
+      ([label]) =>
+        label,
+    );
 };
 
 /* ======================================================
-   CONTENT STYLE ANALYSIS
+   CONTENT STYLE
 ====================================================== */
 
-const analyzeContentStyle = (
+const detectContentStyle = (
   posts,
 ) => {
   const text = posts
@@ -867,856 +818,399 @@ const analyzeContentStyle = (
     .join(" ")
     .toLowerCase();
 
-  const educationalSignals = [
-    "what is",
-    "how to",
-    "guide",
-    "explained",
-    "beginner",
-    "definition",
-  ];
+  const hasMarket =
+    /market|stocks|nasdaq|s&p|dow|futures|wall street|trading/
+      .test(text);
 
-  const newsSignals = [
-    "today",
-    "latest",
-    "futures",
-    "close",
-    "drop",
-    "rise",
-    "surge",
-    "market",
-    "before open",
-  ];
-
-  const analysisSignals = [
-    "analysis",
-    "signals",
-    "outlook",
-    "why",
-    "strategy",
-    "trend",
-    "risk",
-  ];
-
-  const score = (
-    keywords,
-  ) =>
-    keywords.reduce(
-      (sum, keyword) =>
-        sum +
-        (text.includes(keyword)
-          ? 1
-          : 0),
-      0,
-    );
-
-  const educational =
-    score(
-      educationalSignals,
-    );
-
-  const news =
-    score(newsSignals);
-
-  const analysis =
-    score(
-      analysisSignals,
-    );
+  const hasMacro =
+    /cpi|inflation|fed|fomc|interest rate|yield|gdp|economy/
+      .test(text);
 
   if (
-    analysis >= news &&
-    analysis >= educational
+    hasMarket &&
+    hasMacro
   ) {
-    return "Analysis & Commentary";
+    return "Market & Macro Analysis";
   }
 
-  if (
-    educational >= news
-  ) {
-    return "Educational & Practical";
+  if (hasMarket) {
+    return "Timely Market Updates";
   }
 
-  return "Timely Market Updates";
+  if (hasMacro) {
+    return "Economic Insights";
+  }
+
+  return "Expert Insights";
 };
 
 /* ======================================================
-   AUDIENCE
+   BLOG ANALYSIS
 ====================================================== */
 
-const analyzeAudience = (
-  topics,
-  contentStyle,
-) => {
-  const topicText =
-    topics.join(" ");
-
-  if (
-    topicText.includes(
-      "Markets",
-    ) ||
-    topicText.includes(
-      "Investing",
-    )
-  ) {
-    if (
-      contentStyle.includes(
-        "Educational",
-      )
-    ) {
-      return "Readers and investors seeking practical market knowledge";
-    }
-
-    return "Investors following markets, trends and economic signals";
-  }
-
-  if (
-    topicText.includes(
-      "Technology",
-    )
-  ) {
-    return "Readers interested in technology, innovation and market trends";
-  }
-
-  return "Readers looking for useful insights and practical information";
-};
-
-/* ======================================================
-   VALUE PROPOSITION
-====================================================== */
-
-const createValueProposition = (
-  topics,
-  contentStyle,
-) => {
-  const primary =
-    topics[0] || "Insights";
-
-  if (
-    contentStyle ===
-    "Educational & Practical"
-  ) {
-    return `Practical ${primary.toLowerCase()} knowledge, explained clearly and simply.`;
-  }
-
-  if (
-    contentStyle ===
-    "Timely Market Updates"
-  ) {
-    return `Timely ${primary.toLowerCase()} updates and signals to help readers stay informed.`;
-  }
-
-  return `Clear ${primary.toLowerCase()} analysis, timely context and practical insights for informed decisions.`;
-};
-
-/* ======================================================
-   HOMEPAGE PREVIEW
----------------------------------------------------------
-This is intentionally generated locally.
-We DO NOT navigate to the blog homepage with Puppeteer,
-which avoids CAPTCHA / anti-bot pages.
-====================================================== */
-
-const createHomePreview = async (
+const buildAnalysis = (
   siteTitle,
   description,
-  topics,
   posts,
 ) => {
-  const browser =
-    await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-      ],
-    });
+  const topics =
+    analyzeTopics(posts);
 
-  const page =
-    await browser.newPage();
+  const safeTopics =
+    topics.length
+      ? topics
+      : [
+          "Insights",
+          "Analysis",
+          "Trends",
+        ];
 
-  try {
-    await page.setViewport({
-      width: 1920,
-      height: 1080,
-      deviceScaleFactor: 1,
-    });
+  const topicText =
+    safeTopics
+      .slice(0, 3)
+      .join(", ");
 
-    const safeSiteTitle =
-      escapeHtml(
-        siteTitle,
-      );
+  const identity =
+    description ||
+    `${siteTitle} focuses on ${topicText}.`;
 
-    const safeDescription =
-      escapeHtml(
-        truncate(
-          description,
-          180,
-        ),
-      );
+  const audience =
+    safeTopics.includes(
+      "US Markets",
+    ) ||
+    safeTopics.includes(
+      "Global Markets",
+    )
+      ? "Investors following markets, trends and economic signals"
+      : "Readers looking for useful insights, trends and analysis";
 
-    const topicHtml =
-      topics
-        .map(
-          (topic) =>
-            `<span class="topic">${escapeHtml(topic)}</span>`,
-        )
-        .join("");
-
-    const postHtml =
-      posts
-        .slice(0, 5)
-        .map(
-          (post, index) =>
-            `<div class="post">
-              <span class="number">0${
-                index + 1
-              }</span>
-              <span>${escapeHtml(
-                truncate(
-                  post.title,
-                  72,
-                ),
-              )}</span>
-            </div>`,
-        )
-        .join("");
-
-    const html = `
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-}
-
-body {
-  background:
-    radial-gradient(
-      circle at 82% 18%,
-      #273449 0,
-      #111827 28%,
-      #080808 68%
-    );
-  color: #fff;
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
-}
-
-.page {
-  width: 100%;
-  height: 100%;
-  padding: 90px 110px;
-}
-
-.kicker {
-  font-size: 22px;
-  letter-spacing: 8px;
-  color: #9ca3af;
-  margin-bottom: 28px;
-}
-
-.title {
-  font-size: 82px;
-  line-height: 1;
-  font-weight: 900;
-  max-width: 1300px;
-}
-
-.description {
-  margin-top: 30px;
-  font-size: 28px;
-  line-height: 1.45;
-  color: #cbd5e1;
-  max-width: 1150px;
-}
-
-.topics {
-  display: flex;
-  gap: 14px;
-  margin-top: 34px;
-  flex-wrap: wrap;
-}
-
-.topic {
-  padding: 12px 20px;
-  border: 1px solid rgba(255,255,255,.2);
-  border-radius: 999px;
-  color: #e5e7eb;
-  font-size: 19px;
-}
-
-.posts {
-  margin-top: 48px;
-  width: 1100px;
-}
-
-.post {
-  display: flex;
-  align-items: center;
-  gap: 25px;
-  padding: 13px 0;
-  border-bottom: 1px solid rgba(255,255,255,.12);
-  font-size: 22px;
-  color: #e5e7eb;
-}
-
-.number {
-  width: 42px;
-  color: #6b7280;
-  font-size: 16px;
-  letter-spacing: 2px;
-}
-
-.footer {
-  position: absolute;
-  right: 110px;
-  bottom: 80px;
-  color: #64748b;
-  font-size: 18px;
-}
-</style>
-</head>
-
-<body>
-<div class="page">
-
-  <div class="kicker">
-    BLOG INTELLIGENCE
-  </div>
-
-  <div class="title">
-    ${safeSiteTitle}
-  </div>
-
-  <div class="description">
-    ${safeDescription}
-  </div>
-
-  <div class="topics">
-    ${topicHtml}
-  </div>
-
-  <div class="posts">
-    ${postHtml}
-  </div>
-
-  <div class="footer">
-    ${escapeHtml(
-      parsedUrl.hostname,
-    )}
-  </div>
-
-</div>
-</body>
-</html>
-`;
-
-    await page.setContent(
-      html,
-      {
-        waitUntil: "load",
-      },
+  const contentStyle =
+    detectContentStyle(
+      posts,
     );
 
-    await page.screenshot({
-      path: path.join(
-        OUTPUT_DIR,
-        "home.png",
-      ),
-      fullPage: false,
-    });
-  } finally {
-    await page.close();
-    await browser.close();
-  }
+  const valueProposition =
+    safeTopics.includes(
+      "US Markets",
+    )
+      ? "Timely US markets updates and signals to help readers stay informed."
+      : `Focused ${contentStyle.toLowerCase()} covering ${topicText}.`;
+
+  return {
+    identity: truncate(
+      identity,
+      240,
+    ),
+    topics:
+      safeTopics,
+    audience,
+    contentStyle,
+    valueProposition,
+  };
 };
 
 /* ======================================================
    MAIN
 ====================================================== */
 
-console.log(
-  "========================================",
-);
-
-console.log(
-  "BLOG VIDEO CONTENT CAPTURE v2",
-);
-
-console.log(
-  "========================================",
-);
-
-console.log(
-  `Blog URL: ${parsedUrl.href}`,
-);
-
-console.log(
-  `Output: ${OUTPUT_DIR}`,
-);
-
-console.log(
-  "========================================",
-);
-
-/* ======================================================
-   1. BLOGGER FEED
-====================================================== */
-
-const feedUrl =
-  new URL(
-    "/feeds/posts/default",
-    parsedUrl.href,
+const main = async () => {
+  console.log(
+    `Blog URL: ${BLOG_URL}`,
   );
 
-feedUrl.searchParams.set(
-  "alt",
-  "json",
-);
+  const feedUrl =
+    new URL(
+      "/feeds/posts/default",
+      parsedUrl.origin,
+    );
 
-feedUrl.searchParams.set(
-  "max-results",
-  String(MAX_POSTS),
-);
+  feedUrl.searchParams.set(
+    "alt",
+    "json",
+  );
 
-let feed;
-
-try {
-  console.log(
-    "Fetching Blogger Feed...",
+  feedUrl.searchParams.set(
+    "max-results",
+    String(MAX_POSTS),
   );
 
   console.log(
-    `Feed URL: ${feedUrl.href}`,
+    `Blogger Feed: ${feedUrl.href}`,
   );
 
-  feed =
+  const feed =
     await fetchJson(
       feedUrl.href,
     );
 
-  console.log(
-    "Blogger Feed loaded successfully.",
-  );
-} catch (error) {
-  console.error(
-    "Failed to load Blogger Feed.",
-  );
+  const feedData =
+    feed?.feed || {};
 
-  console.error(
-    error,
-  );
+  const entries =
+    Array.isArray(
+      feedData.entry,
+    )
+      ? feedData.entry
+      : [];
 
-  process.exit(1);
-}
+  if (!entries.length) {
+    throw new Error(
+      "No Blogger posts were found in the feed.",
+    );
+  }
 
-/* ======================================================
-   2. BLOG INFORMATION
-====================================================== */
+  const siteTitle =
+    clean(
+      feedData?.title?.$t ||
+        parsedUrl.hostname,
+    );
 
-const feedInfo =
-  feed?.feed || {};
+  const description =
+    clean(
+      feedData?.subtitle?.$t ||
+        "",
+    );
 
-const entries =
-  Array.isArray(
-    feedInfo.entry,
-  )
-    ? feedInfo.entry
-    : [];
+  /*
+  Feed should already be recent-first,
+  but sort explicitly to guarantee consistency.
+  */
 
-const siteTitle =
-  clean(
-    feedInfo?.title?.$t,
-  ) ||
-  parsedUrl.hostname;
+  const sortedEntries =
+    [...entries].sort(
+      (a, b) => {
+        const dateA =
+          new Date(
+            getEntryDate(a),
+          ).getTime() || 0;
 
-const description =
-  clean(
-    feedInfo?.subtitle?.$t,
-  );
+        const dateB =
+          new Date(
+            getEntryDate(b),
+          ).getTime() || 0;
 
-const language =
-  clean(
-    feedInfo?.language?.$t,
-  ) ||
-  clean(
-    feedInfo?.[
-      "xml:lang"
-    ],
-  );
-
-console.log(
-  `Site title: ${siteTitle}`,
-);
-
-console.log(
-  `Description: ${
-    description || "(none)"
-  }`,
-);
-
-console.log(
-  `Entries found: ${entries.length}`,
-);
-
-/* ======================================================
-   3. EXTRACT POSTS
-====================================================== */
-
-const extractedPosts =
-  entries
-    .map(
-      (entry) => {
-        const html =
-          getEntryHtml(entry);
-
-        const text =
-          htmlToText(html);
-
-        const title =
-          clean(
-            entry?.title?.$t,
-          );
-
-        const url =
-          absoluteUrl(
-            getEntryUrl(
-              entry,
-            ),
-          );
-
-        const published =
-          getEntryDate(entry);
-
-        const rawImage =
-          getEntryImage(
-            entry,
-          );
-
-        const image =
-          upgradeBloggerImageUrl(
-            rawImage,
-          );
-
-        const categories =
-          Array.isArray(
-            entry?.category,
-          )
-            ? entry.category
-                .map(
-                  (
-                    category,
-                  ) =>
-                    clean(
-                      category?.term,
-                    ),
-                )
-                .filter(Boolean)
-            : [];
-
-        return {
-          title,
-          url,
-          published,
-          date: published
-            ? new Date(
-                published,
-              ).toLocaleDateString(
-                "en-US",
-                {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                },
-              )
-            : "",
-          excerpt:
-            truncate(
-              text,
-              420,
-            ),
-          image,
-          categories,
-        };
+        return (
+          dateB - dateA
+        );
       },
-    )
-    .filter(
-      (post) =>
-        post.title &&
-        post.url,
-    )
-    .sort(
-      (a, b) =>
-        new Date(
-          b.published || 0,
-        ).getTime() -
-        new Date(
-          a.published || 0,
-        ).getTime(),
-    )
-    .slice(0, MAX_POSTS);
+    );
 
-console.log(
-  `Usable posts: ${extractedPosts.length}`,
-);
+  const selectedEntries =
+    sortedEntries.slice(
+      0,
+      MAX_POSTS,
+    );
 
-/* ======================================================
-   4. CONTENT ANALYSIS
-====================================================== */
+  const posts = [];
 
-const topics =
-  analyzeTopics(
+  for (
+    let i = 0;
+    i < selectedEntries.length;
+    i += 1
+  ) {
+    const entry =
+      selectedEntries[i];
+
+    const index =
+      i + 1;
+
+    const title =
+      getEntryTitle(entry);
+
+    const url =
+      absoluteUrl(
+        getEntryUrl(entry),
+      );
+
+    const published =
+      getEntryDate(entry);
+
+    const excerpt =
+      truncate(
+        htmlToText(
+          getEntryHtml(entry),
+        ),
+        360,
+      );
+
+    const categories =
+      getEntryCategories(
+        entry,
+      );
+
+    const imageUrl =
+      getEntryImage(entry);
+
+    console.log(
+      `\nPost ${index}: ${title}`,
+    );
+
+    console.log(
+      `Image: ${imageUrl || "none"}`,
+    );
+
+    let imageResult = null;
+
+    if (imageUrl) {
+      imageResult =
+        await downloadImage(
+          imageUrl,
+          index,
+        );
+    }
+
+    if (!imageResult) {
+      console.log(
+        `Using fallback image for post ${index}`,
+      );
+
+      imageResult =
+        createFallbackPostImage(
+          index,
+          title,
+        );
+    }
+
+    posts.push({
+      index,
+      title,
+      url,
+      published,
+      date: published
+        ? new Date(
+            published,
+          ).toLocaleDateString(
+            "en-US",
+            {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            },
+          )
+        : "",
+
+      excerpt,
+
+      categories,
+
+      localImage:
+        imageResult.localPath,
+
+      imageSource:
+        imageResult.fallback
+          ? "fallback"
+          : "post-image",
+    });
+  }
+
+  const analysis =
+    buildAnalysis(
+      siteTitle,
+      description,
+      posts,
+    );
+
+  const blogData = {
+    version: 3,
+
+    capturedAt:
+      new Date().toISOString(),
+
+    url: BLOG_URL,
+
+    hostname:
+      parsedUrl.hostname,
+
+    siteTitle,
+
     description,
-    extractedPosts,
-  );
 
-const contentStyle =
-  analyzeContentStyle(
-    extractedPosts,
-  );
+    pageHeading:
+      siteTitle,
 
-const audience =
-  analyzeAudience(
-    topics,
-    contentStyle,
-  );
+    ogImage: "",
 
-const valueProposition =
-  createValueProposition(
-    topics,
-    contentStyle,
-  );
+    language: "",
 
-const identity =
-  `${siteTitle} focuses on ${topics
-    .slice(0, 3)
-    .join(", ")}.`;
+    postCount:
+      posts.length,
 
-console.log(
-  "----------------------------------------",
-);
+    analysis,
 
-console.log(
-  "BLOG ANALYSIS",
-);
-
-console.log(
-  `Topics: ${topics.join(
-    ", ",
-  )}`,
-);
-
-console.log(
-  `Audience: ${audience}`,
-);
-
-console.log(
-  `Content style: ${contentStyle}`,
-);
-
-console.log(
-  `Value proposition: ${valueProposition}`,
-);
-
-console.log(
-  "----------------------------------------",
-);
-
-/* ======================================================
-   5. DOWNLOAD POST IMAGES
-====================================================== */
-
-const posts = [];
-
-for (
-  let i = 0;
-  i < extractedPosts.length;
-  i++
-) {
-  const post =
-    extractedPosts[i];
-
-  console.log(
-    `Processing post ${
-      i + 1
-    }/${extractedPosts.length}: ${
-      post.title
-    }`,
-  );
-
-  const downloaded =
-    await downloadImage(
-      post.image,
-      i + 1,
-    );
-
-  const localImage =
-    downloaded ||
-    createFallbackPostImage(
-      i + 1,
-      post.title,
-    );
-
-  posts.push({
-    ...post,
-
-    index: i + 1,
-
-    image:
-      post.image,
-
-    localImage:
-      localImage.localPath,
-
-    imageSource:
-      downloaded
-        ? "post-image"
-        : "generated-fallback",
-  });
-}
-
-/* ======================================================
-   6. GENERATE LOCAL HOME PREVIEW
-====================================================== */
-
-try {
-  await createHomePreview(
-    siteTitle,
-    description ||
-      valueProposition,
-    topics,
     posts,
+  };
+
+  const jsonPath =
+    path.join(
+      OUTPUT_DIR,
+      "blog.json",
+    );
+
+  fs.writeFileSync(
+    jsonPath,
+    JSON.stringify(
+      blogData,
+      null,
+      2,
+    ),
+    "utf8",
   );
 
   console.log(
-    "home.png created.",
-  );
-} catch (error) {
-  console.warn(
-    "Could not create home.png.",
+    "\n========================================",
   );
 
-  console.warn(
-    error.message,
+  console.log(
+    "BLOG CAPTURE COMPLETE",
   );
-}
 
-/* ======================================================
-   7. BLOG JSON
-====================================================== */
+  console.log(
+    "========================================",
+  );
 
-const blogData = {
-  version: 2,
+  console.log(
+    `Site: ${siteTitle}`,
+  );
 
-  capturedAt:
-    new Date().toISOString(),
+  console.log(
+    `Posts: ${posts.length}`,
+  );
 
-  url:
-    parsedUrl.href,
+  console.log(
+    `Topics: ${analysis.topics.join(", ")}`,
+  );
 
-  hostname:
-    parsedUrl.hostname,
+  console.log(
+    `Output: ${OUTPUT_DIR}`,
+  );
 
-  siteTitle,
+  console.log(
+    "\nFiles:",
+  );
 
-  description,
+  console.log(
+    `- ${jsonPath}`,
+  );
 
-  pageHeading:
-    siteTitle,
-
-  ogImage: "",
-
-  language,
-
-  postCount:
-    posts.length,
-
-  analysis: {
-    identity,
-
-    topics,
-
-    audience,
-
-    contentStyle,
-
-    valueProposition,
-  },
-
-  posts,
+  for (const post of posts) {
+    console.log(
+      `- ${post.localImage}`,
+    );
+  }
 };
 
-const jsonPath =
-  path.join(
-    OUTPUT_DIR,
-    "blog.json",
-  );
+main().catch(
+  (error) => {
+    console.error(
+      "\nBLOG CAPTURE FAILED",
+    );
 
-fs.writeFileSync(
-  jsonPath,
-  JSON.stringify(
-    blogData,
-    null,
-    2,
-  ),
-  "utf8",
-);
+    console.error(
+      error?.stack ||
+        error?.message ||
+        String(error),
+    );
 
-/* ======================================================
-   8. SUMMARY
-====================================================== */
-
-console.log(
-  "========================================",
-);
-
-console.log(
-  "BLOG CAPTURE COMPLETE",
-);
-
-console.log(
-  "========================================",
-);
-
-console.log(
-  `Site: ${siteTitle}`,
-);
-
-console.log(
-  `Posts: ${posts.length}`,
-);
-
-console.log(
-  `Topics: ${topics.join(
-    ", ",
-  )}`,
-);
-
-console.log(
-  `JSON: ${jsonPath}`,
-);
-
-console.log(
-  "Images:",
-);
-
-for (const post of posts) {
-  console.log(
-    `  ${post.index}. ${post.localImage}`,
-  );
-}
-
-console.log(
-  "========================================",
+    process.exit(1);
+  },
 );
