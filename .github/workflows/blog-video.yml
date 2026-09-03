@@ -45,7 +45,7 @@ jobs:
           cache-dependency-path: template/package-lock.json
 
       # ==================================================
-      # INSTALL REMOTION
+      # INSTALL
       # ==================================================
 
       - name: Install Remotion dependencies
@@ -53,7 +53,7 @@ jobs:
         run: npm ci
 
       # ==================================================
-      # VERIFY
+      # VERIFY REPOSITORY
       # ==================================================
 
       - name: Verify repository files
@@ -62,6 +62,7 @@ jobs:
           echo "Repository"
           echo "========================================"
 
+          echo "Current directory:"
           pwd
 
           echo ""
@@ -74,19 +75,26 @@ jobs:
 
           echo ""
           echo "capture-blog.mjs:"
+          test -f scripts/capture-blog.mjs
           ls -lh scripts/capture-blog.mjs
 
           echo ""
           echo "BlogPromo.tsx:"
+          test -f template/src/blog/BlogPromo.tsx
           ls -lh template/src/blog/BlogPromo.tsx
 
           echo ""
           echo "BlogRoot.tsx:"
+          test -f template/src/BlogRoot.tsx
           ls -lh template/src/BlogRoot.tsx
 
           echo ""
-          echo "blog-video.yml:"
+          echo "Workflow:"
+          test -f .github/workflows/blog-video.yml
           ls -lh .github/workflows/blog-video.yml
+
+          echo ""
+          echo "Repository verification passed."
 
       # ==================================================
       # CAPTURE BLOG
@@ -103,15 +111,21 @@ jobs:
           node scripts/capture-blog.mjs "$BLOG_URL"
 
       # ==================================================
-      # CHECK CAPTURED DATA
+      # CHECK CAPTURED FILES
       # ==================================================
 
-      - name: Check captured blog data
+      - name: Validate captured blog and images
+        working-directory: .
         run: |
           echo "========================================"
-          echo "Captured blog files"
+          echo "Captured blog validation"
           echo "========================================"
 
+          test -f template/public/blog/blog.json
+          test -d template/public/blog/posts
+
+          echo ""
+          echo "Captured files:"
           find template/public/blog \
             -maxdepth 3 \
             -type f \
@@ -126,17 +140,236 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo "Required files"
+          echo "Image validation"
           echo "========================================"
 
-          test -f template/public/blog/blog.json
+          node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
 
-          test -d template/public/blog/posts
+          const jsonPath =
+            "template/public/blog/blog.json";
 
-          test "$(find template/public/blog/posts -type f | wc -l)" -ge 5
+          const data =
+            JSON.parse(
+              fs.readFileSync(
+                jsonPath,
+                "utf8",
+              ),
+            );
 
-          echo ""
-          echo "Blog capture validation passed."
+          const posts =
+            Array.isArray(data.posts)
+              ? data.posts
+              : [];
+
+          console.log(
+            `Post count: ${posts.length}`,
+          );
+
+          if (posts.length < 5) {
+            console.error(
+              `ERROR: Expected at least 5 posts, found ${posts.length}`,
+            );
+
+            process.exit(1);
+          }
+
+          let realImages = 0;
+          let fallbackImages = 0;
+
+          for (
+            const post of posts
+          ) {
+            console.log("");
+            console.log(
+              `Post ${post.index}: ${post.title}`,
+            );
+
+            if (
+              !post.localImage
+            ) {
+              console.error(
+                "ERROR: localImage is missing.",
+              );
+
+              process.exit(1);
+            }
+
+            const localPath =
+              path.join(
+                "template/public",
+                post.localImage.replace(
+                  /^blog\//,
+                  "blog/",
+                ),
+              );
+
+            console.log(
+              `Image: ${post.localImage}`,
+            );
+
+            console.log(
+              `Source: ${post.imageSource}`,
+            );
+
+            if (
+              !fs.existsSync(
+                localPath,
+              )
+            ) {
+              console.error(
+                `ERROR: Image file does not exist: ${localPath}`,
+              );
+
+              process.exit(1);
+            }
+
+            const stat =
+              fs.statSync(
+                localPath,
+              );
+
+            console.log(
+              `Size: ${stat.size} bytes`,
+            );
+
+            if (
+              stat.size < 500
+            ) {
+              console.error(
+                `ERROR: Image file is too small: ${localPath}`,
+              );
+
+              process.exit(1);
+            }
+
+            if (
+              post.imageSource ===
+              "post-image"
+            ) {
+              realImages += 1;
+            } else if (
+              post.imageSource ===
+              "fallback"
+            ) {
+              fallbackImages += 1;
+            } else {
+              console.error(
+                `ERROR: Unknown imageSource: ${post.imageSource}`,
+              );
+
+              process.exit(1);
+            }
+          }
+
+          console.log("");
+          console.log(
+            "========================================",
+          );
+
+          console.log(
+            `Real images: ${realImages}/${posts.length}`,
+          );
+
+          console.log(
+            `Fallback images: ${fallbackImages}/${posts.length}`,
+          );
+
+          console.log(
+            "========================================",
+          );
+
+          /*
+           * For this blog-video workflow,
+           * completely image-less blogs should
+           * fail rather than silently producing
+           * a video consisting entirely of fallback cards.
+           */
+
+          if (
+            realImages === 0
+          ) {
+            console.error(
+              "ERROR: No real post images were captured.",
+            );
+
+            console.error(
+              "The blog capture produced only fallback images.",
+            );
+
+            process.exit(1);
+          }
+
+          if (
+            fallbackImages > 0
+          ) {
+            console.warn(
+              `WARNING: ${fallbackImages} post(s) are using fallback images.`,
+            );
+          }
+
+          console.log("");
+          console.log(
+            "Blog capture validation passed.",
+          );
+          NODE
+
+      # ==================================================
+      # SHOW POST SUMMARY
+      # ==================================================
+
+      - name: Show captured post summary
+        run: |
+          echo "========================================"
+          echo "Post summary"
+          echo "========================================"
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const data =
+            JSON.parse(
+              fs.readFileSync(
+                "template/public/blog/blog.json",
+                "utf8",
+              ),
+            );
+
+          console.log(
+            `Site: ${data.siteTitle}`,
+          );
+
+          console.log(
+            `Identity: ${data.analysis?.identity || ""}`,
+          );
+
+          console.log(
+            `Topics: ${(data.analysis?.topics || []).join(", ")}`,
+          );
+
+          console.log("");
+
+          for (
+            const post of data.posts
+          ) {
+            console.log(
+              `${post.index}. ${post.title}`,
+            );
+
+            console.log(
+              `   Image: ${post.localImage}`,
+            );
+
+            console.log(
+              `   Source: ${post.imageSource}`,
+            );
+
+            console.log(
+              `   Categories: ${(post.categories || []).join(", ")}`,
+            );
+          }
+          NODE
 
       # ==================================================
       # RENDER
@@ -173,9 +406,19 @@ jobs:
           echo "Video output"
           echo "========================================"
 
+          test -f out/blog-promo.mp4
+
           ls -lh out/blog-promo.mp4
 
-          test -f out/blog-promo.mp4
+          FILE_SIZE=$(stat -c%s out/blog-promo.mp4)
+
+          echo ""
+          echo "Video size: ${FILE_SIZE} bytes"
+
+          if [ "$FILE_SIZE" -lt 100000 ]; then
+            echo "ERROR: Video file is unexpectedly small."
+            exit 1
+          fi
 
           echo ""
           echo "Video render completed successfully."
