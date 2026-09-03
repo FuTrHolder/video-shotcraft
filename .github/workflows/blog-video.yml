@@ -23,60 +23,124 @@ jobs:
       contents: read
 
     steps:
+
+      # ==================================================
+      # CHECKOUT
+      # ==================================================
+
       - name: Checkout blog-video branch
         uses: actions/checkout@v4
         with:
           ref: blog-video
+
+      # ==================================================
+      # NODE
+      # ==================================================
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: template/package.json
+          cache-dependency-path: template/package-lock.json
+
+      # ==================================================
+      # INSTALL REMOTION
+      # ==================================================
 
       - name: Install Remotion dependencies
         working-directory: template
-        run: npm install
+        run: npm ci
 
-      - name: Install blog capture dependencies
-        run: |
-          npm init -y
-          npm install puppeteer@24
+      # ==================================================
+      # VERIFY
+      # ==================================================
 
       - name: Verify repository files
         run: |
-          echo "Current branch/ref:"
-          git branch --show-current
-          git rev-parse HEAD
+          echo "========================================"
+          echo "Repository"
+          echo "========================================"
 
-          echo ""
-          echo "Repository root:"
           pwd
 
           echo ""
+          echo "Branch:"
+          git branch --show-current
+
+          echo ""
+          echo "Commit:"
+          git rev-parse HEAD
+
+          echo ""
           echo "capture-blog.mjs:"
-          ls -lah scripts/capture-blog.mjs
+          ls -lh scripts/capture-blog.mjs
 
           echo ""
-          echo "BlogPromo:"
-          ls -lah template/src/blog/BlogPromo.tsx
+          echo "BlogPromo.tsx:"
+          ls -lh template/src/blog/BlogPromo.tsx
 
           echo ""
-          echo "BlogRoot:"
-          ls -lah template/src/BlogRoot.tsx
+          echo "BlogRoot.tsx:"
+          ls -lh template/src/BlogRoot.tsx
 
-      - name: Capture blog homepage
+          echo ""
+          echo "blog-video.yml:"
+          ls -lh .github/workflows/blog-video.yml
+
+      # ==================================================
+      # CAPTURE BLOG
+      # ==================================================
+
+      - name: Capture blog content
         env:
           BLOG_URL: ${{ inputs.blog_url }}
         run: |
+          echo "========================================"
+          echo "Capturing blog"
+          echo "========================================"
+
           node scripts/capture-blog.mjs "$BLOG_URL"
 
-      - name: Check captured assets
+      # ==================================================
+      # CHECK CAPTURED DATA
+      # ==================================================
+
+      - name: Check captured blog data
         run: |
-          ls -lah template/public/blog
-          test -f template/public/blog/home.png
+          echo "========================================"
+          echo "Captured blog files"
+          echo "========================================"
+
+          find template/public/blog \
+            -maxdepth 3 \
+            -type f \
+            -print
+
+          echo ""
+          echo "========================================"
+          echo "blog.json"
+          echo "========================================"
+
+          cat template/public/blog/blog.json
+
+          echo ""
+          echo "========================================"
+          echo "Required files"
+          echo "========================================"
+
           test -f template/public/blog/blog.json
+
+          test -d template/public/blog/posts
+
+          test "$(find template/public/blog/posts -type f | wc -l)" -ge 5
+
+          echo ""
+          echo "Blog capture validation passed."
+
+      # ==================================================
+      # RENDER
+      # ==================================================
 
       - name: Render blog promotional video
         working-directory: template
@@ -84,6 +148,12 @@ jobs:
           BLOG_TITLE: ${{ inputs.blog_title }}
           BLOG_URL: ${{ inputs.blog_url }}
         run: |
+          echo "========================================"
+          echo "Rendering BlogPromo"
+          echo "========================================"
+
+          rm -rf out
+
           mkdir -p out
 
           npx remotion render \
@@ -92,11 +162,27 @@ jobs:
             out/blog-promo.mp4 \
             --concurrency=1
 
+      # ==================================================
+      # CHECK VIDEO
+      # ==================================================
+
       - name: Check video output
         working-directory: template
         run: |
+          echo "========================================"
+          echo "Video output"
+          echo "========================================"
+
           ls -lh out/blog-promo.mp4
+
           test -f out/blog-promo.mp4
+
+          echo ""
+          echo "Video render completed successfully."
+
+      # ==================================================
+      # UPLOAD MP4
+      # ==================================================
 
       - name: Upload promotional video
         uses: actions/upload-artifact@v4
@@ -105,9 +191,13 @@ jobs:
           path: template/out/blog-promo.mp4
           if-no-files-found: error
 
-      - name: Upload captured blog screenshot
+      # ==================================================
+      # UPLOAD BLOG DATA
+      # ==================================================
+
+      - name: Upload captured blog assets
         uses: actions/upload-artifact@v4
         with:
           name: blog-capture
-          path: template/public/blog/home.png
+          path: template/public/blog/
           if-no-files-found: error
