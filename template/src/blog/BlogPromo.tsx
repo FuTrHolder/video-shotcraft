@@ -12,16 +12,23 @@ import {
 /*
 =========================================================
 BLOG PROMO
----------------------------------------------------------
-0–3s    BLOG IDENTITY
-3–6s    CORE FIELDS
-6–18s   FIVE RECENT POSTS
-18–21s  BLOG VALUE
-21–24s  CTA
+=========================================================
+
+0–3s     Blog identity
+3–6s     Core fields
+6–18s    Recent posts 1–5
+18–21s   Value proposition
+21–24s   CTA
 
 1920 × 1080
 30 FPS
 720 FRAMES
+
+Data:
+  /public/blog/blog.json
+
+Images:
+  /public/blog/posts/*
 =========================================================
 */
 
@@ -40,11 +47,10 @@ export const BLOG_PROMO_DURATION =
 type BlogPost = {
   index?: number;
   title: string;
-  url: string;
+  url?: string;
   date?: string;
   published?: string;
   excerpt?: string;
-  image?: string;
   localImage?: string;
   imageSource?: string;
   categories?: string[];
@@ -61,57 +67,32 @@ type BlogAnalysis = {
 type BlogData = {
   version?: number;
   capturedAt?: string;
-
   url: string;
-
   hostname?: string;
-
   siteTitle: string;
-
   description?: string;
-
   pageHeading?: string;
-
-  ogImage?: string;
-
   language?: string;
-
   postCount?: number;
-
   analysis?: BlogAnalysis;
-
   posts: BlogPost[];
 };
 
 /* ======================================================
-   DESIGN SYSTEM
+   DESIGN
 ====================================================== */
 
 const COLORS = {
-  background: "#08090b",
-  background2: "#101318",
-
+  background: "#07090d",
+  panel: "#10141b",
+  panelLight: "#171d26",
   white: "#ffffff",
-
   text: "#f5f7fa",
-
-  muted:
-    "rgba(245,247,250,0.68)",
-
-  soft:
-    "rgba(245,247,250,0.48)",
-
-  faint:
-    "rgba(245,247,250,0.22)",
-
-  line:
-    "rgba(255,255,255,0.13)",
-
-  panel:
-    "rgba(18,21,27,0.94)",
-
-  accent:
-    "#6ea8ff",
+  muted: "rgba(245,247,250,0.70)",
+  soft: "rgba(245,247,250,0.48)",
+  faint: "rgba(245,247,250,0.20)",
+  line: "rgba(255,255,255,0.12)",
+  accent: "#75a9ff",
 };
 
 /* ======================================================
@@ -119,34 +100,23 @@ const COLORS = {
 ====================================================== */
 
 const safe = (
-  value:
-    | string
-    | undefined,
+  value?: string,
   fallback = "",
 ) => {
   const text =
-    String(
-      value || "",
-    ).trim();
+    String(value || "").trim();
 
-  return (
-    text || fallback
-  );
+  return text || fallback;
 };
 
 const truncate = (
-  value:
-    | string
-    | undefined,
+  value: string | undefined,
   length: number,
 ) => {
   const text =
     safe(value);
 
-  if (
-    text.length <=
-    length
-  ) {
+  if (text.length <= length) {
     return text;
   }
 
@@ -176,7 +146,7 @@ const clamp = (
 
 const fadeIn = (
   frame: number,
-  duration = 16,
+  duration = 18,
 ) =>
   interpolate(
     frame,
@@ -193,7 +163,7 @@ const fadeIn = (
 const fadeOut = (
   frame: number,
   end: number,
-  duration = 16,
+  duration = 18,
 ) =>
   interpolate(
     frame,
@@ -242,7 +212,7 @@ const slideUp = (
 
 const slideLeft = (
   frame: number,
-  distance = 60,
+  distance = 50,
   duration = 20,
 ) =>
   interpolate(
@@ -258,7 +228,7 @@ const slideLeft = (
   );
 
 /* ======================================================
-   DATA LOADER
+   DATA
 ====================================================== */
 
 const loadBlogData =
@@ -280,29 +250,19 @@ const loadBlogData =
   };
 
 /* ======================================================
-   IMAGE SOURCE
+   IMAGE
 ====================================================== */
 
 const getImageSource = (
   post: BlogPost,
 ) => {
-  if (
-    post.localImage
-  ) {
+  if (post.localImage) {
     return staticFile(
       post.localImage,
     );
   }
 
-  if (
-    post.image
-  ) {
-    return post.image;
-  }
-
-  return staticFile(
-    "blog/home.png",
-  );
+  return undefined;
 };
 
 /* ======================================================
@@ -315,9 +275,9 @@ export const BlogPromo: React.FC =
       data,
       setData,
     ] =
-      React.useState<BlogData | null>(
-        null,
-      );
+      React.useState<
+        BlogData | null
+      >(null);
 
     const [
       error,
@@ -330,18 +290,13 @@ export const BlogPromo: React.FC =
     React.useEffect(
       () => {
         loadBlogData()
-          .then(
-            setData,
-          )
+          .then(setData)
           .catch(
             (err) => {
               setError(
-                err instanceof
-                  Error
+                err instanceof Error
                   ? err.message
-                  : String(
-                      err,
-                    ),
+                  : String(err),
               );
             },
           );
@@ -363,12 +318,11 @@ export const BlogPromo: React.FC =
               "center",
             fontFamily:
               "Arial, Helvetica, sans-serif",
-            padding: 80,
           }}
         >
           <div
             style={{
-              fontSize: 44,
+              fontSize: 46,
               fontWeight: 800,
             }}
           >
@@ -378,12 +332,9 @@ export const BlogPromo: React.FC =
           <div
             style={{
               marginTop: 20,
-              fontSize: 22,
               color:
                 COLORS.muted,
-              textAlign:
-                "center",
-              maxWidth: 1200,
+              fontSize: 22,
             }}
           >
             {error}
@@ -415,14 +366,11 @@ export const BlogPromo: React.FC =
     }
 
     const posts =
-      (
-        data.posts ||
-        []
-      ).slice(0, 5);
+      (data.posts || [])
+        .slice(0, 5);
 
     const analysis =
-      data.analysis ||
-      {};
+      data.analysis || {};
 
     const topics =
       (
@@ -449,10 +397,7 @@ export const BlogPromo: React.FC =
             "hidden",
         }}
       >
-        {/* ============================================
-            0–3s
-            IDENTITY
-        ============================================ */}
+        {/* IDENTITY */}
 
         <Sequence
           from={0}
@@ -460,16 +405,11 @@ export const BlogPromo: React.FC =
         >
           <IdentityScene
             data={data}
-            analysis={
-              analysis
-            }
+            analysis={analysis}
           />
         </Sequence>
 
-        {/* ============================================
-            3–6s
-            CORE FIELDS
-        ============================================ */}
+        {/* TOPICS */}
 
         <Sequence
           from={90}
@@ -477,16 +417,11 @@ export const BlogPromo: React.FC =
         >
           <TopicsScene
             topics={topics}
-            analysis={
-              analysis
-            }
+            analysis={analysis}
           />
         </Sequence>
 
-        {/* ============================================
-            6–18s
-            POSTS
-        ============================================ */}
+        {/* POSTS */}
 
         {posts.map(
           (
@@ -496,21 +431,18 @@ export const BlogPromo: React.FC =
             <Sequence
               key={
                 post.url ||
+                post.title ||
                 `post-${index}`
               }
               from={
                 180 +
                 index * 72
               }
-              durationInFrames={
-                72
-              }
+              durationInFrames={72}
             >
               <PostScene
                 post={post}
-                index={
-                  index
-                }
+                index={index}
                 total={
                   posts.length
                 }
@@ -519,10 +451,7 @@ export const BlogPromo: React.FC =
           ),
         )}
 
-        {/* ============================================
-            18–21s
-            VALUE
-        ============================================ */}
+        {/* VALUE */}
 
         <Sequence
           from={540}
@@ -530,19 +459,12 @@ export const BlogPromo: React.FC =
         >
           <ValueScene
             data={data}
-            analysis={
-              analysis
-            }
-            topics={
-              topics
-            }
+            analysis={analysis}
+            topics={topics}
           />
         </Sequence>
 
-        {/* ============================================
-            21–24s
-            CTA
-        ============================================ */}
+        {/* CTA */}
 
         <Sequence
           from={630}
@@ -557,66 +479,41 @@ export const BlogPromo: React.FC =
   };
 
 /* ======================================================
-   COMMON BACKGROUND
+   BACKGROUND
 ====================================================== */
 
-const PremiumBackground: React.FC<{
-  image?: string;
-  imageOpacity?: number;
-}> = ({
-  image,
-  imageOpacity = 0.18,
-}) => {
+const BaseBackground: React.FC = () => {
   return (
     <>
       <AbsoluteFill
         style={{
           background:
-            "linear-gradient(135deg, #07080a 0%, #11151c 48%, #08090b 100%)",
-        }}
-      />
-
-      {image && (
-        <AbsoluteFill
-          style={{
-            opacity:
-              imageOpacity,
-            overflow:
-              "hidden",
-          }}
-        >
-          <Img
-            src={image}
-            style={{
-              width:
-                "100%",
-              height:
-                "100%",
-              objectFit:
-                "cover",
-              filter:
-                "blur(2px)",
-              transform:
-                "scale(1.06)",
-            }}
-          />
-        </AbsoluteFill>
-      )}
-
-      <AbsoluteFill
-        style={{
-          background:
-            "linear-gradient(90deg, rgba(8,9,11,0.97) 0%, rgba(8,9,11,0.80) 48%, rgba(8,9,11,0.40) 100%)",
+            "linear-gradient(135deg, #07090d 0%, #101720 55%, #07090d 100%)",
         }}
       />
 
       <AbsoluteFill
         style={{
-          opacity: 0.06,
+          opacity: 0.035,
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.35) 1px, transparent 1px)",
           backgroundSize:
             "80px 80px",
+        }}
+      />
+
+      <div
+        style={{
+          position:
+            "absolute",
+          left: 0,
+          top: 0,
+          width: 8,
+          height:
+            "100%",
+          background:
+            COLORS.accent,
+          opacity: 0.8,
         }}
       />
     </>
@@ -624,8 +521,7 @@ const PremiumBackground: React.FC<{
 };
 
 /* ======================================================
-   IDENTITY SCENE
-   0–3s
+   IDENTITY
 ====================================================== */
 
 const IdentityScene: React.FC<{
@@ -647,24 +543,11 @@ const IdentityScene: React.FC<{
   const y =
     slideUp(
       frame,
-      55,
-      22,
+      60,
+      24,
     );
 
-  const scale =
-    interpolate(
-      frame,
-      [0, 90],
-      [1.04, 1],
-      {
-        extrapolateLeft:
-          "clamp",
-        extrapolateRight:
-          "clamp",
-      },
-    );
-
-  const primaryTopic =
+  const topic =
     safe(
       analysis.topics?.[0],
       "INSIGHTS",
@@ -675,7 +558,7 @@ const IdentityScene: React.FC<{
       analysis.identity,
       safe(
         data.description,
-        `${data.siteTitle} delivers useful insights and information.`,
+        `${data.siteTitle} delivers useful insights and analysis.`,
       ),
     );
 
@@ -685,14 +568,14 @@ const IdentityScene: React.FC<{
         opacity,
       }}
     >
-      <PremiumBackground />
+      <BaseBackground />
 
       <div
         style={{
           position:
             "absolute",
-          left: 120,
-          right: 120,
+          left: 130,
+          right: 130,
           top: 100,
           bottom: 80,
           display:
@@ -702,25 +585,25 @@ const IdentityScene: React.FC<{
           justifyContent:
             "center",
           transform:
-            `translateY(${y}px) scale(${scale})`,
+            `translateY(${y}px)`,
         }}
       >
         <div
           style={{
             fontSize: 18,
-            letterSpacing: 7,
+            letterSpacing: 8,
             fontWeight: 700,
             color:
-              COLORS.soft,
-            marginBottom: 26,
+              COLORS.accent,
+            marginBottom: 28,
           }}
         >
-          {primaryTopic}
+          {topic}
         </div>
 
         <div
           style={{
-            fontSize: 88,
+            fontSize: 92,
             lineHeight: 0.98,
             fontWeight: 900,
             letterSpacing: -4,
@@ -735,9 +618,9 @@ const IdentityScene: React.FC<{
 
         <div
           style={{
-            width: 120,
+            marginTop: 34,
+            width: 110,
             height: 4,
-            marginTop: 32,
             background:
               COLORS.white,
           }}
@@ -745,30 +628,30 @@ const IdentityScene: React.FC<{
 
         <div
           style={{
-            marginTop: 26,
-            maxWidth: 1200,
-            fontSize: 28,
-            lineHeight: 1.4,
+            marginTop: 28,
+            maxWidth: 1250,
+            fontSize: 29,
+            lineHeight: 1.42,
             color:
               COLORS.muted,
           }}
         >
           {truncate(
             identity,
-            150,
+            180,
           )}
         </div>
 
         <div
           style={{
-            marginTop: 34,
+            marginTop: 32,
             fontSize: 15,
             letterSpacing: 4,
             color:
               COLORS.soft,
           }}
         >
-          DISCOVER THE BLOG
+          A BLOG BUILT AROUND INSIGHT
         </div>
       </div>
     </AbsoluteFill>
@@ -776,8 +659,7 @@ const IdentityScene: React.FC<{
 };
 
 /* ======================================================
-   TOPICS SCENE
-   3–6s
+   TOPICS
 ====================================================== */
 
 const TopicsScene: React.FC<{
@@ -796,36 +678,49 @@ const TopicsScene: React.FC<{
       90,
     );
 
+  const y =
+    slideUp(
+      frame,
+      45,
+      20,
+    );
+
   return (
     <AbsoluteFill
       style={{
         opacity,
-        background:
-          COLORS.background,
       }}
     >
-      <PremiumBackground />
+      <BaseBackground />
 
       <div
         style={{
           position:
             "absolute",
-          left: 120,
-          top: 120,
-          right: 120,
+          left: 130,
+          right: 130,
+          top: 110,
           bottom: 100,
+          display:
+            "flex",
+          flexDirection:
+            "column",
+          justifyContent:
+            "center",
+          transform:
+            `translateY(${y}px)`,
         }}
       >
         <div
           style={{
-            fontSize: 16,
+            fontSize: 17,
             letterSpacing: 6,
             color:
-              COLORS.soft,
+              COLORS.accent,
             fontWeight: 700,
           }}
         >
-          CORE FIELDS
+          WHAT YOU'LL FIND
         </div>
 
         <div
@@ -836,17 +731,31 @@ const TopicsScene: React.FC<{
             letterSpacing: -2,
           }}
         >
-          What this blog covers
+          Focused fields.
         </div>
 
         <div
           style={{
-            marginTop: 55,
+            marginTop: 14,
+            color:
+              COLORS.muted,
+            fontSize: 25,
+          }}
+        >
+          {truncate(
+            analysis.contentStyle,
+            90,
+          )}
+        </div>
+
+        <div
+          style={{
             display:
               "flex",
-            gap: 20,
             flexWrap:
               "wrap",
+            gap: 18,
+            marginTop: 52,
             maxWidth: 1500,
           }}
         >
@@ -855,65 +764,67 @@ const TopicsScene: React.FC<{
               topic,
               index,
             ) => {
-              const localFrame =
-                frame -
-                index * 5;
-
-              const itemOpacity =
-                fadeIn(
-                  localFrame,
-                  14,
+              const chipOpacity =
+                interpolate(
+                  frame,
+                  [
+                    12 +
+                      index * 8,
+                    28 +
+                      index * 8,
+                  ],
+                  [0, 1],
+                  {
+                    extrapolateLeft:
+                      "clamp",
+                    extrapolateRight:
+                      "clamp",
+                  },
                 );
 
-              const x =
-                slideLeft(
-                  localFrame,
-                  55,
-                  18,
+              const chipY =
+                interpolate(
+                  frame,
+                  [
+                    12 +
+                      index * 8,
+                    28 +
+                      index * 8,
+                  ],
+                  [20, 0],
+                  {
+                    extrapolateLeft:
+                      "clamp",
+                    extrapolateRight:
+                      "clamp",
+                  },
                 );
 
               return (
                 <div
-                  key={topic}
+                  key={
+                    topic
+                  }
                   style={{
                     opacity:
-                      itemOpacity,
+                      chipOpacity,
                     transform:
-                      `translateX(${x}px)`,
+                      `translateY(${chipY}px)`,
                     padding:
-                      "22px 30px",
+                      "20px 28px",
                     border:
                       `1px solid ${COLORS.line}`,
                     borderRadius:
-                      18,
+                      999,
                     background:
                       "rgba(255,255,255,0.045)",
-                    minWidth:
-                      280,
+                    fontSize:
+                      24,
+                    fontWeight:
+                      700,
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: 15,
-                      color:
-                        COLORS.soft,
-                      letterSpacing: 3,
-                    }}
-                  >
-                    0
-                    {index +
-                      1}
-                  </div>
-
-                  <div
-                    style={{
-                      marginTop: 14,
-                      fontSize: 30,
-                      fontWeight: 800,
-                    }}
-                  >
-                    {topic}
-                  </div>
+                  {topic}
                 </div>
               );
             },
@@ -922,22 +833,15 @@ const TopicsScene: React.FC<{
 
         <div
           style={{
-            position:
-              "absolute",
-            left: 0,
-            bottom: 0,
-            fontSize: 22,
+            marginTop: 42,
+            fontSize: 20,
             color:
-              COLORS.muted,
-            maxWidth: 1250,
+              COLORS.soft,
           }}
         >
           {truncate(
-            safe(
-              analysis.audience,
-              "For readers looking for useful insights.",
-            ),
-            125,
+            analysis.audience,
+            110,
           )}
         </div>
       </div>
@@ -947,10 +851,6 @@ const TopicsScene: React.FC<{
 
 /* ======================================================
    POST SCENE
-   6–18s
----------------------------------------------------------
-Each post gets 72 frames = 2.4 seconds.
-Image is intentionally large.
 ====================================================== */
 
 const PostScene: React.FC<{
@@ -971,67 +871,32 @@ const PostScene: React.FC<{
       72,
     );
 
-  const image =
-    getImageSource(
-      post,
-    );
-
-  const imageScale =
-    interpolate(
-      frame,
-      [0, 72],
-      [
-        1.02,
-        1.08,
-      ],
-      {
-        extrapolateLeft:
-          "clamp",
-        extrapolateRight:
-          "clamp",
-      },
-    );
-
   const imageX =
-    index % 2 === 0
-      ? interpolate(
-          frame,
-          [0, 72],
-          [0, -18],
-          {
-            extrapolateLeft:
-              "clamp",
-            extrapolateRight:
-              "clamp",
-          },
-        )
-      : interpolate(
-          frame,
-          [0, 72],
-          [18, 0],
-          {
-            extrapolateLeft:
-              "clamp",
-            extrapolateRight:
-              "clamp",
-          },
-        );
+    slideLeft(
+      frame,
+      80,
+      20,
+    );
 
-  const titleY =
+  const textY =
     slideUp(
       frame,
       35,
-      17,
+      20,
     );
 
-  const excerptY =
-    slideUp(
-      Math.max(
-        0,
-        frame - 7,
-      ),
-      30,
-      17,
+  const image =
+    getImageSource(post);
+
+  const progress =
+    clamp(
+      (index + 1) /
+        Math.max(
+          1,
+          total,
+        ),
+      0,
+      1,
     );
 
   return (
@@ -1040,93 +905,134 @@ const PostScene: React.FC<{
         opacity,
       }}
     >
-      <AbsoluteFill
-        style={{
-          background:
-            COLORS.background,
-        }}
-      />
+      <BaseBackground />
 
-      {/* ============================================
-          LARGE IMAGE
-      ============================================ */}
+      {/* IMAGE PANEL */}
 
       <div
         style={{
           position:
             "absolute",
-          left: 70,
-          top: 70,
-          width: 1120,
-          height: 940,
+          left: 100,
+          top: 110,
+          width: 1030,
+          height: 820,
+          borderRadius: 26,
           overflow:
             "hidden",
-          borderRadius:
-            24,
+          background:
+            COLORS.panel,
           border:
             `1px solid ${COLORS.line}`,
-          background:
-            "#111",
+          transform:
+            `translateX(${-imageX}px)`,
+          boxShadow:
+            "0 30px 80px rgba(0,0,0,0.45)",
         }}
       >
-        <Img
-          src={image}
+        {image ? (
+          <Img
+            src={image}
+            style={{
+              width:
+                "100%",
+              height:
+                "100%",
+              objectFit:
+                "cover",
+              display:
+                "block",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width:
+                "100%",
+              height:
+                "100%",
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+              padding: 60,
+              textAlign:
+                "center",
+              fontSize: 36,
+              fontWeight: 800,
+            }}
+          >
+            {truncate(
+              post.title,
+              80,
+            )}
+          </div>
+        )}
+
+        {/* IMAGE OVERLAY */}
+
+        <div
           style={{
-            width:
-              "100%",
-            height:
-              "100%",
-            objectFit:
-              "cover",
-            transform:
-              `translateX(${imageX}px) scale(${imageScale})`,
+            position:
+              "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.02) 40%, rgba(0,0,0,0.48) 100%)",
           }}
         />
 
-        {/* Subtle image protection */}
-        <AbsoluteFill
+        <div
           style={{
-            background:
-              "linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.32) 100%)",
+            position:
+              "absolute",
+            left: 28,
+            bottom: 26,
+            fontSize: 15,
+            letterSpacing: 4,
+            fontWeight: 700,
+            color:
+              "rgba(255,255,255,0.86)",
           }}
-        />
+        >
+          FEATURED POST
+        </div>
       </div>
 
-      {/* ============================================
-          RIGHT INFORMATION PANEL
-      ============================================ */}
+      {/* TEXT PANEL */}
 
       <div
         style={{
           position:
             "absolute",
-          left: 1240,
-          top: 100,
+          left: 1190,
           right: 95,
-          bottom: 100,
+          top: 130,
+          bottom: 120,
           display:
             "flex",
           flexDirection:
             "column",
           justifyContent:
             "center",
+          transform:
+            `translateY(${textY}px)`,
         }}
       >
         <div
           style={{
-            fontSize: 15,
-            letterSpacing: 4,
+            fontSize: 18,
+            letterSpacing: 5,
             color:
-              COLORS.soft,
-            fontWeight: 700,
+              COLORS.accent,
+            fontWeight: 800,
           }}
         >
-          FEATURE
-          {"  "}
           {String(
             index + 1,
-          ).padStart(2, "0")}
-          {" / "}
+          ).padStart(2, "0")}{" "}
+          /{" "}
           {String(
             total,
           ).padStart(2, "0")}
@@ -1134,14 +1040,7 @@ const PostScene: React.FC<{
 
         <div
           style={{
-            marginTop: 22,
-            opacity:
-              fadeIn(
-                frame,
-                14,
-              ),
-            transform:
-              `translateY(${titleY}px)`,
+            marginTop: 24,
             fontSize: 48,
             lineHeight: 1.08,
             fontWeight: 900,
@@ -1150,137 +1049,111 @@ const PostScene: React.FC<{
         >
           {truncate(
             post.title,
-            95,
+            105,
           )}
         </div>
 
-        {post.date && (
-          <div
-            style={{
-              marginTop: 20,
-              fontSize: 17,
-              color:
-                COLORS.soft,
-              letterSpacing: 1,
-            }}
-          >
-            {post.date}
-          </div>
-        )}
-
         <div
           style={{
-            marginTop: 25,
-            height: 1,
-            width: "100%",
-            background:
-              COLORS.line,
-          }}
-        />
-
-        <div
-          style={{
-            marginTop: 25,
-            opacity:
-              fadeIn(
-                Math.max(
-                  0,
-                  frame - 7,
-                ),
-                15,
-              ),
-            transform:
-              `translateY(${excerptY}px)`,
-            fontSize: 20,
-            lineHeight: 1.45,
+            marginTop: 24,
+            fontSize: 21,
+            lineHeight: 1.5,
             color:
               COLORS.muted,
           }}
         >
           {truncate(
             post.excerpt,
-            190,
+            240,
           )}
         </div>
 
+        {post.categories &&
+          post.categories.length >
+            0 && (
+            <div
+              style={{
+                display:
+                  "flex",
+                flexWrap:
+                  "wrap",
+                gap: 9,
+                marginTop: 26,
+              }}
+            >
+              {post.categories
+                .slice(0, 3)
+                .map(
+                  (
+                    category,
+                  ) => (
+                    <div
+                      key={
+                        category
+                      }
+                      style={{
+                        fontSize:
+                          14,
+                        color:
+                          COLORS.soft,
+                        border:
+                          `1px solid ${COLORS.line}`,
+                        borderRadius:
+                          999,
+                        padding:
+                          "7px 13px",
+                      }}
+                    >
+                      {category}
+                    </div>
+                  ),
+                )}
+            </div>
+          )}
+
+        {post.date && (
+          <div
+            style={{
+              marginTop: 26,
+              fontSize: 16,
+              color:
+                COLORS.soft,
+            }}
+          >
+            {post.date}
+          </div>
+        )}
+
+        {/* PROGRESS */}
+
         <div
           style={{
-            marginTop: 30,
-            display:
-              "flex",
-            gap: 9,
-            flexWrap:
-              "wrap",
+            marginTop: 40,
+            width:
+              "100%",
+            height: 3,
+            background:
+              COLORS.faint,
           }}
         >
-          {(
-            post.categories ||
-            []
-          )
-            .slice(0, 3)
-            .map(
-              (
-                category,
-              ) => (
-                <div
-                  key={
-                    category
-                  }
-                  style={{
-                    fontSize: 13,
-                    padding:
-                      "8px 12px",
-                    border:
-                      `1px solid ${COLORS.line}`,
-                    borderRadius:
-                      999,
-                    color:
-                      COLORS.soft,
-                  }}
-                >
-                  {category}
-                </div>
-              ),
-            )}
+          <div
+            style={{
+              width:
+                `${progress * 100}%`,
+              height:
+                "100%",
+              background:
+                COLORS.accent,
+            }}
+          />
         </div>
-      </div>
-
-      {/* ============================================
-          PROGRESS
-      ============================================ */}
-
-      <div
-        style={{
-          position:
-            "absolute",
-          left: 70,
-          right: 95,
-          bottom: 38,
-          height: 3,
-          background:
-            "rgba(255,255,255,0.12)",
-        }}
-      >
-        <div
-          style={{
-            width: `${
-              ((index + 1) /
-                total) *
-              100
-            }%`,
-            height: "100%",
-            background:
-              COLORS.white,
-          }}
-        />
       </div>
     </AbsoluteFill>
   );
 };
 
 /* ======================================================
-   VALUE SCENE
-   18–21s
+   VALUE
 ====================================================== */
 
 const ValueScene: React.FC<{
@@ -1304,13 +1177,9 @@ const ValueScene: React.FC<{
   const y =
     slideUp(
       frame,
-      40,
+      45,
       20,
     );
-
-  const primary =
-    topics[0] ||
-    "Insights";
 
   return (
     <AbsoluteFill
@@ -1318,14 +1187,14 @@ const ValueScene: React.FC<{
         opacity,
       }}
     >
-      <PremiumBackground />
+      <BaseBackground />
 
       <div
         style={{
           position:
             "absolute",
-          left: 120,
-          right: 120,
+          left: 150,
+          right: 150,
           top: 100,
           bottom: 100,
           display:
@@ -1340,112 +1209,78 @@ const ValueScene: React.FC<{
       >
         <div
           style={{
-            fontSize: 16,
+            fontSize: 18,
             letterSpacing: 6,
             color:
-              COLORS.soft,
-            fontWeight: 700,
+              COLORS.accent,
+            fontWeight: 800,
           }}
         >
-          WHY FOLLOW
+          WHY FOLLOW {safe(
+            data.siteTitle,
+          ).toUpperCase()}
         </div>
 
         <div
           style={{
-            marginTop: 25,
-            fontSize: 68,
+            marginTop: 28,
+            fontSize: 66,
+            lineHeight: 1.05,
             fontWeight: 900,
-            letterSpacing: -2,
+            maxWidth: 1500,
           }}
         >
           {truncate(
-            safe(
-              analysis.valueProposition,
-              `Clear ${primary.toLowerCase()} insights and practical information.`,
-            ),
-            105,
+            analysis.valueProposition,
+            150,
           )}
         </div>
 
         <div
           style={{
-            marginTop: 40,
             display:
               "flex",
-            gap: 50,
+            gap: 14,
+            marginTop: 48,
           }}
         >
-          <Stat
-            label="FOCUS"
-            value={
-              primary
-            }
-          />
-
-          <Stat
-            label="STYLE"
-            value={truncate(
-              safe(
-                analysis.contentStyle,
-                "Analysis",
+          {topics
+            .slice(0, 3)
+            .map(
+              (
+                topic,
+              ) => (
+                <div
+                  key={
+                    topic
+                  }
+                  style={{
+                    fontSize:
+                      18,
+                    fontWeight:
+                      700,
+                    color:
+                      COLORS.muted,
+                    padding:
+                      "13px 20px",
+                    border:
+                      `1px solid ${COLORS.line}`,
+                    borderRadius:
+                      999,
+                  }}
+                >
+                  {topic}
+                </div>
               ),
-              28,
             )}
-          />
-
-          <Stat
-            label="POSTS"
-            value={String(
-              data.postCount ||
-                data.posts
-                  ?.length ||
-                0,
-            )}
-          />
         </div>
       </div>
     </AbsoluteFill>
   );
 };
 
-const Stat: React.FC<{
-  label: string;
-  value: string;
-}> = ({
-  label,
-  value,
-}) => (
-  <div
-    style={{
-      minWidth: 250,
-    }}
-  >
-    <div
-      style={{
-        fontSize: 13,
-        letterSpacing: 4,
-        color:
-          COLORS.soft,
-      }}
-    >
-      {label}
-    </div>
-
-    <div
-      style={{
-        marginTop: 12,
-        fontSize: 25,
-        fontWeight: 800,
-      }}
-    >
-      {value}
-    </div>
-  </div>
-);
-
 /* ======================================================
    CTA
-   21–24s
 ====================================================== */
 
 const CtaScene: React.FC<{
@@ -1466,7 +1301,7 @@ const CtaScene: React.FC<{
     interpolate(
       frame,
       [0, 90],
-      [0.96, 1],
+      [0.94, 1],
       {
         extrapolateLeft:
           "clamp",
@@ -1475,37 +1310,27 @@ const CtaScene: React.FC<{
       },
     );
 
-  const hostname =
-    safe(
-      data.hostname,
-      (() => {
-        try {
-          return new URL(
-            data.url,
-          ).hostname.replace(
-            /^www\./,
-            "",
-          );
-        } catch {
-          return "";
-        }
-      })(),
-    );
-
   return (
     <AbsoluteFill
       style={{
         opacity,
-        background:
-          "radial-gradient(circle at 50% 45%, #1b2431 0%, #0b0d10 55%, #050607 100%)",
-        alignItems:
-          "center",
-        justifyContent:
-          "center",
       }}
     >
+      <BaseBackground />
+
       <div
         style={{
+          position:
+            "absolute",
+          inset: 0,
+          display:
+            "flex",
+          flexDirection:
+            "column",
+          alignItems:
+            "center",
+          justifyContent:
+            "center",
           textAlign:
             "center",
           transform:
@@ -1514,79 +1339,61 @@ const CtaScene: React.FC<{
       >
         <div
           style={{
-            fontSize: 17,
+            fontSize: 18,
             letterSpacing: 7,
             color:
-              COLORS.soft,
-            fontWeight: 700,
+              COLORS.accent,
+            fontWeight: 800,
           }}
         >
-          {hostname}
+          EXPLORE MORE
         </div>
 
         <div
           style={{
-            marginTop: 24,
-            fontSize: 78,
+            marginTop: 26,
+            fontSize: 90,
             fontWeight: 900,
-            letterSpacing: -3,
+            letterSpacing: -4,
           }}
         >
           {truncate(
             data.siteTitle,
-            40,
+            42,
           )}
         </div>
 
         <div
           style={{
-            marginTop: 25,
-            fontSize: 31,
+            marginTop: 24,
+            fontSize: 26,
             color:
               COLORS.muted,
           }}
         >
-          Stay informed.
-          {" "}
-          Explore what matters.
+          Discover the latest posts,
+          insights and analysis.
         </div>
 
         <div
           style={{
-            display:
-              "inline-flex",
-            alignItems:
-              "center",
-            justifyContent:
-              "center",
-            marginTop: 45,
+            marginTop: 44,
             padding:
               "18px 34px",
-            border:
-              "1px solid rgba(255,255,255,0.32)",
             borderRadius:
               999,
-            fontSize: 18,
-            fontWeight: 800,
-            letterSpacing: 3,
             background:
-              "rgba(255,255,255,0.07)",
-          }}
-        >
-          VISIT THE BLOG
-        </div>
-
-        <div
-          style={{
-            marginTop: 28,
-            fontSize: 15,
+              COLORS.white,
             color:
-              COLORS.soft,
+              COLORS.background,
+            fontSize: 21,
+            fontWeight: 800,
           }}
         >
           {truncate(
-            data.url,
-            90,
+            data.hostname ||
+              data.url,
+            70,
           )}
         </div>
       </div>
