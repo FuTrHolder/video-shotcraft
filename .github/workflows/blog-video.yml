@@ -33,6 +33,13 @@ jobs:
         working-directory: template
         run: npm install
 
+      - name: Install ImageMagick
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+          echo "=== ImageMagick ==="
+          magick --version
+
       - name: Verify repository files
         run: |
           echo "=== Git ==="
@@ -68,7 +75,10 @@ jobs:
           import fs from "node:fs";
           import crypto from "node:crypto";
 
-          const data = JSON.parse(fs.readFileSync("template/public/blog/blog.json", "utf8"));
+          const data = JSON.parse(
+            fs.readFileSync("template/public/blog/blog.json", "utf8")
+          );
+
           const posts = (data.posts || []).slice(0, 5);
 
           if (posts.length !== 5) {
