@@ -21,7 +21,6 @@ let parsedUrl;
 
 try {
   parsedUrl = new URL(BLOG_URL);
-
   if (!["http:", "https:"].includes(parsedUrl.protocol)) {
     throw new Error("Unsupported protocol");
   }
@@ -42,18 +41,32 @@ const clean = (value = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-const unique = (items) => [...new Set((items || []).filter(Boolean))];
+const unique = (items) =>
+  [...new Set((items || []).filter(Boolean))];
 
 const asArray = (value) =>
-  Array.isArray(value) ? value : value ? [value] : [];
+  Array.isArray(value)
+    ? value
+    : value
+      ? [value]
+      : [];
 
 const absoluteUrl = (value) => {
   if (!value) return "";
 
   try {
-    const url = new URL(String(value).trim(), parsedUrl.href);
+    const url = new URL(
+      String(value).trim(),
+      parsedUrl.href,
+    );
 
-    if (!["http:", "https:"].includes(url.protocol)) return "";
+    if (
+      !["http:", "https:"].includes(
+        url.protocol,
+      )
+    ) {
+      return "";
+    }
 
     return url.href;
   } catch {
@@ -67,9 +80,18 @@ const normalizeBloggerImageUrl = (value) => {
   if (!url) return "";
 
   return url
-    .replace(/\/s\d+(?:-c)?\//i, "/s1600/")
-    .replace(/=s\d+(?:-c)?(?:-[^&]*)?/i, "=s1600")
-    .replace(/\/w\d+-h\d+(?:-p-k-no)?\//i, "/s1600/");
+    .replace(
+      /\/s\d+(?:-c)?\//i,
+      "/s1600/",
+    )
+    .replace(
+      /=s\d+(?:-c)?(?:-[^&]*)?/i,
+      "=s1600",
+    )
+    .replace(
+      /\/w\d+-h\d+(?:-p-k-no)?\//i,
+      "/s1600/",
+    );
 };
 
 const decodeHtml = (value = "") =>
@@ -84,22 +106,21 @@ const stripHtml = (value = "") =>
   clean(
     decodeHtml(
       String(value)
-        .replace(/<script[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style[\s\S]*?<\/style>/gi, " ")
-        .replace(/<[^>]+>/g, " "),
+        .replace(
+          /<script[\s\S]*?<\/script>/gi,
+          " ",
+        )
+        .replace(
+          /<style[\s\S]*?<\/style>/gi,
+          " ",
+        )
+        .replace(
+          /<[^>]+>/g,
+          " ",
+        ),
     ),
   );
 
-/*
- * Extract image URLs from HTML <img> tags.
- *
- * Priority:
- * 1. data-src
- * 2. data-original
- * 3. data-lazy-src
- * 4. src
- * 5. srcset / data-srcset
- */
 const htmlImageCandidates = (html = "") => {
   const candidates = [];
   const source = String(html);
@@ -116,7 +137,10 @@ const htmlImageCandidates = (html = "") => {
       "src",
     ]) {
       const m = tag.match(
-        new RegExp(`${attr}\\s*=\\s*[\\\"']([^\\\"']+)`, "i"),
+        new RegExp(
+          `${attr}\\s*=\\s*[\\\"']([^\\\"']+)`,
+          "i",
+        ),
       );
 
       if (m?.[1]) {
@@ -131,7 +155,9 @@ const htmlImageCandidates = (html = "") => {
 
     if (srcset) {
       for (const item of srcset.split(",")) {
-        const url = item.trim().split(/\s+/)[0];
+        const url = item
+          .trim()
+          .split(/\s+/)[0];
 
         if (url) {
           candidates.push(url);
@@ -140,12 +166,13 @@ const htmlImageCandidates = (html = "") => {
     }
   }
 
-  return unique(candidates.map(normalizeBloggerImageUrl));
+  return unique(
+    candidates.map(
+      normalizeBloggerImageUrl,
+    ),
+  );
 };
 
-/*
- * Extract OpenGraph / Twitter / image_src metadata.
- */
 const metaImageCandidates = (html = "") => {
   const candidates = [];
   const metaRe = /<meta\b[^>]*>/gi;
@@ -172,14 +199,20 @@ const metaImageCandidates = (html = "") => {
     }
 
     const content =
-      tag.match(/content\s*=\s*["']([^"']+)["']/i)?.[1] || "";
+      tag.match(
+        /content\s*=\s*["']([^"']+)["']/i,
+      )?.[1] || "";
 
     if (content) {
       candidates.push(content);
     }
   }
 
-  return unique(candidates.map(normalizeBloggerImageUrl));
+  return unique(
+    candidates.map(
+      normalizeBloggerImageUrl,
+    ),
+  );
 };
 
 const fetchText = async (url) => {
@@ -194,7 +227,9 @@ const fetchText = async (url) => {
   });
 
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    throw new Error(
+      `${response.status} ${response.statusText}`,
+    );
   }
 
   return response.text();
@@ -212,7 +247,9 @@ const fetchJson = async (url) => {
   });
 
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    throw new Error(
+      `${response.status} ${response.statusText}`,
+    );
   }
 
   return response.json();
@@ -224,15 +261,15 @@ const getEntryLink = (entry) => {
     : [];
 
   return (
-    links.find((item) => item.rel === "alternate")?.href ||
+    links.find(
+      (item) =>
+        item.rel === "alternate",
+    )?.href ||
     links[0]?.href ||
     ""
   );
 };
 
-/*
- * Extract image candidates from Blogger feed entry.
- */
 const feedImageCandidates = (entry) => {
   const candidates = [];
 
@@ -241,32 +278,55 @@ const feedImageCandidates = (entry) => {
       typeof value === "string" &&
       value.trim()
     ) {
-      candidates.push(value.trim());
+      candidates.push(
+        value.trim(),
+      );
     }
   };
 
-  add(entry?.media$thumbnail?.url);
+  add(
+    entry?.media$thumbnail?.url,
+  );
 
-  const group = entry?.media$group;
+  const group =
+    entry?.media$group;
 
   if (group) {
-    for (const item of asArray(group.media$content)) {
+    for (const item of asArray(
+      group.media$content,
+    )) {
       add(item?.url);
     }
 
-    for (const item of asArray(group.media$thumbnail)) {
+    for (const item of asArray(
+      group.media$thumbnail,
+    )) {
       add(item?.url);
     }
   }
 
-  const content = entry?.content?.$t || "";
-  const summary = entry?.summary?.$t || "";
+  const content =
+    entry?.content?.$t || "";
 
-  candidates.push(...htmlImageCandidates(content));
-  candidates.push(...htmlImageCandidates(summary));
+  const summary =
+    entry?.summary?.$t || "";
+
+  candidates.push(
+    ...htmlImageCandidates(
+      content,
+    ),
+  );
+
+  candidates.push(
+    ...htmlImageCandidates(
+      summary,
+    ),
+  );
 
   return unique(
-    candidates.map(normalizeBloggerImageUrl),
+    candidates.map(
+      normalizeBloggerImageUrl,
+    ),
   );
 };
 
@@ -276,22 +336,24 @@ const hashBuffer = (buffer) =>
     .update(buffer)
     .digest("hex");
 
-/*
- * Generate perceptual fingerprints.
- *
- * ImageMagick is used only for normalizing the downloaded image.
- *
- * 33x32 grayscale:
- * - aHash: 1056 bits
- * - dHash: 1024 bits
- *
- * This catches the same image even when:
- * - resolution differs
- * - JPEG/WebP encoding differs
- * - compression differs
- * - image URL differs
- */
-const getVisualFingerprint = (buffer) => {
+const getVisualFingerprint = (
+  buffer,
+) => {
+  /*
+   * Build several content-based signatures
+   * from a canonical representation of the
+   * downloaded image.
+   *
+   * This is intentionally stronger than SHA-256
+   * of the original file because the same photo
+   * may be served as:
+   *
+   * - JPEG vs WebP
+   * - different resolutions
+   * - different compression levels
+   * - different Blogger image-size URLs
+   */
+
   try {
     const output = execFileSync(
       "magick",
@@ -301,41 +363,93 @@ const getVisualFingerprint = (buffer) => {
         "-colorspace",
         "Gray",
         "-resize",
-        "33x32!",
+        "64x64!",
         "-depth",
         "8",
         "gray:-",
       ],
       {
         input: buffer,
-        maxBuffer: 1024 * 1024,
-        stdio: ["pipe", "pipe", "ignore"],
+        maxBuffer:
+          1024 * 1024,
+        stdio: [
+          "pipe",
+          "pipe",
+          "ignore",
+        ],
       },
     );
 
-    if (output.length !== 33 * 32) {
+    if (
+      output.length !==
+      64 * 64
+    ) {
       return null;
     }
 
+    /*
+     * Quantized canonical pixels.
+     *
+     * 8-bit grayscale ->
+     * 4-bit grayscale.
+     */
+    const quantized =
+      Buffer.alloc(
+        output.length,
+      );
+
+    for (
+      let i = 0;
+      i < output.length;
+      i++
+    ) {
+      quantized[i] =
+        output[i] >> 4;
+    }
+
+    const canonicalHash =
+      crypto
+        .createHash("sha256")
+        .update(quantized)
+        .digest("hex");
+
+    /*
+     * Average hash.
+     */
     const average =
       output.reduce(
-        (sum, value) => sum + value,
+        (sum, value) =>
+          sum + value,
         0,
-      ) / output.length;
+      ) /
+      output.length;
 
     let averageHash = "";
 
     for (const value of output) {
       averageHash +=
-        value >= average ? "1" : "0";
+        value >= average
+          ? "1"
+          : "0";
     }
 
+    /*
+     * Difference hash.
+     */
     let differenceHash = "";
 
-    for (let y = 0; y < 32; y++) {
-      const row = y * 33;
+    for (
+      let y = 0;
+      y < 64;
+      y++
+    ) {
+      const row = y * 64;
 
-      for (let x = 0; x < 32; x++) {
+      for (
+        let x = 0;
+        x < 63;
+        x++
+      ) {
         differenceHash +=
           output[row + x] >
           output[row + x + 1]
@@ -344,16 +458,84 @@ const getVisualFingerprint = (buffer) => {
       }
     }
 
+    /*
+     * Coarse 16x16 block signature.
+     *
+     * Each block contains the average
+     * luminance of a 4x4 area.
+     */
+    const blocks =
+      Buffer.alloc(
+        16 * 16,
+      );
+
+    for (
+      let by = 0;
+      by < 16;
+      by++
+    ) {
+      for (
+        let bx = 0;
+        bx < 16;
+        bx++
+      ) {
+        let sum = 0;
+
+        for (
+          let y = 0;
+          y < 4;
+          y++
+        ) {
+          for (
+            let x = 0;
+            x < 4;
+            x++
+          ) {
+            const index =
+              (by * 4 + y) *
+                64 +
+              (bx * 4 + x);
+
+            sum +=
+              output[index];
+          }
+        }
+
+        blocks[
+          by * 16 + bx
+        ] =
+          Math.round(
+            sum / 16,
+          ) >> 3;
+      }
+    }
+
+    const blockHash =
+      crypto
+        .createHash("sha256")
+        .update(blocks)
+        .digest("hex");
+
     return {
+      canonicalHash,
+      blockHash,
       averageHash,
       differenceHash,
     };
   } catch {
+    /*
+     * If ImageMagick is unavailable,
+     * SHA-256 still provides exact-byte
+     * duplicate detection.
+     */
     return null;
   }
 };
 
-const hammingDistance = (a, b) => {
+const hammingDistance = (
+  a,
+  b,
+) => {
   if (
     !a ||
     !b ||
@@ -364,7 +546,11 @@ const hammingDistance = (a, b) => {
 
   let distance = 0;
 
-  for (let i = 0; i < a.length; i++) {
+  for (
+    let i = 0;
+    i < a.length;
+    i++
+  ) {
     if (a[i] !== b[i]) {
       distance++;
     }
@@ -382,24 +568,45 @@ const isVisuallyDuplicate = (
   }
 
   for (const previous of usedFingerprints) {
-    const aHashDistance = hammingDistance(
-      fingerprint.averageHash,
-      previous.averageHash,
-    );
-
-    const dHashDistance = hammingDistance(
-      fingerprint.differenceHash,
-      previous.differenceHash,
-    );
+    /*
+     * Same normalized/quantized
+     * pixels.
+     */
+    if (
+      fingerprint.canonicalHash &&
+      previous.canonicalHash &&
+      fingerprint.canonicalHash ===
+        previous.canonicalHash
+    ) {
+      return true;
+    }
 
     /*
-     * Conservative thresholds.
-     *
-     * The first condition requires both hashes
-     * to be relatively close.
-     *
-     * The second catches cases where one
-     * perceptual hash is extremely close.
+     * Same coarse block signature.
+     */
+    if (
+      fingerprint.blockHash &&
+      previous.blockHash &&
+      fingerprint.blockHash ===
+        previous.blockHash
+    ) {
+      return true;
+    }
+
+    const aHashDistance =
+      hammingDistance(
+        fingerprint.averageHash,
+        previous.averageHash,
+      );
+
+    const dHashDistance =
+      hammingDistance(
+        fingerprint.differenceHash,
+        previous.differenceHash,
+      );
+
+    /*
+     * Conservative perceptual thresholds.
      */
     if (
       aHashDistance <= 48 &&
@@ -423,19 +630,44 @@ const extensionFor = (
   contentType,
   url,
 ) => {
-  const type = String(contentType || "")
+  const type = String(
+    contentType || "",
+  )
     .split(";")[0]
     .toLowerCase();
 
-  if (type === "image/jpeg") return ".jpg";
-  if (type === "image/png") return ".png";
-  if (type === "image/webp") return ".webp";
-  if (type === "image/gif") return ".gif";
+  if (
+    type === "image/jpeg"
+  ) {
+    return ".jpg";
+  }
+
+  if (
+    type === "image/png"
+  ) {
+    return ".png";
+  }
+
+  if (
+    type === "image/webp"
+  ) {
+    return ".webp";
+  }
+
+  if (
+    type === "image/gif"
+  ) {
+    return ".gif";
+  }
 
   try {
-    const ext = path
-      .extname(new URL(url).pathname)
-      .toLowerCase();
+    const ext =
+      path
+        .extname(
+          new URL(url)
+            .pathname,
+        )
+        .toLowerCase();
 
     if (
       [
@@ -455,49 +687,55 @@ const extensionFor = (
   return ".jpg";
 };
 
-/*
- * Download an image while rejecting:
- * - data URLs
- * - non-image responses
- * - tiny files
- * - exact duplicates
- * - perceptually duplicated images
- */
 const downloadUniqueImage = async (
   candidates,
   index,
   usedHashes,
   usedFingerprints,
 ) => {
-  for (const candidate of unique(candidates)) {
+  for (
+    const candidate of unique(
+      candidates,
+    )
+  ) {
     const url =
-      normalizeBloggerImageUrl(candidate);
+      normalizeBloggerImageUrl(
+        candidate,
+      );
 
-    if (!url || /^data:/i.test(url)) {
+    if (
+      !url ||
+      /^data:/i.test(url)
+    ) {
       continue;
     }
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          "user-agent":
-            "Mozilla/5.0 (compatible; BlogPromoBot/1.0)",
-          accept:
-            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        },
-        redirect: "follow",
-      });
+      const response =
+        await fetch(url, {
+          headers: {
+            "user-agent":
+              "Mozilla/5.0 (compatible; BlogPromoBot/1.0)",
+            accept:
+              "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          },
+          redirect:
+            "follow",
+        });
 
       if (!response.ok) {
         continue;
       }
 
       const contentType =
-        response.headers.get("content-type") || "";
+        response.headers.get(
+          "content-type",
+        ) || "";
 
-      const buffer = Buffer.from(
-        await response.arrayBuffer(),
-      );
+      const buffer =
+        Buffer.from(
+          await response.arrayBuffer(),
+        );
 
       if (
         !contentType
@@ -507,16 +745,21 @@ const downloadUniqueImage = async (
         continue;
       }
 
-      if (buffer.length < 5000) {
+      if (
+        buffer.length < 5000
+      ) {
         continue;
       }
 
       /*
-       * Exact byte duplicate check.
+       * Exact byte duplicate.
        */
-      const hash = hashBuffer(buffer);
+      const hash =
+        hashBuffer(buffer);
 
-      if (usedHashes.has(hash)) {
+      if (
+        usedHashes.has(hash)
+      ) {
         console.log(
           `  Exact duplicate image skipped: ${url}`,
         );
@@ -525,10 +768,12 @@ const downloadUniqueImage = async (
       }
 
       /*
-       * Perceptual duplicate check.
+       * Perceptual duplicate.
        */
       const fingerprint =
-        getVisualFingerprint(buffer);
+        getVisualFingerprint(
+          buffer,
+        );
 
       if (
         fingerprint &&
@@ -544,10 +789,11 @@ const downloadUniqueImage = async (
         continue;
       }
 
-      const ext = extensionFor(
-        contentType,
-        url,
-      );
+      const ext =
+        extensionFor(
+          contentType,
+          url,
+        );
 
       const filename =
         `post-${index + 1}${ext}`;
@@ -563,7 +809,9 @@ const downloadUniqueImage = async (
         buffer,
       );
 
-      usedHashes.add(hash);
+      usedHashes.add(
+        hash,
+      );
 
       if (fingerprint) {
         usedFingerprints.push(
@@ -579,7 +827,7 @@ const downloadUniqueImage = async (
           response.url || url,
 
         imageSource:
-          "post",
+          "feed",
 
         imageHash:
           hash,
@@ -599,7 +847,9 @@ const downloadUniqueImage = async (
 
 const topicRules = [
   {
-    name: "Markets & Investing",
+    name:
+      "Markets & Investing",
+
     keywords: [
       "stock",
       "stocks",
@@ -621,7 +871,9 @@ const topicRules = [
   },
 
   {
-    name: "Economy & Macro",
+    name:
+      "Economy & Macro",
+
     keywords: [
       "inflation",
       "cpi",
@@ -641,7 +893,9 @@ const topicRules = [
   },
 
   {
-    name: "Technology",
+    name:
+      "Technology",
+
     keywords: [
       "ai",
       "artificial intelligence",
@@ -656,7 +910,9 @@ const topicRules = [
   },
 
   {
-    name: "Business",
+    name:
+      "Business",
+
     keywords: [
       "business",
       "company",
@@ -670,7 +926,9 @@ const topicRules = [
   },
 
   {
-    name: "Asia Markets",
+    name:
+      "Asia Markets",
+
     keywords: [
       "korea",
       "korean",
@@ -690,7 +948,7 @@ console.log(
 );
 
 console.log(
-  "BLOG ANALYZER v5",
+  "BLOG ANALYZER v6",
 );
 
 console.log(
@@ -724,7 +982,9 @@ try {
   );
 
   feed =
-    await fetchJson(feedUrl);
+    await fetchJson(
+      feedUrl,
+    );
 } catch (error) {
   console.warn(
     `Blogger JSON feed unavailable: ${error.message}`,
@@ -746,14 +1006,17 @@ if (
   !feed?.feed?.entry?.length
 ) {
   throw new Error(
-    "No Blogger feed entries found. This v5 capture currently requires a Blogger-compatible JSON feed.",
+    "No Blogger feed entries found. This v6 capture currently requires a Blogger-compatible JSON feed.",
   );
 }
 
-const feedInfo = feed.feed;
+const feedInfo =
+  feed.feed;
 
 const entries =
-  asArray(feedInfo.entry).slice(
+  asArray(
+    feedInfo.entry,
+  ).slice(
     0,
     5,
   );
@@ -764,8 +1027,7 @@ const usedHashes =
 const usedFingerprints =
   [];
 
-const posts =
-  [];
+const posts = [];
 
 for (
   let i = 0;
@@ -776,62 +1038,54 @@ for (
     entries[i];
 
   const content =
-    entry?.content?.$t || "";
+    entry?.content?.$t ||
+    "";
 
   const summary =
-    entry?.summary?.$t || "";
+    entry?.summary?.$t ||
+    "";
 
   const title =
     clean(
-      entry?.title?.$t || "",
+      entry?.title?.$t ||
+        "",
     );
 
   const url =
     absoluteUrl(
-      getEntryLink(entry),
+      getEntryLink(
+        entry,
+      ),
     );
 
   const published =
     clean(
       entry?.published?.$t ||
-      entry?.updated?.$t ||
-      "",
+        entry?.updated?.$t ||
+        "",
     );
 
   const categories =
     unique(
-      asArray(entry?.category).map(
+      asArray(
+        entry?.category,
+      ).map(
         (item) =>
           clean(
-            item?.term || "",
+            item?.term ||
+              "",
           ),
       ),
     );
 
-  /*
-   * Start with feed candidates.
-   * The article page will be checked first
-   * below and its candidates will be placed
-   * before these.
-   */
-  const feedCandidates =
-    feedImageCandidates(entry);
-
   let candidates =
-    feedCandidates;
+    feedImageCandidates(
+      entry,
+    );
 
   let imageSource =
     "feed";
 
-  /*
-   * IMPORTANT:
-   *
-   * The individual article page is analyzed
-   * before feed images.
-   *
-   * This helps avoid Blogger/site-wide
-   * thumbnail or OG images being reused.
-   */
   if (url) {
     try {
       console.log(
@@ -839,7 +1093,9 @@ for (
       );
 
       const postHtml =
-        await fetchText(url);
+        await fetchText(
+          url,
+        );
 
       const pageMeta =
         metaImageCandidates(
@@ -852,28 +1108,28 @@ for (
         );
 
       /*
-       * Priority:
+       * Prefer article page images over
+       * feed-level images.
        *
-       * 1. post og:image
-       * 2. article body images
-       * 3. feed images
-       *
-       * If the first candidate is visually
-       * duplicated, downloadUniqueImage()
-       * rejects it and automatically moves
-       * to the next candidate.
+       * If the site-wide OG image is reused,
+       * the duplicate detector rejects it
+       * and moves to the next candidate.
        */
       candidates =
         unique([
           ...pageMeta,
           ...pageImages,
-          ...feedCandidates,
+          ...candidates,
         ]);
 
-      if (pageMeta.length) {
+      if (
+        pageMeta.length
+      ) {
         imageSource =
           "post-og";
-      } else if (pageImages.length) {
+      } else if (
+        pageImages.length
+      ) {
         imageSource =
           "post-img";
       }
@@ -902,8 +1158,11 @@ for (
 
   posts.push({
     index: i,
+
     title,
+
     url,
+
     published,
 
     date: published
@@ -912,26 +1171,39 @@ for (
         ).toLocaleDateString(
           "en-US",
           {
-            year: "numeric",
-            month: "long",
-            day: "2-digit",
-            timeZone: "UTC",
+            year:
+              "numeric",
+
+            month:
+              "long",
+
+            day:
+              "2-digit",
+
+            timeZone:
+              "UTC",
           },
         )
       : "",
 
     excerpt:
       stripHtml(
-        content || summary,
-      ).slice(0, 300),
+        content ||
+          summary,
+      ).slice(
+        0,
+        300,
+      ),
 
     categories,
 
     localImage:
-      image?.localImage || "",
+      image?.localImage ||
+      "",
 
     imageUrl:
-      image?.imageUrl || "",
+      image?.imageUrl ||
+      "",
 
     imageSource:
       image
@@ -939,10 +1211,12 @@ for (
         : "none",
 
     imageHash:
-      image?.imageHash || "",
+      image?.imageHash ||
+      "",
 
     imageBytes:
-      image?.bytes || 0,
+      image?.bytes ||
+      0,
   });
 
   if (image) {
@@ -957,16 +1231,19 @@ for (
 }
 
 const combinedText =
-  clean([
-    feedInfo.title?.$t,
-    feedInfo.subtitle?.$t,
-    ...posts.flatMap(
-      (post) => [
-        post.title,
-        post.excerpt,
-      ],
-    ),
-  ].join(" "));
+  clean(
+    [
+      feedInfo.title?.$t,
+      feedInfo.subtitle?.$t,
+
+      ...posts.flatMap(
+        (post) => [
+          post.title,
+          post.excerpt,
+        ],
+      ),
+    ].join(" "),
+  );
 
 const lowerText =
   combinedText.toLowerCase();
@@ -975,7 +1252,8 @@ const topicScores =
   topicRules
     .map(
       (rule) => ({
-        name: rule.name,
+        name:
+          rule.name,
 
         score:
           rule.keywords.reduce(
@@ -995,7 +1273,8 @@ const topicScores =
     )
     .sort(
       (a, b) =>
-        b.score - a.score,
+        b.score -
+        a.score,
     );
 
 const topics =
@@ -1004,7 +1283,10 @@ const topics =
       (item) =>
         item.score > 0,
     )
-    .slice(0, 3)
+    .slice(
+      0,
+      3,
+    )
     .map(
       (item) =>
         item.name,
@@ -1049,13 +1331,15 @@ const valueProposition =
 
 const identity =
   clean(
-    feedInfo.subtitle?.$t || "",
+    feedInfo.subtitle?.$t ||
+      "",
   ) ||
   valueProposition;
 
 const siteTitle =
   clean(
-    feedInfo.title?.$t || "",
+    feedInfo.title?.$t ||
+      "",
   ) ||
   parsedUrl.hostname;
 
@@ -1068,7 +1352,8 @@ const realImageCount =
   posts.filter(
     (post) =>
       post.localImage &&
-      post.imageSource !== "none",
+      post.imageSource !==
+        "none",
   ).length;
 
 const uniqueImageCount =
@@ -1085,7 +1370,7 @@ const uniqueImageCount =
   ).size;
 
 const result = {
-  version: 5,
+  version: 6,
 
   capturedAt:
     new Date().toISOString(),
@@ -1100,7 +1385,8 @@ const result = {
 
   description:
     clean(
-      feedInfo.subtitle?.$t || "",
+      feedInfo.subtitle?.$t ||
+        "",
     ),
 
   pageHeading:
@@ -1116,9 +1402,13 @@ const result = {
 
   analysis: {
     identity,
+
     topics,
+
     audience,
+
     contentStyle,
+
     valueProposition,
   },
 
@@ -1180,7 +1470,7 @@ console.log(
 );
 
 console.log(
-  "Image duplicate detection: SHA-256 + perceptual aHash/dHash",
+  "Image duplicate detection: SHA-256 + canonical pixels + block hash + aHash/dHash",
 );
 
 console.log(
@@ -1191,7 +1481,9 @@ console.log(
   "========================================",
 );
 
-if (posts.length < 5) {
+if (
+  posts.length < 5
+) {
   throw new Error(
     `Only ${posts.length} posts were captured; 5 recent posts are required for the promo.`,
   );
