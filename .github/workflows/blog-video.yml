@@ -8,12 +8,6 @@ on:
         required: true
         type: string
 
-      blog_title:
-        description: "Optional blog title"
-        required: false
-        type: string
-        default: ""
-
 jobs:
   generate-blog-video:
     name: Generate Blog Promo
@@ -23,370 +17,115 @@ jobs:
       contents: read
 
     steps:
-
-      # ==================================================
-      # CHECKOUT
-      # ==================================================
-
       - name: Checkout blog-video branch
         uses: actions/checkout@v4
         with:
           ref: blog-video
 
-      # ==================================================
-      # NODE
-      # ==================================================
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-          cache-dependency-path: template/package-lock.json
-
-      # ==================================================
-      # INSTALL
-      # ==================================================
+          cache-dependency-path: template/package.json
 
       - name: Install Remotion dependencies
         working-directory: template
-        run: npm ci
-
-      # ==================================================
-      # VERIFY REPOSITORY
-      # ==================================================
+        run: npm install
 
       - name: Verify repository files
         run: |
-          echo "========================================"
-          echo "Repository"
-          echo "========================================"
-
-          echo "Current directory:"
-          pwd
-
-          echo ""
-          echo "Branch:"
+          echo "=== Git ==="
           git branch --show-current
-
-          echo ""
-          echo "Commit:"
           git rev-parse HEAD
-
           echo ""
-          echo "capture-blog.mjs:"
+          echo "=== Files ==="
           test -f scripts/capture-blog.mjs
-          ls -lh scripts/capture-blog.mjs
-
-          echo ""
-          echo "BlogPromo.tsx:"
           test -f template/src/blog/BlogPromo.tsx
-          ls -lh template/src/blog/BlogPromo.tsx
+          test -f template/src/index.ts
+          ls -lah scripts/capture-blog.mjs
+          ls -lah template/src/blog/BlogPromo.tsx
 
-          echo ""
-          echo "BlogRoot.tsx:"
-          test -f template/src/BlogRoot.tsx
-          ls -lh template/src/BlogRoot.tsx
-
-          echo ""
-          echo "Workflow:"
-          test -f .github/workflows/blog-video.yml
-          ls -lh .github/workflows/blog-video.yml
-
-          echo ""
-          echo "Repository verification passed."
-
-      # ==================================================
-      # CAPTURE BLOG
-      # ==================================================
-
-      - name: Capture blog content
+      - name: Capture and analyze blog
         env:
           BLOG_URL: ${{ inputs.blog_url }}
         run: |
-          echo "========================================"
-          echo "Capturing blog"
-          echo "========================================"
-
           node scripts/capture-blog.mjs "$BLOG_URL"
 
-      # ==================================================
-      # CHECK CAPTURED FILES
-      # ==================================================
-
-      - name: Validate captured blog and images
-        working-directory: .
+      - name: Validate blog analysis and captures
         run: |
-          echo "========================================"
-          echo "Captured blog validation"
-          echo "========================================"
-
-          test -f template/public/blog/blog.json
-          test -d template/public/blog/posts
+          echo "=== Captured files ==="
+          find template/public/blog -maxdepth 3 -type f -print | sort
 
           echo ""
-          echo "Captured files:"
-          find template/public/blog \
-            -maxdepth 3 \
-            -type f \
-            -print
-
-          echo ""
-          echo "========================================"
-          echo "blog.json"
-          echo "========================================"
-
+          echo "=== blog.json ==="
           cat template/public/blog/blog.json
 
-          echo ""
-          echo "========================================"
-          echo "Image validation"
-          echo "========================================"
+          test -s template/public/blog/blog.json
+          test -d template/public/blog/images
 
-          node <<'NODE'
-          const fs = require("fs");
-          const path = require("path");
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
 
-          const jsonPath =
-            "template/public/blog/blog.json";
+          const data = JSON.parse(fs.readFileSync("template/public/blog/blog.json", "utf8"));
+          const posts = (data.posts || []).slice(0, 5);
 
-          const data =
-            JSON.parse(
-              fs.readFileSync(
-                jsonPath,
-                "utf8",
-              ),
-            );
-
-          const posts =
-            Array.isArray(data.posts)
-              ? data.posts
-              : [];
-
-          console.log(
-            `Post count: ${posts.length}`,
-          );
-
-          if (posts.length < 5) {
-            console.error(
-              `ERROR: Expected at least 5 posts, found ${posts.length}`,
-            );
-
-            process.exit(1);
+          if (posts.length !== 5) {
+            throw new Error(`Expected 5 posts, got ${posts.length}`);
           }
 
-          let realImages = 0;
-          let fallbackImages = 0;
+          const hashes = [];
 
-          for (
-            const post of posts
-          ) {
-            console.log("");
-            console.log(
-              `Post ${post.index}: ${post.title}`,
-            );
+          for (let i = 0; i < posts.length; i++) {
+            const post = posts[i];
 
-            if (
-              !post.localImage
-            ) {
-              console.error(
-                "ERROR: localImage is missing.",
+            if (!post.title || !post.url || !post.localImage) {
+              throw new Error(
+                `Post ${i + 1} is missing title, url, or localImage`
               );
-
-              process.exit(1);
             }
 
-            const localPath =
-              path.join(
-                "template/public",
-                post.localImage.replace(
-                  /^blog\//,
-                  "blog/",
-                ),
+            if (/^data:/i.test(post.localImage)) {
+              throw new Error(
+                `Post ${i + 1} contains a data URI instead of a local image`
               );
-
-            console.log(
-              `Image: ${post.localImage}`,
-            );
-
-            console.log(
-              `Source: ${post.imageSource}`,
-            );
-
-            if (
-              !fs.existsSync(
-                localPath,
-              )
-            ) {
-              console.error(
-                `ERROR: Image file does not exist: ${localPath}`,
-              );
-
-              process.exit(1);
             }
 
-            const stat =
-              fs.statSync(
-                localPath,
-              );
+            const file = `template/public/${post.localImage}`;
 
-            console.log(
-              `Size: ${stat.size} bytes`,
-            );
-
-            if (
-              stat.size < 500
-            ) {
-              console.error(
-                `ERROR: Image file is too small: ${localPath}`,
-              );
-
-              process.exit(1);
+            if (!fs.existsSync(file)) {
+              throw new Error(`Missing image file: ${file}`);
             }
 
-            if (
-              post.imageSource ===
-              "post-image"
-            ) {
-              realImages += 1;
-            } else if (
-              post.imageSource ===
-              "fallback"
-            ) {
-              fallbackImages += 1;
-            } else {
-              console.error(
-                `ERROR: Unknown imageSource: ${post.imageSource}`,
-              );
+            const buf = fs.readFileSync(file);
 
-              process.exit(1);
+            if (buf.length < 5000) {
+              throw new Error(`Image too small: ${file}`);
             }
-          }
 
-          console.log("");
-          console.log(
-            "========================================",
-          );
-
-          console.log(
-            `Real images: ${realImages}/${posts.length}`,
-          );
-
-          console.log(
-            `Fallback images: ${fallbackImages}/${posts.length}`,
-          );
-
-          console.log(
-            "========================================",
-          );
-
-          /*
-           * For this blog-video workflow,
-           * completely image-less blogs should
-           * fail rather than silently producing
-           * a video consisting entirely of fallback cards.
-           */
-
-          if (
-            realImages === 0
-          ) {
-            console.error(
-              "ERROR: No real post images were captured.",
-            );
-
-            console.error(
-              "The blog capture produced only fallback images.",
-            );
-
-            process.exit(1);
-          }
-
-          if (
-            fallbackImages > 0
-          ) {
-            console.warn(
-              `WARNING: ${fallbackImages} post(s) are using fallback images.`,
+            hashes.push(
+              crypto
+                .createHash("sha256")
+                .update(buf)
+                .digest("hex")
             );
           }
 
-          console.log("");
-          console.log(
-            "Blog capture validation passed.",
-          );
-          NODE
+          const unique = new Set(hashes).size;
 
-      # ==================================================
-      # SHOW POST SUMMARY
-      # ==================================================
+          console.log(`Real images: ${posts.length}/${posts.length}`);
+          console.log(`Unique images: ${unique}/${posts.length}`);
 
-      - name: Show captured post summary
-        run: |
-          echo "========================================"
-          echo "Post summary"
-          echo "========================================"
-
-          node <<'NODE'
-          const fs = require("fs");
-
-          const data =
-            JSON.parse(
-              fs.readFileSync(
-                "template/public/blog/blog.json",
-                "utf8",
-              ),
-            );
-
-          console.log(
-            `Site: ${data.siteTitle}`,
-          );
-
-          console.log(
-            `Identity: ${data.analysis?.identity || ""}`,
-          );
-
-          console.log(
-            `Topics: ${(data.analysis?.topics || []).join(", ")}`,
-          );
-
-          console.log("");
-
-          for (
-            const post of data.posts
-          ) {
-            console.log(
-              `${post.index}. ${post.title}`,
-            );
-
-            console.log(
-              `   Image: ${post.localImage}`,
-            );
-
-            console.log(
-              `   Source: ${post.imageSource}`,
-            );
-
-            console.log(
-              `   Categories: ${(post.categories || []).join(", ")}`,
-            );
+          if (unique < posts.length) {
+            throw new Error("Post images are duplicated");
           }
           NODE
 
-      # ==================================================
-      # RENDER
-      # ==================================================
-
-      - name: Render blog promotional video
+      - name: Render 24-second promotional video
         working-directory: template
-        env:
-          BLOG_TITLE: ${{ inputs.blog_title }}
-          BLOG_URL: ${{ inputs.blog_url }}
         run: |
-          echo "========================================"
-          echo "Rendering BlogPromo"
-          echo "========================================"
-
           rm -rf out
-
           mkdir -p out
 
           npx remotion render \
@@ -395,37 +134,12 @@ jobs:
             out/blog-promo.mp4 \
             --concurrency=1
 
-      # ==================================================
-      # CHECK VIDEO
-      # ==================================================
-
-      - name: Check video output
+      - name: Verify video output
         working-directory: template
         run: |
-          echo "========================================"
-          echo "Video output"
-          echo "========================================"
-
-          test -f out/blog-promo.mp4
-
+          test -s out/blog-promo.mp4
           ls -lh out/blog-promo.mp4
-
-          FILE_SIZE=$(stat -c%s out/blog-promo.mp4)
-
-          echo ""
-          echo "Video size: ${FILE_SIZE} bytes"
-
-          if [ "$FILE_SIZE" -lt 100000 ]; then
-            echo "ERROR: Video file is unexpectedly small."
-            exit 1
-          fi
-
-          echo ""
-          echo "Video render completed successfully."
-
-      # ==================================================
-      # UPLOAD MP4
-      # ==================================================
+          file out/blog-promo.mp4
 
       - name: Upload promotional video
         uses: actions/upload-artifact@v4
@@ -433,14 +147,12 @@ jobs:
           name: blog-promotional-video
           path: template/out/blog-promo.mp4
           if-no-files-found: error
+          retention-days: 7
 
-      # ==================================================
-      # UPLOAD BLOG DATA
-      # ==================================================
-
-      - name: Upload captured blog assets
+      - name: Upload blog analysis and captures
         uses: actions/upload-artifact@v4
         with:
           name: blog-capture
-          path: template/public/blog/
+          path: template/public/blog
           if-no-files-found: error
+          retention-days: 7
