@@ -37,8 +37,23 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y imagemagick
-          echo "=== ImageMagick ==="
-          magick --version
+
+          echo "=== ImageMagick installation ==="
+          convert --version
+          identify --version
+
+          echo "=== Create ImageMagick magick compatibility command ==="
+          if command -v magick >/dev/null 2>&1; then
+            echo "ImageMagick 'magick' command already exists."
+            magick --version
+          elif command -v convert >/dev/null 2>&1; then
+            sudo ln -sf "$(command -v convert)" /usr/local/bin/magick
+            echo "Created magick -> $(command -v convert)"
+            magick --version
+          else
+            echo "ERROR: ImageMagick was installed but neither magick nor convert is available."
+            exit 1
+          fi
 
       - name: Verify repository files
         run: |
