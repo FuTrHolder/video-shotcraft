@@ -17,10 +17,12 @@ const stripMarkdownUrl = (value) => {
 };
 
 const BLOG_URL = stripMarkdownUrl(rawUrl);
+
 let parsedUrl;
 
 try {
   parsedUrl = new URL(BLOG_URL);
+
   if (!["http:", "https:"].includes(parsedUrl.protocol)) {
     throw new Error("Unsupported protocol");
   }
@@ -32,8 +34,14 @@ try {
 const OUTPUT_DIR = path.resolve("template/public/blog");
 const POSTS_DIR = path.join(OUTPUT_DIR, "images");
 
-fs.rmSync(OUTPUT_DIR, {recursive: true, force: true});
-fs.mkdirSync(POSTS_DIR, {recursive: true});
+fs.rmSync(OUTPUT_DIR, {
+  recursive: true,
+  force: true,
+});
+
+fs.mkdirSync(POSTS_DIR, {
+  recursive: true,
+});
 
 const clean = (value = "") =>
   String(value)
@@ -52,7 +60,9 @@ const asArray = (value) =>
       : [];
 
 const absoluteUrl = (value) => {
-  if (!value) return "";
+  if (!value) {
+    return "";
+  }
 
   try {
     const url = new URL(
@@ -60,11 +70,7 @@ const absoluteUrl = (value) => {
       parsedUrl.href,
     );
 
-    if (
-      !["http:", "https:"].includes(
-        url.protocol,
-      )
-    ) {
+    if (!["http:", "https:"].includes(url.protocol)) {
       return "";
     }
 
@@ -74,24 +80,106 @@ const absoluteUrl = (value) => {
   }
 };
 
+/*
+ * Normalize Blogger image URLs.
+ *
+ * Examples:
+ *
+ * /s72-c/image.jpg
+ * /s1600/image.jpg
+ * /w144-h144-p-k-no-nu/image.jpg
+ * /w600-h338-p-k-no-nu/image.jpg
+ * /w1000-h562-p-k-no/image.jpg
+ *
+ * are all converted to:
+ *
+ * /s1600/image.jpg
+ *
+ * Query-string variants such as:
+ *
+ * ?=s72-c
+ * ?=w144-h144-p-k-no-nu
+ *
+ * are also normalized.
+ */
 const normalizeBloggerImageUrl = (value) => {
   const url = absoluteUrl(value);
 
-  if (!url) return "";
+  if (!url) {
+    return "";
+  }
 
-  return url
-    .replace(
-      /\/s\d+(?:-c)?\//i,
-      "/s1600/",
-    )
-    .replace(
-      /=s\d+(?:-c)?(?:-[^&]*)?/i,
-      "=s1600",
-    )
-    .replace(
-      /\/w\d+-h\d+(?:-p-k-no)?\//i,
-      "/s1600/",
-    );
+  let normalized = url;
+
+  /*
+   * /s72-c/
+   * /s1600/
+   * /s300/
+   * /s640/
+   */
+  normalized = normalized.replace(
+    /\/s\d+(?:-[^/]+)?\//gi,
+    "/s1600/",
+  );
+
+  /*
+   * /w144-h144-p-k-no-nu/
+   * /w600-h338-p-k-no-nu/
+   * /w1000-h562-p-k-no/
+   * /w800-h450/
+   *
+   * The important point is that all Blogger
+   * width/height transformation paths are
+   * treated as the same original image.
+   */
+  normalized = normalized.replace(
+    /\/w\d+(?:-h\d+)?(?:-[^/]+)*\//gi,
+    "/s1600/",
+  );
+
+  /*
+   * Query-string Blogger transformations.
+   *
+   * Examples:
+   * =s72-c
+   * =s1600
+   * =w144-h144-p-k-no-nu
+   */
+  normalized = normalized.replace(
+    /=s\d+(?:-[^&]*)?/gi,
+    "=s1600",
+  );
+
+  normalized = normalized.replace(
+    /=w\d+(?:-h\d+)?(?:-[^&]*)?/gi,
+    "=s1600",
+  );
+
+  /*
+   * Remove common Blogger image processing
+   * parameters that may remain in the query.
+   */
+  try {
+    const parsed = new URL(normalized);
+
+    const removeParams = [
+      "w",
+      "h",
+      "s",
+      "resize",
+      "crop",
+    ];
+
+    for (const key of removeParams) {
+      parsed.searchParams.delete(key);
+    }
+
+    normalized = parsed.href;
+  } catch {
+    // Keep the normalized URL if URL parsing fails.
+  }
+
+  return normalized;
 };
 
 const decodeHtml = (value = "") =>
@@ -121,6 +209,17 @@ const stripHtml = (value = "") =>
     ),
   );
 
+/*
+ * Extract image URLs from HTML.
+ *
+ * Priority inside an <img>:
+ *
+ * 1. data-src
+ * 2. data-original
+ * 3. data-lazy-src
+ * 4. src
+ * 5. srcset
+ */
 const htmlImageCandidates = (html = "") => {
   const candidates = [];
   const source = String(html);
@@ -134,11 +233,17 @@ const htmlImageCandidates = (html = "") => {
       "data-src",
       "data-original",
       "data-lazy-src",
+      "data-lazy",
       "src",
     ]) {
+      const escapedAttr = attr.replace(
+        /[-/\\^$*+?.()|[\]{}]/g,
+        "\\$&",
+      );
+
       const m = tag.match(
         new RegExp(
-          `${attr}\\s*=\\s*[\\\"']([^\\\"']+)`,
+          `${escapedAttr}\\s*=\\s*["']([^"']+)`,
           "i",
         ),
       );
@@ -150,7 +255,7 @@ const htmlImageCandidates = (html = "") => {
 
     const srcset =
       tag.match(
-        /(?:srcset|data-srcset)\s*=\s*[\"']([^\"']+)/i,
+        /(?:srcset|data-srcset)\s*=\s*["']([^"']+)/i,
       )?.[1] || "";
 
     if (srcset) {
@@ -167,12 +272,19 @@ const htmlImageCandidates = (html = "") => {
   }
 
   return unique(
-    candidates.map(
-      normalizeBloggerImageUrl,
-    ),
+    candidates
+      .map(normalizeBloggerImageUrl)
+      .filter(Boolean),
   );
 };
 
+/*
+ * Extract OG/Twitter/meta images.
+ *
+ * IMPORTANT:
+ * These are intentionally separated from article
+ * body images and are only used as fallback.
+ */
 const metaImageCandidates = (html = "") => {
   const candidates = [];
   const metaRe = /<meta\b[^>]*>/gi;
@@ -209,9 +321,9 @@ const metaImageCandidates = (html = "") => {
   }
 
   return unique(
-    candidates.map(
-      normalizeBloggerImageUrl,
-    ),
+    candidates
+      .map(normalizeBloggerImageUrl)
+      .filter(Boolean),
   );
 };
 
@@ -262,32 +374,61 @@ const getEntryLink = (entry) => {
 
   return (
     links.find(
-      (item) =>
-        item.rel === "alternate",
+      (item) => item.rel === "alternate",
     )?.href ||
-    links[0]?.href ||
+    links.find(
+      (item) => item.href,
+    )?.href ||
     ""
   );
 };
 
+/*
+ * Feed-level image candidates.
+ *
+ * IMPORTANT:
+ * The caller determines their priority.
+ *
+ * This function does NOT put thumbnail first
+ * over article body images.
+ */
 const feedImageCandidates = (entry) => {
-  const candidates = [];
+  const bodyImages = [];
+  const mediaImages = [];
+  const thumbnailImages = [];
 
-  const add = (value) => {
+  const add = (target, value) => {
     if (
       typeof value === "string" &&
       value.trim()
     ) {
-      candidates.push(
-        value.trim(),
-      );
+      target.push(value.trim());
     }
   };
 
-  add(
-    entry?.media$thumbnail?.url,
+  /*
+   * Blogger feed content.
+   *
+   * This is more valuable than a thumbnail because
+   * it can contain the actual article image.
+   */
+  const content =
+    entry?.content?.$t || "";
+
+  const summary =
+    entry?.summary?.$t || "";
+
+  bodyImages.push(
+    ...htmlImageCandidates(content),
   );
 
+  bodyImages.push(
+    ...htmlImageCandidates(summary),
+  );
+
+  /*
+   * media$group / media$content
+   */
   const group =
     entry?.media$group;
 
@@ -295,39 +436,43 @@ const feedImageCandidates = (entry) => {
     for (const item of asArray(
       group.media$content,
     )) {
-      add(item?.url);
+      add(mediaImages, item?.url);
     }
 
     for (const item of asArray(
       group.media$thumbnail,
     )) {
-      add(item?.url);
+      add(mediaImages, item?.url);
     }
   }
 
-  const content =
-    entry?.content?.$t || "";
-
-  const summary =
-    entry?.summary?.$t || "";
-
-  candidates.push(
-    ...htmlImageCandidates(
-      content,
-    ),
+  /*
+   * Thumbnail is deliberately last.
+   */
+  add(
+    thumbnailImages,
+    entry?.media$thumbnail?.url,
   );
 
-  candidates.push(
-    ...htmlImageCandidates(
-      summary,
+  return {
+    body: unique(
+      bodyImages
+        .map(normalizeBloggerImageUrl)
+        .filter(Boolean),
     ),
-  );
 
-  return unique(
-    candidates.map(
-      normalizeBloggerImageUrl,
+    media: unique(
+      mediaImages
+        .map(normalizeBloggerImageUrl)
+        .filter(Boolean),
     ),
-  );
+
+    thumbnail: unique(
+      thumbnailImages
+        .map(normalizeBloggerImageUrl)
+        .filter(Boolean),
+    ),
+  };
 };
 
 const hashBuffer = (buffer) =>
@@ -336,200 +481,243 @@ const hashBuffer = (buffer) =>
     .update(buffer)
     .digest("hex");
 
-const getVisualFingerprint = (
-  buffer,
-) => {
-  /*
-   * Build several content-based signatures
-   * from a canonical representation of the
-   * downloaded image.
-   *
-   * This is intentionally stronger than SHA-256
-   * of the original file because the same photo
-   * may be served as:
-   *
-   * - JPEG vs WebP
-   * - different resolutions
-   * - different compression levels
-   * - different Blogger image-size URLs
-   */
+/*
+ * ImageMagick availability check.
+ *
+ * v7 intentionally FAILS when magick is not available.
+ * We must never silently disable perceptual duplicate
+ * detection.
+ */
+const assertImageMagick = () => {
+  console.log(
+    "Checking ImageMagick...",
+  );
 
   try {
-    const output = execFileSync(
+    const version = execFileSync(
       "magick",
-      [
-        "-",
-        "-auto-orient",
-        "-colorspace",
-        "Gray",
-        "-resize",
-        "64x64!",
-        "-depth",
-        "8",
-        "gray:-",
-      ],
+      ["-version"],
       {
-        input: buffer,
-        maxBuffer:
-          1024 * 1024,
+        encoding: "utf8",
         stdio: [
-          "pipe",
-          "pipe",
           "ignore",
+          "pipe",
+          "pipe",
         ],
       },
+    ).trim();
+
+    const firstLine =
+      version
+        .split("\n")
+        .find(Boolean) ||
+      "ImageMagick detected";
+
+    console.log(
+      `ImageMagick: ${firstLine}`,
     );
 
-    if (
-      output.length !==
-      64 * 64
-    ) {
-      return null;
-    }
+    return true;
+  } catch (error) {
+    console.error("");
+    console.error(
+      "ERROR: ImageMagick (magick) is required by capture-blog.mjs v7.",
+    );
+    console.error(
+      "Perceptual duplicate detection cannot run without ImageMagick.",
+    );
+    console.error(
+      "Install ImageMagick in the GitHub Actions runner before running this script.",
+    );
+    console.error("");
 
-    /*
-     * Quantized canonical pixels.
-     *
-     * 8-bit grayscale ->
-     * 4-bit grayscale.
-     */
-    const quantized =
-      Buffer.alloc(
-        output.length,
-      );
+    process.exit(1);
+  }
+};
+
+assertImageMagick();
+
+/*
+ * Build several content-based signatures
+ * from a canonical representation of the
+ * downloaded image.
+ *
+ * Same photo with:
+ *
+ * - JPEG/WebP
+ * - different resolution
+ * - different compression
+ * - Blogger size transformations
+ *
+ * should still produce similar signatures.
+ */
+const getVisualFingerprint = (buffer) => {
+  const output = execFileSync(
+    "magick",
+    [
+      "-",
+      "-auto-orient",
+      "-colorspace",
+      "Gray",
+      "-resize",
+      "64x64!",
+      "-depth",
+      "8",
+      "gray:-",
+    ],
+    {
+      input: buffer,
+      maxBuffer:
+        1024 * 1024,
+      stdio: [
+        "pipe",
+        "pipe",
+        "pipe",
+      ],
+    },
+  );
+
+  if (
+    output.length !==
+    64 * 64
+  ) {
+    throw new Error(
+      `Unexpected ImageMagick output size: ${output.length}`,
+    );
+  }
+
+  /*
+   * Quantized canonical pixels.
+   *
+   * 8-bit -> 4-bit grayscale.
+   */
+  const quantized =
+    Buffer.alloc(
+      output.length,
+    );
+
+  for (
+    let i = 0;
+    i < output.length;
+    i++
+  ) {
+    quantized[i] =
+      output[i] >> 4;
+  }
+
+  const canonicalHash =
+    crypto
+      .createHash("sha256")
+      .update(quantized)
+      .digest("hex");
+
+  /*
+   * Average hash.
+   */
+  const average =
+    output.reduce(
+      (sum, value) =>
+        sum + value,
+      0,
+    ) /
+    output.length;
+
+  let averageHash = "";
+
+  for (const value of output) {
+    averageHash +=
+      value >= average
+        ? "1"
+        : "0";
+  }
+
+  /*
+   * Difference hash.
+   */
+  let differenceHash = "";
+
+  for (
+    let y = 0;
+    y < 64;
+    y++
+  ) {
+    const row =
+      y * 64;
 
     for (
-      let i = 0;
-      i < output.length;
-      i++
+      let x = 0;
+      x < 63;
+      x++
     ) {
-      quantized[i] =
-        output[i] >> 4;
-    }
-
-    const canonicalHash =
-      crypto
-        .createHash("sha256")
-        .update(quantized)
-        .digest("hex");
-
-    /*
-     * Average hash.
-     */
-    const average =
-      output.reduce(
-        (sum, value) =>
-          sum + value,
-        0,
-      ) /
-      output.length;
-
-    let averageHash = "";
-
-    for (const value of output) {
-      averageHash +=
-        value >= average
+      differenceHash +=
+        output[row + x] >
+        output[row + x + 1]
           ? "1"
           : "0";
     }
-
-    /*
-     * Difference hash.
-     */
-    let differenceHash = "";
-
-    for (
-      let y = 0;
-      y < 64;
-      y++
-    ) {
-      const row = y * 64;
-
-      for (
-        let x = 0;
-        x < 63;
-        x++
-      ) {
-        differenceHash +=
-          output[row + x] >
-          output[row + x + 1]
-            ? "1"
-            : "0";
-      }
-    }
-
-    /*
-     * Coarse 16x16 block signature.
-     *
-     * Each block contains the average
-     * luminance of a 4x4 area.
-     */
-    const blocks =
-      Buffer.alloc(
-        16 * 16,
-      );
-
-    for (
-      let by = 0;
-      by < 16;
-      by++
-    ) {
-      for (
-        let bx = 0;
-        bx < 16;
-        bx++
-      ) {
-        let sum = 0;
-
-        for (
-          let y = 0;
-          y < 4;
-          y++
-        ) {
-          for (
-            let x = 0;
-            x < 4;
-            x++
-          ) {
-            const index =
-              (by * 4 + y) *
-                64 +
-              (bx * 4 + x);
-
-            sum +=
-              output[index];
-          }
-        }
-
-        blocks[
-          by * 16 + bx
-        ] =
-          Math.round(
-            sum / 16,
-          ) >> 3;
-      }
-    }
-
-    const blockHash =
-      crypto
-        .createHash("sha256")
-        .update(blocks)
-        .digest("hex");
-
-    return {
-      canonicalHash,
-      blockHash,
-      averageHash,
-      differenceHash,
-    };
-  } catch {
-    /*
-     * If ImageMagick is unavailable,
-     * SHA-256 still provides exact-byte
-     * duplicate detection.
-     */
-    return null;
   }
+
+  /*
+   * Coarse 16x16 block signature.
+   */
+  const blocks =
+    Buffer.alloc(
+      16 * 16,
+    );
+
+  for (
+    let by = 0;
+    by < 16;
+    by++
+  ) {
+    for (
+      let bx = 0;
+      bx < 16;
+      bx++
+    ) {
+      let sum = 0;
+
+      for (
+        let y = 0;
+        y < 4;
+        y++
+      ) {
+        for (
+          let x = 0;
+          x < 4;
+          x++
+        ) {
+          const index =
+            (by * 4 + y) *
+              64 +
+            (bx * 4 + x);
+
+          sum +=
+            output[index];
+        }
+      }
+
+      blocks[
+        by * 16 + bx
+      ] =
+        Math.round(
+          sum / 16,
+        ) >> 3;
+    }
+  }
+
+  const blockHash =
+    crypto
+      .createHash("sha256")
+      .update(blocks)
+      .digest("hex");
+
+  return {
+    canonicalHash,
+    blockHash,
+    averageHash,
+    differenceHash,
+  };
 };
 
 const hammingDistance = (
@@ -563,14 +751,9 @@ const isVisuallyDuplicate = (
   fingerprint,
   usedFingerprints,
 ) => {
-  if (!fingerprint) {
-    return false;
-  }
-
   for (const previous of usedFingerprints) {
     /*
-     * Same normalized/quantized
-     * pixels.
+     * Exact canonical pixel match.
      */
     if (
       fingerprint.canonicalHash &&
@@ -582,7 +765,7 @@ const isVisuallyDuplicate = (
     }
 
     /*
-     * Same coarse block signature.
+     * Exact coarse block match.
      */
     if (
       fingerprint.blockHash &&
@@ -606,7 +789,7 @@ const isVisuallyDuplicate = (
       );
 
     /*
-     * Conservative perceptual thresholds.
+     * Conservative combined threshold.
      */
     if (
       aHashDistance <= 48 &&
@@ -615,6 +798,9 @@ const isVisuallyDuplicate = (
       return true;
     }
 
+    /*
+     * Strong match on either signature.
+     */
     if (
       aHashDistance <= 24 ||
       dHashDistance <= 32
@@ -636,27 +822,19 @@ const extensionFor = (
     .split(";")[0]
     .toLowerCase();
 
-  if (
-    type === "image/jpeg"
-  ) {
+  if (type === "image/jpeg") {
     return ".jpg";
   }
 
-  if (
-    type === "image/png"
-  ) {
+  if (type === "image/png") {
     return ".png";
   }
 
-  if (
-    type === "image/webp"
-  ) {
+  if (type === "image/webp") {
     return ".webp";
   }
 
-  if (
-    type === "image/gif"
-  ) {
+  if (type === "image/gif") {
     return ".gif";
   }
 
@@ -664,8 +842,7 @@ const extensionFor = (
     const ext =
       path
         .extname(
-          new URL(url)
-            .pathname,
+          new URL(url).pathname,
         )
         .toLowerCase();
 
@@ -687,6 +864,14 @@ const extensionFor = (
   return ".jpg";
 };
 
+/*
+ * Download the first candidate that:
+ *
+ * 1. is a real image
+ * 2. is large enough
+ * 3. is not an exact byte duplicate
+ * 4. is not a perceptual duplicate
+ */
 const downloadUniqueImage = async (
   candidates,
   index,
@@ -694,10 +879,18 @@ const downloadUniqueImage = async (
   usedFingerprints,
 ) => {
   for (
-    const candidate of unique(
-      candidates,
-    )
+    const item of unique(candidates)
   ) {
+    const candidate =
+      typeof item === "string"
+        ? item
+        : item?.url;
+
+    const candidateSource =
+      typeof item === "string"
+        ? "unknown"
+        : item?.source || "unknown";
+
     const url =
       normalizeBloggerImageUrl(
         candidate,
@@ -719,11 +912,13 @@ const downloadUniqueImage = async (
             accept:
               "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
           },
-          redirect:
-            "follow",
+          redirect: "follow",
         });
 
       if (!response.ok) {
+        console.warn(
+          `  Image HTTP ${response.status}: ${url}`,
+        );
         continue;
       }
 
@@ -742,12 +937,18 @@ const downloadUniqueImage = async (
           .toLowerCase()
           .startsWith("image/")
       ) {
+        console.warn(
+          `  Not an image: ${url} (${contentType})`,
+        );
         continue;
       }
 
       if (
         buffer.length < 5000
       ) {
+        console.warn(
+          `  Image too small: ${url} (${buffer.length} bytes)`,
+        );
         continue;
       }
 
@@ -769,6 +970,9 @@ const downloadUniqueImage = async (
 
       /*
        * Perceptual duplicate.
+       *
+       * v7 guarantees ImageMagick exists,
+       * so this must succeed.
        */
       const fingerprint =
         getVisualFingerprint(
@@ -776,7 +980,6 @@ const downloadUniqueImage = async (
         );
 
       if (
-        fingerprint &&
         isVisuallyDuplicate(
           fingerprint,
           usedFingerprints,
@@ -813,11 +1016,9 @@ const downloadUniqueImage = async (
         hash,
       );
 
-      if (fingerprint) {
-        usedFingerprints.push(
-          fingerprint,
-        );
-      }
+      usedFingerprints.push(
+        fingerprint,
+      );
 
       return {
         localImage:
@@ -827,13 +1028,15 @@ const downloadUniqueImage = async (
           response.url || url,
 
         imageSource:
-          "feed",
+          candidateSource,
 
         imageHash:
           hash,
 
         bytes:
           buffer.length,
+
+        fingerprint,
       };
     } catch (error) {
       console.warn(
@@ -847,8 +1050,7 @@ const downloadUniqueImage = async (
 
 const topicRules = [
   {
-    name:
-      "Markets & Investing",
+    name: "Markets & Investing",
 
     keywords: [
       "stock",
@@ -871,8 +1073,7 @@ const topicRules = [
   },
 
   {
-    name:
-      "Economy & Macro",
+    name: "Economy & Macro",
 
     keywords: [
       "inflation",
@@ -893,8 +1094,7 @@ const topicRules = [
   },
 
   {
-    name:
-      "Technology",
+    name: "Technology",
 
     keywords: [
       "ai",
@@ -910,8 +1110,7 @@ const topicRules = [
   },
 
   {
-    name:
-      "Business",
+    name: "Business",
 
     keywords: [
       "business",
@@ -926,8 +1125,7 @@ const topicRules = [
   },
 
   {
-    name:
-      "Asia Markets",
+    name: "Asia Markets",
 
     keywords: [
       "korea",
@@ -948,7 +1146,7 @@ console.log(
 );
 
 console.log(
-  "BLOG ANALYZER v6",
+  "BLOG ANALYZER v7",
 );
 
 console.log(
@@ -1006,7 +1204,7 @@ if (
   !feed?.feed?.entry?.length
 ) {
   throw new Error(
-    "No Blogger feed entries found. This v6 capture currently requires a Blogger-compatible JSON feed.",
+    "No Blogger feed entries found. This v7 capture currently requires a Blogger-compatible JSON feed.",
   );
 }
 
@@ -1078,18 +1276,34 @@ for (
       ),
     );
 
-  let candidates =
+  /*
+   * ------------------------------------------------
+   * IMAGE CANDIDATE PRIORITY
+   * ------------------------------------------------
+   *
+   * 1. Actual post page body images
+   * 2. Feed article body images
+   * 3. Feed media content
+   * 4. Feed thumbnail
+   * 5. Post OG/Twitter/meta images
+   *
+   * This is the key v7 change.
+   */
+  const feedImages =
     feedImageCandidates(
       entry,
     );
 
-  let imageSource =
-    "feed";
+  let candidates = [];
+  let imageSource = "none";
 
+  /*
+   * 1. FETCH ACTUAL POST PAGE
+   */
   if (url) {
     try {
       console.log(
-        `Post ${i + 1}: fetching page image metadata...`,
+        `Post ${i + 1}: fetching article page...`,
       );
 
       const postHtml =
@@ -1097,48 +1311,221 @@ for (
           url,
         );
 
-      const pageMeta =
-        metaImageCandidates(
-          postHtml,
-        );
-
+      /*
+       * ARTICLE BODY FIRST.
+       */
       const pageImages =
         htmlImageCandidates(
           postHtml,
         );
 
       /*
-       * Prefer article page images over
-       * feed-level images.
-       *
-       * If the site-wide OG image is reused,
-       * the duplicate detector rejects it
-       * and moves to the next candidate.
+       * OG/Twitter metadata is extracted separately
+       * and intentionally placed LAST.
        */
-      candidates =
-        unique([
-          ...pageMeta,
-          ...pageImages,
-          ...candidates,
-        ]);
+      const pageMeta =
+        metaImageCandidates(
+          postHtml,
+        );
 
-      if (
+      /*
+       * Build candidates with explicit source.
+       */
+      candidates.push(
+        ...pageImages.map(
+          (image) => ({
+            url: image,
+            source: "post-body",
+          }),
+        ),
+      );
+
+      candidates.push(
+        ...feedImages.body.map(
+          (image) => ({
+            url: image,
+            source: "feed-content",
+          }),
+        ),
+      );
+
+      candidates.push(
+        ...feedImages.media.map(
+          (image) => ({
+            url: image,
+            source: "feed-media",
+          }),
+        ),
+      );
+
+      candidates.push(
+        ...feedImages.thumbnail.map(
+          (image) => ({
+            url: image,
+            source: "feed-thumbnail",
+          }),
+        ),
+      );
+
+      /*
+       * OG is FALLBACK only.
+       */
+      candidates.push(
+        ...pageMeta.map(
+          (image) => ({
+            url: image,
+            source: "post-og",
+          }),
+        ),
+      );
+
+      if (pageImages.length) {
+        imageSource = "post-body";
+      } else if (
+        feedImages.body.length
+      ) {
+        imageSource = "feed-content";
+      } else if (
+        feedImages.media.length
+      ) {
+        imageSource = "feed-media";
+      } else if (
+        feedImages.thumbnail.length
+      ) {
+        imageSource = "feed-thumbnail";
+      } else if (
         pageMeta.length
       ) {
-        imageSource =
-          "post-og";
-      } else if (
-        pageImages.length
-      ) {
-        imageSource =
-          "post-img";
+        imageSource = "post-og";
       }
     } catch (error) {
       console.warn(
         `  Post page fetch failed: ${error.message}`,
       );
+
+      /*
+       * If the post page cannot be fetched,
+       * still use feed content/media/thumbnail.
+       */
+      candidates.push(
+        ...feedImages.body.map(
+          (image) => ({
+            url: image,
+            source: "feed-content",
+          }),
+        ),
+      );
+
+      candidates.push(
+        ...feedImages.media.map(
+          (image) => ({
+            url: image,
+            source: "feed-media",
+          }),
+        ),
+      );
+
+      candidates.push(
+        ...feedImages.thumbnail.map(
+          (image) => ({
+            url: image,
+            source: "feed-thumbnail",
+          }),
+        ),
+      );
+
+      if (
+        feedImages.body.length
+      ) {
+        imageSource = "feed-content";
+      } else if (
+        feedImages.media.length
+      ) {
+        imageSource = "feed-media";
+      } else if (
+        feedImages.thumbnail.length
+      ) {
+        imageSource = "feed-thumbnail";
+      }
+    }
+  } else {
+    /*
+     * No post URL.
+     * Fall back to feed images.
+     */
+    candidates.push(
+      ...feedImages.body.map(
+        (image) => ({
+          url: image,
+          source: "feed-content",
+        }),
+      ),
+    );
+
+    candidates.push(
+      ...feedImages.media.map(
+        (image) => ({
+          url: image,
+          source: "feed-media",
+        }),
+      ),
+    );
+
+    candidates.push(
+      ...feedImages.thumbnail.map(
+        (image) => ({
+          url: image,
+          source: "feed-thumbnail",
+        }),
+      ),
+    );
+
+    if (
+      feedImages.body.length
+    ) {
+      imageSource = "feed-content";
+    } else if (
+      feedImages.media.length
+    ) {
+      imageSource = "feed-media";
+    } else if (
+      feedImages.thumbnail.length
+    ) {
+      imageSource = "feed-thumbnail";
     }
   }
+
+  /*
+   * Remove duplicate normalized candidate URLs
+   * while preserving priority order.
+   */
+  const seenCandidates =
+    new Set();
+
+  candidates =
+    candidates.filter(
+      (item) => {
+        const normalized =
+          normalizeBloggerImageUrl(
+            item.url,
+          );
+
+        if (
+          !normalized ||
+          seenCandidates.has(
+            normalized,
+          )
+        ) {
+          return false;
+        }
+
+        seenCandidates.add(
+          normalized,
+        );
+
+        return true;
+      },
+    );
 
   console.log(
     `Post ${i + 1}: ${title}`,
@@ -1147,6 +1534,21 @@ for (
   console.log(
     `  Image candidates: ${candidates.length}`,
   );
+
+  /*
+   * Show the first few candidates so the
+   * extraction priority can be inspected in
+   * GitHub Actions logs.
+   */
+  candidates
+    .slice(0, 5)
+    .forEach(
+      (candidate, candidateIndex) => {
+        console.log(
+          `    Candidate ${candidateIndex + 1} [${candidate.source}]: ${candidate.url}`,
+        );
+      },
+    );
 
   const image =
     await downloadUniqueImage(
@@ -1171,17 +1573,10 @@ for (
         ).toLocaleDateString(
           "en-US",
           {
-            year:
-              "numeric",
-
-            month:
-              "long",
-
-            day:
-              "2-digit",
-
-            timeZone:
-              "UTC",
+            year: "numeric",
+            month: "long",
+            day: "2-digit",
+            timeZone: "UTC",
           },
         )
       : "",
@@ -1206,9 +1601,8 @@ for (
       "",
 
     imageSource:
-      image
-        ? imageSource
-        : "none",
+      image?.imageSource ||
+      "none",
 
     imageHash:
       image?.imageHash ||
@@ -1222,6 +1616,10 @@ for (
   if (image) {
     console.log(
       `  Real image: ${image.localImage} (${image.bytes} bytes)`,
+    );
+
+    console.log(
+      `  Selected source: ${image.imageSource}`,
     );
   } else {
     console.warn(
@@ -1262,11 +1660,13 @@ const topicScores =
               keyword,
             ) =>
               score +
-              (lowerText.includes(
-                keyword,
-              )
-                ? 1
-                : 0),
+              (
+                lowerText.includes(
+                  keyword,
+                )
+                  ? 1
+                  : 0
+              ),
             0,
           ),
       }),
@@ -1370,7 +1770,7 @@ const uniqueImageCount =
   ).size;
 
 const result = {
-  version: 6,
+  version: 7,
 
   capturedAt:
     new Date().toISOString(),
@@ -1471,6 +1871,14 @@ console.log(
 
 console.log(
   "Image duplicate detection: SHA-256 + canonical pixels + block hash + aHash/dHash",
+);
+
+console.log(
+  "Image selection priority: post-body > feed-content > feed-media > feed-thumbnail > post-og",
+);
+
+console.log(
+  "Blogger URL normalization: s-size + w/h variants + -nu variants",
 );
 
 console.log(
