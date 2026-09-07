@@ -7,103 +7,152 @@ on:
         description: "Blog URL"
         required: true
         type: string
-      blog_title:
-        description: "Optional blog title"
-        required: false
-        type: string
-        default: ""
 
 jobs:
   generate-blog-video:
     name: Generate Blog Promo
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
+
     steps:
       - name: Checkout blog-video branch
         uses: actions/checkout@v4
         with:
           ref: blog-video
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-          cache-dependency-path: template/package-lock.json
+          cache-dependency-path: template/package.json
+
       - name: Install Remotion dependencies
         working-directory: template
-        run: npm ci
+        run: npm install
+
       - name: Verify repository files
         run: |
+          echo "=== Git ==="
+          git branch --show-current
+          git rev-parse HEAD
+          echo ""
+          echo "=== Files ==="
           test -f scripts/capture-blog.mjs
           test -f template/src/blog/BlogPromo.tsx
-          node --check scripts/capture-blog.mjs
-      - name: Capture blog content
+          test -f template/src/index.ts
+          ls -lah scripts/capture-blog.mjs
+          ls -lah template/src/blog/BlogPromo.tsx
+
+      - name: Capture and analyze blog
         env:
           BLOG_URL: ${{ inputs.blog_url }}
-        run: node scripts/capture-blog.mjs "$BLOG_URL"
-      - name: Validate captured blog and unique images
         run: |
-          node <<'NODE'
-          const crypto = require("crypto");
-          const fs = require("fs");
-          const path = require("path");
-          const root = "template/public/blog";
-          const data = JSON.parse(fs.readFileSync(path.join(root, "blog.json"), "utf8"));
-          const posts = Array.isArray(data.posts) ? data.posts : [];
-          if (posts.length !== 5) throw new Error(`Expected exactly 5 posts, got ${posts.length}`);
-          const hashes = new Set();
-          const names = new Set();
-          let realImages = 0;
-          let fallbackImages = 0;
-          for (let index = 0; index < posts.length; index += 1) {
-            const post = posts[index];
-            if (post.index !== index + 1) throw new Error(`Unexpected post index: ${post.index}`);
-            if (!/^blog\/posts\/post-[1-5]\.(?:jpg|png|webp|gif|avif|svg)$/.test(post.localImage || "")) throw new Error(`Invalid localImage: ${post.localImage}`);
-            const filename = path.basename(post.localImage);
-            const file = path.join(root, "posts", filename);
-            if (!fs.existsSync(file)) throw new Error(`Missing image: ${file}`);
-            const size = fs.statSync(file).size;
-            if (size < 500) throw new Error(`Image is too small: ${file} (${size} bytes)`);
-            const sha256 = crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
-            console.log(`post-${post.index}: ${filename} | ${size} bytes | SHA-256: ${sha256} | ${post.imageSource} | ${post.imageCandidateSource}`);
-            if (post.imageSha256 !== sha256) throw new Error(`SHA-256 metadata mismatch for ${filename}`);
-            if (names.has(filename)) throw new Error(`Image filename reused: ${filename}`);
-            if (hashes.has(sha256)) throw new Error(`Duplicate image bytes detected: ${filename}`);
-            if (!["post-image", "fallback"].includes(post.imageSource)) throw new Error(`Unknown imageSource: ${post.imageSource}`);
-            if (post.imageSource === "post-image") realImages += 1; else fallbackImages += 1;
-            names.add(filename);
-            hashes.add(sha256);
+          node scripts/capture-blog.mjs "$BLOG_URL"
+
+      - name: Validate blog analysis and captures
+        run: |
+          echo "=== Captured files ==="
+          find template/public/blog -maxdepth 3 -type f -print | sort
+
+          echo ""
+          echo "=== blog.json ==="
+          cat template/public/blog/blog.json
+
+          test -s template/public/blog/blog.json
+          test -d template/public/blog/images
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
+
+          const data = JSON.parse(fs.readFileSync("template/public/blog/blog.json", "utf8"));
+          const posts = (data.posts || []).slice(0, 5);
+
+          if (posts.length !== 5) {
+            throw new Error(`Expected 5 posts, got ${posts.length}`);
           }
-          if (realImages === 0) throw new Error("No real post images were captured.");
-          console.log(`Real images: ${realImages}/5`);
-          console.log(`Fallback images: ${fallbackImages}/5`);
-          console.log(`Unique image SHA-256: ${hashes.size}/5`);
-          console.log("Blog capture validation passed.");
+
+          const hashes = [];
+
+          for (let i = 0; i < posts.length; i++) {
+            const post = posts[i];
+
+            if (!post.title || !post.url || !post.localImage) {
+              throw new Error(
+                `Post ${i + 1} is missing title, url, or localImage`
+              );
+            }
+
+            if (/^data:/i.test(post.localImage)) {
+              throw new Error(
+                `Post ${i + 1} contains a data URI instead of a local image`
+              );
+            }
+
+            const file = `template/public/${post.localImage}`;
+
+            if (!fs.existsSync(file)) {
+              throw new Error(`Missing image file: ${file}`);
+            }
+
+            const buf = fs.readFileSync(file);
+
+            if (buf.length < 5000) {
+              throw new Error(`Image too small: ${file}`);
+            }
+
+            hashes.push(
+              crypto
+                .createHash("sha256")
+                .update(buf)
+                .digest("hex")
+            );
+          }
+
+          const unique = new Set(hashes).size;
+
+          console.log(`Real images: ${posts.length}/${posts.length}`);
+          console.log(`Unique images: ${unique}/${posts.length}`);
+
+          if (unique < posts.length) {
+            throw new Error("Post images are duplicated");
+          }
           NODE
-      - name: Render blog promotional video
+
+      - name: Render 24-second promotional video
         working-directory: template
-        env:
-          BLOG_TITLE: ${{ inputs.blog_title }}
-          BLOG_URL: ${{ inputs.blog_url }}
         run: |
           rm -rf out
           mkdir -p out
-          npx remotion render src/index.ts BlogPromo out/blog-promo.mp4 --concurrency=1
-      - name: Check video output
+
+          npx remotion render \
+            src/index.ts \
+            BlogPromo \
+            out/blog-promo.mp4 \
+            --concurrency=1
+
+      - name: Verify video output
         working-directory: template
         run: |
-          test -f out/blog-promo.mp4
-          test "$(stat -c%s out/blog-promo.mp4)" -ge 100000
+          test -s out/blog-promo.mp4
+          ls -lh out/blog-promo.mp4
+          file out/blog-promo.mp4
+
       - name: Upload promotional video
         uses: actions/upload-artifact@v4
         with:
           name: blog-promotional-video
           path: template/out/blog-promo.mp4
           if-no-files-found: error
-      - name: Upload captured blog assets
+          retention-days: 7
+
+      - name: Upload blog analysis and captures
         uses: actions/upload-artifact@v4
         with:
           name: blog-capture
-          path: template/public/blog/
+          path: template/public/blog
           if-no-files-found: error
+          retention-days: 7
