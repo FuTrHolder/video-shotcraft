@@ -180,13 +180,43 @@ function isDataImage(url) {
   return /^data:image\//i.test(String(url || ""));
 }
 
-function isObviouslyBadImageUrl(url) {
+function isObviouslyBadImageUrl(url, pageUrl = null) {
   if (!url) return true;
 
-  const lower = url.toLowerCase();
+  const lower = String(url).toLowerCase();
 
-  if (isDataImage(url)) return true;
+  // Base64 / data URI
+  if (/^data:image\//i.test(String(url))) {
+    return true;
+  }
 
+  // 현재 게시물 페이지 자체가 이미지 후보로 들어온 경우
+  if (pageUrl) {
+    try {
+      const candidateUrl = new URL(url);
+      const currentPageUrl = new URL(pageUrl);
+
+      if (
+        candidateUrl.origin === currentPageUrl.origin &&
+        candidateUrl.pathname === currentPageUrl.pathname
+      ) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // HTML 페이지 자체
+  if (
+    lower.endsWith(".html") ||
+    lower.endsWith(".htm") ||
+    lower.includes("/2026/") && lower.includes(".html")
+  ) {
+    return true;
+  }
+
+  // 명백한 비이미지 URL
   if (
     lower.includes("favicon") ||
     lower.includes("sprite") ||
@@ -278,6 +308,66 @@ function extractSrcsetUrls(srcset, baseUrl) {
 // ------------------------------------------------------------
 // HTML image extraction
 // ------------------------------------------------------------
+function extractBloggerImageUrls(html, baseUrl) {
+  const candidates = [];
+
+  if (!html) return candidates;
+
+  const patterns = [
+    // blogger.googleusercontent.com
+    /https?:\/\/blogger\.googleusercontent\.com\/img\/[^\s"'<>\\)]+/gi,
+
+    // blogspot CDN
+    /https?:\/\/[^"'<>\\\s]+\.bp\.blogspot\.com\/[^\s"'<>\\)]+/gi,
+
+    // 일반 blogspot image URL
+    /https?:\/\/[^"'<>\\\s]+\.blogspot\.com\/[^\s"'<>\\)]+/gi,
+
+    // protocol-relative
+    /\/\/blogger\.googleusercontent\.com\/img\/[^\s"'<>\\)]+/gi
+  ];
+
+  for (const regex of patterns) {
+    for (const match of html.matchAll(regex)) {
+      let url = match[0];
+
+      // URL 뒤에 붙는 HTML 문자 제거
+      url = url
+        .replace(/[),.;]+$/g, "")
+        .replace(/\\u0026/gi, "&")
+        .replace(/&amp;/gi, "&");
+
+      const absolute =
+        absoluteUrl(url, baseUrl);
+
+      if (!absolute) continue;
+
+      const normalized =
+        normalizeImageUrl(absolute);
+
+      if (!normalized) continue;
+
+      if (
+        isObviouslyBadImageUrl(
+          normalized,
+          baseUrl
+        )
+      ) {
+        continue;
+      }
+
+      candidates.push({
+        url: normalized,
+        source: "blogger-image",
+        order: candidates.length,
+        score: 140
+      });
+    }
+  }
+
+  return dedupeCandidates(candidates);
+}
+
 
 function extractImagesFromHtml(
   html,
@@ -301,7 +391,7 @@ function extractImagesFromHtml(
     const normalized = normalizeImageUrl(absolute);
 
     if (!normalized) return;
-    if (isObviouslyBadImageUrl(normalized)) return;
+    if (isObviouslyBadImageUrl(normalized, baseUrl)) return;
 
     const contextScore = getContextScore(meta);
 
@@ -763,15 +853,44 @@ function extractPageCandidates(
 ) {
   const allCandidates = [];
 
-  const normalizedTitle =
-    normalizeText(title);
+  if (!html) {
+    return allCandidates;
+  }
+
+  // ==========================================================
+  // 1. Blogger CDN URL 직접 탐색
+  //
+  // Blogger 페이지에서는 실제 본문 이미지가
+  // blogger.googleusercontent.com/img/... 형태로 존재하는
+  // 경우가 많다.
+  //
+  // 이것은 현재 게시물 페이지 HTML 안에서만 검색하므로
+  // 다른 게시물의 이미지를 빌려오는 문제가 없다.
+  // ==========================================================
+
+  const bloggerImages =
+    extractBloggerImageUrls(
+      html,
+      postUrl
+    );
+
+  for (const candidate of bloggerImages) {
+    candidate.score += 40;
+  }
+
+  allCandidates.push(
+    ...bloggerImages
+  );
+
+  // ==========================================================
+  // 2. Blogger post container 탐색
+  // ==========================================================
 
   const containers =
     findPostContainers(html);
 
-  // ----------------------------------------------------------
-  // First: containers that actually contain this post title
-  // ----------------------------------------------------------
+  const normalizedTitle =
+    normalizeText(title);
 
   const titleContainers = [];
 
@@ -783,11 +902,17 @@ function extractPageCandidates(
 
     if (
       text.includes(normalizedTitle) ||
-      normalizedTitle.includes(text.slice(0, 150))
+      normalizedTitle.includes(
+        text.slice(0, 150)
+      )
     ) {
       titleContainers.push(container);
     }
   }
+
+  // ==========================================================
+  // 3. 제목과 연결되는 post container 우선
+  // ==========================================================
 
   for (const container of titleContainers) {
     const candidates =
@@ -795,20 +920,17 @@ function extractPageCandidates(
         container.html,
         postUrl,
         "post-body",
-        100
+        120
       );
 
-    for (const candidate of candidates) {
-      candidate.score += 30;
-    }
-
-    allCandidates.push(...candidates);
+    allCandidates.push(
+      ...candidates
+    );
   }
 
-  // ----------------------------------------------------------
-  // Second: article/post containers even when title wasn't
-  // detected because Blogger templates may alter the title
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 4. Blogger post container fallback
+  // ==========================================================
 
   if (allCandidates.length === 0) {
     for (const container of containers) {
@@ -817,58 +939,87 @@ function extractPageCandidates(
           container.html,
           postUrl,
           "post-container",
-          75
+          90
         );
 
-      allCandidates.push(...candidates);
+      allCandidates.push(
+        ...candidates
+      );
     }
   }
 
-  // ----------------------------------------------------------
-  // Third: locate the title in raw HTML and inspect a bounded
-  // window around it.
-  // ----------------------------------------------------------
+  // ==========================================================
+  // 5. 제목 주변 HTML 탐색
+  // ==========================================================
 
   if (allCandidates.length === 0) {
-    const decodedHtml =
-      htmlDecode(html);
+    const normalizedHtml =
+      normalizeText(html);
 
     const titleIndex =
-      normalizeText(decodedHtml)
-        .indexOf(normalizedTitle);
+      normalizedHtml.indexOf(
+        normalizedTitle
+      );
 
     if (titleIndex >= 0) {
       const start =
-        Math.max(0, titleIndex - 5000);
+        Math.max(
+          0,
+          titleIndex - 5000
+        );
 
       const end =
         Math.min(
-          decodedHtml.length,
-          titleIndex + 120000
+          html.length,
+          titleIndex + 150000
         );
 
       const windowHtml =
-        decodedHtml.slice(start, end);
+        html.slice(
+          start,
+          end
+        );
 
       const candidates =
         extractImagesFromHtml(
           windowHtml,
           postUrl,
           "post-title-window",
-          45
+          60
         );
 
-      allCandidates.push(...candidates);
+      allCandidates.push(
+        ...candidates
+      );
+
+      // Blogger 이미지 URL도 다시 검색
+      const windowBloggerImages =
+        extractBloggerImageUrls(
+          windowHtml,
+          postUrl
+        );
+
+      for (
+        const candidate
+        of windowBloggerImages
+      ) {
+        candidate.score += 30;
+      }
+
+      allCandidates.push(
+        ...windowBloggerImages
+      );
     }
   }
 
-  // ----------------------------------------------------------
-  // Fourth: page-local fallback.
+  // ==========================================================
+  // 6. 마지막 fallback
   //
-  // IMPORTANT:
-  // This is still THIS POST'S URL.
-  // We never borrow candidates from another post.
-  // ----------------------------------------------------------
+  // 중요:
+  // 이 fallback 역시 "현재 게시물 URL"의 HTML만 검사한다.
+  //
+  // 다른 게시물의 후보를 가져오는 구조가 아니다.
+  // ==========================================================
 
   if (allCandidates.length === 0) {
     const candidates =
@@ -876,18 +1027,59 @@ function extractPageCandidates(
         html,
         postUrl,
         "post-page",
-        10
+        20
       );
 
-    // Strongly penalize generic page images.
-    for (const candidate of candidates) {
-      candidate.score -= 25;
-    }
-
-    allCandidates.push(...candidates);
+    allCandidates.push(
+      ...candidates
+    );
   }
 
-  return dedupeCandidates(allCandidates);
+  // ==========================================================
+  // 7. Blogger 이미지 URL 재탐색
+  //
+  // HTML 구조가 비표준이어도 CDN URL 자체가 있으면
+  // 마지막으로 확보한다.
+  // ==========================================================
+
+  if (allCandidates.length === 0) {
+    const candidates =
+      extractBloggerImageUrls(
+        html,
+        postUrl
+      );
+
+    allCandidates.push(
+      ...candidates
+    );
+  }
+
+  // ==========================================================
+  // 8. 최종 후보 정리
+  // ==========================================================
+
+  const cleaned =
+    dedupeCandidates(
+      allCandidates
+    ).filter(candidate => {
+      if (!candidate?.url) {
+        return false;
+      }
+
+      // 현재 게시물 페이지 URL이면 제거
+      if (
+        isObviouslyBadImageUrl(
+          candidate.url,
+          postUrl
+        )
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+  return cleaned;
 }
 
 // ------------------------------------------------------------
@@ -1418,6 +1610,15 @@ async function evaluateCandidate(
     console.log(
       `    Downloaded: ${bytes} bytes`
     );
+
+    const inputInfo =
+      identifyImage(tempInput);
+    
+    if (!inputInfo) {
+      throw new Error(
+        "Downloaded URL is not a valid image"
+      );
+    }
 
     const inputInfo =
       identifyImage(tempInput);
