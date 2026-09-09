@@ -989,50 +989,290 @@ function findMatchingClosingTag(html, openingStart, tagName) {
 function findUnsplashAttributionCandidates(blockHtml) {
   const candidates = [];
 
+  if (!blockHtml) {
+    return candidates;
+  }
+
+  /*
+   * Only inspect the area around an explicit:
+   *
+   *   Photo by ... Unsplash
+   *
+   * attribution.
+   *
+   * IMPORTANT:
+   * We intentionally do NOT use
+   * extractImageCandidatesFromHtml() here.
+   *
+   * That helper also inspects <a href>, which can contain
+   * Blogger article/label navigation URLs rather than images.
+   */
+
   const attributionRegex =
     /Photo\s+by[\s\S]{0,800}?Unsplash/gi;
 
   let match;
 
   while ((match = attributionRegex.exec(blockHtml))) {
-    const start = Math.max(0, match.index - 10000);
+    const start = Math.max(
+      0,
+      match.index - 5000
+    );
+
     const end = Math.min(
       blockHtml.length,
-      match.index + match[0].length + 10000
+      match.index +
+        match[0].length +
+        5000
     );
 
-    const windowHtml = blockHtml.slice(start, end);
+    const windowHtml =
+      blockHtml.slice(start, end);
 
-    const nearby = extractImageCandidatesFromHtml(
-      windowHtml,
-      {
-        source: "article-unsplash",
+    /*
+     * ------------------------------------------------------------
+     * 1. <img> src / data-* attributes
+     * ------------------------------------------------------------
+     */
+
+    const imgRegex =
+      /<img\b[^>]*>/gi;
+
+    let imgMatch;
+
+    while (
+      (imgMatch = imgRegex.exec(windowHtml))
+    ) {
+      const attrs =
+        parseAttributes(imgMatch[0]);
+
+      const imageAttributes = [
+        "src",
+        "data-src",
+        "data-original",
+        "data-lazy-src",
+        "data-image",
+        "data-url",
+        "data-original-src",
+      ];
+
+      for (const attribute of imageAttributes) {
+        if (!attrs[attribute]) {
+          continue;
+        }
+
+        const url = attrs[attribute];
+
+        if (
+          !isLikelyImageUrl(url)
+        ) {
+          continue;
+        }
+
+        addCandidate(
+          candidates,
+          url,
+          "article-unsplash",
+          1100,
+          {
+            attribute,
+            association: "article-body",
+            reason:
+              "unsplash-attribution-img",
+          }
+        );
       }
-    );
 
-    for (const candidate of nearby) {
       /*
-       * Real Unsplash CDN image gets a substantial priority.
+       * srcset
        */
-      if (isUnsplashImageUrl(candidate.url)) {
-        candidate.score = 1050;
-        candidate.association = "article-body";
-        candidate.reason = "unsplash-attribution-nearby";
+      if (attrs.srcset) {
+        const parts =
+          attrs.srcset.split(",");
 
-        candidates.push(candidate);
-      } else {
-        candidate.score += 100;
-        candidate.association = "article-body";
-        candidate.reason = "attribution-nearby";
+        for (const part of parts) {
+          const tokens =
+            part.trim().split(/\s+/);
 
-        candidates.push(candidate);
+          const url = tokens[0];
+
+          if (
+            !url ||
+            !isLikelyImageUrl(url)
+          ) {
+            continue;
+          }
+
+          addCandidate(
+            candidates,
+            url,
+            "article-unsplash",
+            1080,
+            {
+              attribute: "srcset",
+              association:
+                "article-body",
+              reason:
+                "unsplash-attribution-srcset",
+            }
+          );
+        }
       }
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 2. <source src/srcset>
+     * ------------------------------------------------------------
+     */
+
+    const sourceRegex =
+      /<source\b[^>]*>/gi;
+
+    let sourceMatch;
+
+    while (
+      (sourceMatch =
+        sourceRegex.exec(windowHtml))
+    ) {
+      const attrs =
+        parseAttributes(
+          sourceMatch[0]
+        );
+
+      if (attrs.src) {
+        if (
+          isLikelyImageUrl(attrs.src)
+        ) {
+          addCandidate(
+            candidates,
+            attrs.src,
+            "article-unsplash",
+            1070,
+            {
+              attribute: "source-src",
+              association:
+                "article-body",
+              reason:
+                "unsplash-attribution-source",
+            }
+          );
+        }
+      }
+
+      if (attrs.srcset) {
+        const parts =
+          attrs.srcset.split(",");
+
+        for (const part of parts) {
+          const tokens =
+            part.trim().split(/\s+/);
+
+          const url = tokens[0];
+
+          if (
+            !url ||
+            !isLikelyImageUrl(url)
+          ) {
+            continue;
+          }
+
+          addCandidate(
+            candidates,
+            url,
+            "article-unsplash",
+            1060,
+            {
+              attribute:
+                "source-srcset",
+              association:
+                "article-body",
+              reason:
+                "unsplash-attribution-source-srcset",
+            }
+          );
+        }
+      }
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 3. CSS background-image
+     * ------------------------------------------------------------
+     */
+
+    const cssRegex =
+      /url\(\s*(['"]?)(https?:\/\/.*?)\1\s*\)/gi;
+
+    let cssMatch;
+
+    while (
+      (cssMatch =
+        cssRegex.exec(windowHtml))
+    ) {
+      const url = cssMatch[2];
+
+      if (
+        !isLikelyImageUrl(url)
+      ) {
+        continue;
+      }
+
+      addCandidate(
+        candidates,
+        url,
+        "article-unsplash",
+        1050,
+        {
+          attribute: "css-url",
+          association:
+            "article-body",
+          reason:
+            "unsplash-attribution-css",
+        }
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------
+     * 4. Only allow actual Unsplash CDN URLs from raw HTML
+     * ------------------------------------------------------------
+     *
+     * Do NOT accept arbitrary Blogger href URLs here.
+     */
+
+    const unsplashUrlRegex =
+      /https?:\/\/images\.unsplash\.com\/[^\s"'<>\\]+/gi;
+
+    let unsplashMatch;
+
+    while (
+      (unsplashMatch =
+        unsplashUrlRegex.exec(windowHtml))
+    ) {
+      const url =
+        unsplashMatch[0]
+          .replace(/[),.;]+$/, "");
+
+      addCandidate(
+        candidates,
+        url,
+        "article-unsplash",
+        1200,
+        {
+          attribute:
+            "raw-unsplash-url",
+          association:
+            "article-body",
+          reason:
+            "unsplash-cdn-near-attribution",
+        }
+      );
     }
   }
 
   return candidates;
 }
-
 /* -------------------------------------------------------------------------- */
 /* Feed parsing                                                               */
 /* -------------------------------------------------------------------------- */
