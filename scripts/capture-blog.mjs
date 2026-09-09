@@ -815,10 +815,18 @@ function blockMatchesPost(attrs) {
   const semantic =
     `${classValue} ${idValue} ${itemprop}`;
 
+  // Title/header blocks are NOT article containers.
+  if (
+    /\bpost-title\b/.test(classValue) ||
+    /\bentry-title\b/.test(classValue) ||
+    /\bpost-header\b/.test(classValue)
+  ) {
+    return false;
+  }
+
   const patterns = [
     /\bpost-body\b/,
     /\bpost-body-container\b/,
-    /\bpost\b/,
     /\bpost-outer\b/,
     /\bblog-post\b/,
     /\bentry-content\b/,
