@@ -1299,15 +1299,23 @@ function extractTagText(xml, tagName) {
   return match ? normalizeWhitespace(stripHtml(match[1])) : "";
 }
 
-function extractTagRaw(xml, tagName) {
+function extractTagText(xml, tagName) {
+  const escapedTag =
+    escapeRegExp(tagName);
+
   const regex = new RegExp(
-    `<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`,
+    `<${escapedTag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escapedTag}\\s*>`,
     "i"
   );
 
-  const match = xml.match(regex);
+  const match =
+    xml.match(regex);
 
-  return match ? match[1] : "";
+  return match
+    ? normalizeWhitespace(
+        stripHtml(match[1])
+      )
+    : "";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2248,7 +2256,7 @@ async function main() {
 
   const feedUrl =
     new URL(
-      "/feeds/posts/default?alt=rss&max-results=10",
+      "/feeds/posts/default?alt=atom&max-results=10",
       BLOG_URL
     ).href;
 
