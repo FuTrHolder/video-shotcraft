@@ -1288,16 +1288,6 @@ function extractFeedEntries(feedXml) {
 
   return entries;
 }
-function extractTagText(xml, tagName) {
-  const regex = new RegExp(
-    `<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`,
-    "i"
-  );
-
-  const match = xml.match(regex);
-
-  return match ? normalizeWhitespace(stripHtml(match[1])) : "";
-}
 
 function extractTagText(xml, tagName) {
   const escapedTag =
