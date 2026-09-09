@@ -1032,8 +1032,25 @@ function findUnsplashAttributionCandidates(blockHtml) {
 function extractFeedEntries(feedXml) {
   const entries = [];
 
-  const entryRegex =
-    /<entry\b[\s\S]*?<\/entry\s*>/gi;
+  /*
+   * Blogger can return either:
+   *
+   *   Atom: <entry>...</entry>
+   *   RSS:  <item>...</item>
+   *
+   * The v12.0 parser only handled <entry>.
+   */
+
+  const isRss =
+    /<rss\b/i.test(feedXml) ||
+    /<channel\b/i.test(feedXml);
+
+  const tagName = isRss ? "item" : "entry";
+
+  const entryRegex = new RegExp(
+    `<${tagName}\\b[\\s\\S]*?<\\/${tagName}\\s*>`,
+    "gi"
+  );
 
   let match;
 
@@ -1044,27 +1061,71 @@ function extractFeedEntries(feedXml) {
       extractTagText(entry, "title") ||
       "";
 
+    /*
+     * Atom:
+     *
+     * <published>...</published>
+     * <updated>...</updated>
+     *
+     * RSS:
+     *
+     * <pubDate>...</pubDate>
+     */
     const published =
       extractTagText(entry, "published") ||
+      extractTagText(entry, "pubDate") ||
       extractTagText(entry, "updated") ||
       "";
 
+    /*
+     * Blogger Atom uses:
+     *
+     * <summary>...</summary>
+     * <content>...</content>
+     *
+     * RSS usually uses:
+     *
+     * <description>...</description>
+     * <content:encoded>...</content:encoded>
+     */
     const summary =
       extractTagRaw(entry, "summary") ||
+      extractTagRaw(entry, "description") ||
       "";
 
     const content =
       extractTagRaw(entry, "content") ||
+      extractTagRaw(entry, "content:encoded") ||
+      extractTagRaw(entry, "description") ||
       "";
 
     const links = [];
 
-    const linkRegex = /<link\b[^>]*>/gi;
+    /*
+     * ------------------------------------------------------------
+     * Atom link format
+     * ------------------------------------------------------------
+     *
+     * <link rel="alternate"
+     *       type="text/html"
+     *       href="https://..."/>
+     *
+     * ------------------------------------------------------------
+     * RSS link format
+     * ------------------------------------------------------------
+     *
+     * <link>https://...</link>
+     * ------------------------------------------------------------
+     */
+
+    const atomLinkRegex =
+      /<link\b[^>]*>/gi;
 
     let linkMatch;
 
-    while ((linkMatch = linkRegex.exec(entry))) {
-      const attrs = parseAttributes(linkMatch[0]);
+    while ((linkMatch = atomLinkRegex.exec(entry))) {
+      const attrs =
+        parseAttributes(linkMatch[0]);
 
       if (attrs.href) {
         links.push({
@@ -1075,41 +1136,111 @@ function extractFeedEntries(feedXml) {
       }
     }
 
+    /*
+     * RSS <link> is text content, not an href attribute.
+     */
+    const rssLink =
+      extractTagText(entry, "link");
+
+    if (rssLink) {
+      links.push({
+        rel: "alternate",
+        type: "text/html",
+        href: absoluteUrl(rssLink),
+      });
+    }
+
     const alternate =
       links.find(
         (link) =>
-          String(link.rel).toLowerCase() === "alternate"
+          String(link.rel)
+            .toLowerCase() ===
+          "alternate"
       )?.href ||
       links.find(
         (link) =>
-          String(link.type).toLowerCase().includes("text/html")
+          String(link.type)
+            .toLowerCase()
+            .includes("text/html")
+      )?.href ||
+      links.find(
+        (link) => link.href
       )?.href ||
       null;
 
     const categoryMatches = [];
 
+    /*
+     * Atom:
+     *
+     * <category term="Stocks"/>
+     *
+     * RSS:
+     *
+     * <category>Stocks</category>
+     */
     const categoryRegex =
       /<category\b[^>]*>/gi;
 
     let categoryMatch;
 
-    while ((categoryMatch = categoryRegex.exec(entry))) {
-      const attrs = parseAttributes(categoryMatch[0]);
+    while (
+      (categoryMatch =
+        categoryRegex.exec(entry))
+    ) {
+      const attrs =
+        parseAttributes(
+          categoryMatch[0]
+        );
 
       if (attrs.term) {
-        categoryMatches.push(attrs.term);
+        categoryMatches.push(
+          attrs.term
+        );
+      }
+    }
+
+    const rssCategoryRegex =
+      /<category\b[^>]*>([\s\S]*?)<\/category\s*>/gi;
+
+    let rssCategoryMatch;
+
+    while (
+      (rssCategoryMatch =
+        rssCategoryRegex.exec(entry))
+    ) {
+      const category =
+        normalizeWhitespace(
+          stripHtml(
+            rssCategoryMatch[1]
+          )
+        );
+
+      if (
+        category &&
+        !categoryMatches.includes(
+          category
+        )
+      ) {
+        categoryMatches.push(
+          category
+        );
       }
     }
 
     /*
-     * IMPORTANT:
+     * IMPORTANT
      *
-     * Feed images are extracted ONLY from the content/summary
-     * as actual image elements.
+     * Feed images are extracted ONLY from actual image
+     * references in the feed content.
      *
-     * We do NOT extract arbitrary hrefs from the feed.
-     * This prevents Unsplash attribution links from becoming
-     * "images".
+     * We deliberately do NOT inspect arbitrary href values.
+     *
+     * This prevents:
+     *
+     * https://unsplash.com/@author
+     *
+     * from being treated as an image.
      */
     const feedCandidates = [
       ...extractImageCandidatesFromHtml(
@@ -1126,24 +1257,37 @@ function extractFeedEntries(feedXml) {
       ),
     ];
 
-    for (const candidate of feedCandidates) {
-      candidate.association = "feed-content";
+    for (
+      const candidate of feedCandidates
+    ) {
+      candidate.association =
+        "feed-content";
     }
 
     entries.push({
-      title: normalizeWhitespace(stripHtml(title)),
+      title:
+        normalizeWhitespace(
+          stripHtml(title)
+        ),
+
       published,
+
       url: alternate,
+
       summary,
+
       content,
-      categories: categoryMatches,
-      imageCandidates: feedCandidates,
+
+      categories:
+        categoryMatches,
+
+      imageCandidates:
+        feedCandidates,
     });
   }
 
   return entries;
 }
-
 function extractTagText(xml, tagName) {
   const regex = new RegExp(
     `<${tagName}\\b[^>]*>([\\s\\S]*?)<\\/${tagName}>`,
