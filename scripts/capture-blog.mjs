@@ -5,95 +5,169 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 // ============================================================
-// BLOG ANALYZER v10.2
+// BLOG ANALYZER v10.3
 //
-// Main goals
-// 1. Never treat the current article URL as an image.
-// 2. Never accept malformed Blogger CDN URLs such as /w1200/.
-// 3. Prefer images belonging to the current post only.
-// 4. Avoid page-wide Blogger image scraping whenever possible.
-// 5. Validate downloaded content with Content-Type + ImageMagick.
-// 6. Prevent duplicate images between posts.
-// 7. Keep blog.json compatible with the existing Remotion workflow.
+// Fixes:
+// 1. ImageMagick 6 / 7 command separation.
+// 2. Never use "magick identify".
+// 3. Use identify directly for image validation.
+// 4. Reject resize-only Blogger URLs.
+// 5. Do not globally scrape arbitrary Blogger CDN URLs.
+// 6. Prefer current post's feed/body images.
+// 7. Avoid unrelated previous-post images.
+// 8. Validate Content-Type before ImageMagick.
+// 9. Prevent duplicate images between posts.
+// 10. Keep existing blog.json / Remotion compatibility.
 // ============================================================
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename =
+  fileURLToPath(import.meta.url);
 
-const BLOG_URL = process.argv[2];
+const __dirname =
+  path.dirname(__filename);
+
+const BLOG_URL =
+  process.argv[2];
 
 if (!BLOG_URL) {
   console.error(
     "Usage: node scripts/capture-blog.mjs <BLOG_URL>"
   );
+
   process.exit(1);
 }
 
-const OUTPUT_DIR = path.resolve(
-  __dirname,
-  "../template/public/blog"
-);
+// ============================================================
+// Paths
+// ============================================================
 
-const IMAGE_DIR = path.join(
-  OUTPUT_DIR,
-  "images"
-);
+const OUTPUT_DIR =
+  path.resolve(
+    __dirname,
+    "../template/public/blog"
+  );
 
-fs.mkdirSync(
+const IMAGE_DIR =
+  path.join(
+    OUTPUT_DIR,
+    "images"
+  );
+
+fs.rmSync(
   OUTPUT_DIR,
-  { recursive: true }
+  {
+    recursive: true,
+    force: true
+  }
 );
 
 fs.mkdirSync(
   IMAGE_DIR,
-  { recursive: true }
+  {
+    recursive: true
+  }
 );
 
 // ============================================================
-// ImageMagick
+// ImageMagick detection
+//
+// IMPORTANT:
+//
+// Ubuntu runner currently has ImageMagick 6.
+//
+// ImageMagick 6:
+//   identify
+//   convert
+//
+// ImageMagick 7:
+//   magick identify
+//   magick
+//
+// The workflow creates:
+//
+//   magick -> convert
+//
+// Therefore we NEVER execute:
+//   magick identify
+//
+// Instead identifyImage() always uses the real "identify"
+// binary when available.
 // ============================================================
 
-function findImageMagick() {
-  for (const command of ["magick", "convert"]) {
-    try {
-      execFileSync(
-        command,
-        ["-version"],
-        { stdio: "ignore" }
-      );
+function commandExists(
+  command
+) {
+  try {
+    execFileSync(
+      "bash",
+      [
+        "-lc",
+        `command -v ${command}`
+      ],
+      {
+        stdio: "ignore"
+      }
+    );
 
-      return command;
-    } catch {
-      // continue
-    }
+    return true;
+  } catch {
+    return false;
   }
-
-  return null;
 }
 
-const IMAGE_MAGICK = findImageMagick();
+const HAS_MAGICK =
+  commandExists("magick");
 
-if (!IMAGE_MAGICK) {
+const HAS_IDENTIFY =
+  commandExists("identify");
+
+const HAS_CONVERT =
+  commandExists("convert");
+
+if (
+  !HAS_IDENTIFY &&
+  !HAS_MAGICK
+) {
   console.error(
-    "ERROR: ImageMagick was not found."
+    "ERROR: ImageMagick identify/magick command was not found."
   );
 
   process.exit(1);
 }
 
+const IDENTIFY_COMMAND =
+  HAS_IDENTIFY
+    ? "identify"
+    : "magick";
+
+const CONVERT_COMMAND =
+  HAS_CONVERT
+    ? "convert"
+    : "magick";
+
 console.log(
-  `ImageMagick command: ${IMAGE_MAGICK}`
+  `ImageMagick identify command: ${IDENTIFY_COMMAND}`
+);
+
+console.log(
+  `ImageMagick convert command: ${CONVERT_COMMAND}`
 );
 
 try {
-  const version = execFileSync(
-    IMAGE_MAGICK,
-    ["-version"],
-    { encoding: "utf8" }
-  );
+  const version =
+    execFileSync(
+      IDENTIFY_COMMAND,
+      [
+        "-version"
+      ],
+      {
+        encoding: "utf8"
+      }
+    );
 
   console.log(
-    version.split("\n")[0]
+    version
+      .split("\n")[0]
   );
 } catch {
   // ignore
@@ -103,50 +177,98 @@ try {
 // Helpers
 // ============================================================
 
-function sleep(ms) {
+function sleep(
+  ms
+) {
   return new Promise(
-    resolve => setTimeout(resolve, ms)
+    resolve =>
+      setTimeout(
+        resolve,
+        ms
+      )
   );
 }
 
-function normalizeText(value) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
+function normalizeText(
+  value
+) {
+  return String(
+    value || ""
+  )
+    .replace(
+      /\s+/g,
+      " "
+    )
     .trim()
     .toLowerCase();
 }
 
-function htmlDecode(value) {
-  return String(value || "")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x27;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, n) => {
-      try {
-        return String.fromCodePoint(
-          Number(n)
-        );
-      } catch {
-        return _;
+function htmlDecode(
+  value
+) {
+  return String(
+    value || ""
+  )
+    .replace(
+      /&amp;/gi,
+      "&"
+    )
+    .replace(
+      /&quot;/gi,
+      '"'
+    )
+    .replace(
+      /&#39;/gi,
+      "'"
+    )
+    .replace(
+      /&#x27;/gi,
+      "'"
+    )
+    .replace(
+      /&lt;/gi,
+      "<"
+    )
+    .replace(
+      /&gt;/gi,
+      ">"
+    )
+    .replace(
+      /&#(\d+);/g,
+      (_, value) => {
+        try {
+          return String.fromCodePoint(
+            Number(value)
+          );
+        } catch {
+          return _;
+        }
       }
-    })
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => {
-      try {
-        return String.fromCodePoint(
-          parseInt(n, 16)
-        );
-      } catch {
-        return _;
+    )
+    .replace(
+      /&#x([0-9a-f]+);/gi,
+      (_, value) => {
+        try {
+          return String.fromCodePoint(
+            parseInt(
+              value,
+              16
+            )
+          );
+        } catch {
+          return _;
+        }
       }
-    });
+    );
 }
 
-function stripHtml(html) {
+function stripHtml(
+  html
+) {
   return htmlDecode(
-    String(html || "")
+    String(
+      html || ""
+    )
       .replace(
         /<script[\s\S]*?<\/script>/gi,
         " "
@@ -164,7 +286,10 @@ function stripHtml(html) {
         " "
       )
   )
-    .replace(/\s+/g, " ")
+    .replace(
+      /\s+/g,
+      " "
+    )
     .trim();
 }
 
@@ -173,54 +298,51 @@ function absoluteUrl(
   baseUrl
 ) {
   if (!rawUrl) {
-    return null;
+    return "";
   }
 
-  let value = htmlDecode(
-    String(rawUrl)
-      .trim()
-      .replace(/^['"]|['"]$/g, "")
-  );
+  let value =
+    htmlDecode(
+      String(rawUrl)
+        .trim()
+        .replace(
+          /^['"]|['"]$/g,
+          ""
+        )
+    );
 
   if (!value) {
-    return null;
+    return "";
   }
 
-  if (value.startsWith("//")) {
-    value = `https:${value}`;
-  }
-
-  try {
-    return new URL(
-      value,
-      baseUrl
-    ).href;
-  } catch {
-    return null;
-  }
-}
-
-function samePageUrl(
-  candidateUrl,
-  pageUrl
-) {
-  if (!candidateUrl || !pageUrl) {
-    return false;
+  if (
+    value.startsWith("//")
+  ) {
+    value =
+      `https:${value}`;
   }
 
   try {
-    const candidate =
-      new URL(candidateUrl);
+    const url =
+      new URL(
+        value,
+        baseUrl
+      );
 
-    const page =
-      new URL(pageUrl);
+    if (
+      ![
+        "http:",
+        "https:"
+      ].includes(
+        url.protocol
+      )
+    ) {
+      return "";
+    }
 
-    return (
-      candidate.origin === page.origin &&
-      candidate.pathname === page.pathname
-    );
+    return url.href;
   } catch {
-    return false;
+    return "";
   }
 }
 
@@ -231,119 +353,127 @@ function samePageUrl(
 function normalizeBloggerImageUrl(
   rawUrl
 ) {
-  if (!rawUrl) {
-    return null;
-  }
-
-  let value = htmlDecode(
-    String(rawUrl)
-      .trim()
-      .replace(/^['"]|['"]$/g, "")
-  );
-
-  if (!value) {
-    return null;
-  }
-
-  if (value.startsWith("//")) {
-    value = `https:${value}`;
-  }
-
-  let parsed;
-
-  try {
-    parsed = new URL(value);
-  } catch {
-    return null;
-  }
-
-  const originalPath =
-    parsed.pathname;
-
-  // ----------------------------------------------------------
-  // IMPORTANT
-  //
-  // Blogger URLs can look like:
-  //
-  // /img/.../w1200/
-  //
-  // That is NOT sufficient.
-  //
-  // A real image URL normally has an image identifier after
-  // the resize segment.
-  //
-  // Therefore:
-  //
-  // /w1200/
-  //
-  // is rejected.
-  // ----------------------------------------------------------
-
-  const resizePatterns = [
-    /\/s\d+(?:-c)?\/$/i,
-    /\/s\d+(?:-c)?\/([^/]+)$/i,
-    /\/w\d+\/$/i,
-    /\/w\d+-h\d+(?:-p)?\/$/i,
-    /\/w\d+-h\d+(?:-p)?\/([^/]+)$/i,
-  ];
-
-  const isResizeOnly =
-    resizePatterns.some(
-      pattern => pattern.test(
-        originalPath
-      )
-    ) &&
-    (
-      /\/w\d+\/$/i.test(originalPath) ||
-      /\/w\d+-h\d+(?:-p)?\/$/i.test(originalPath) ||
-      /\/s\d+(?:-c)?\/$/i.test(originalPath)
+  const absolute =
+    absoluteUrl(
+      rawUrl,
+      BLOG_URL
     );
 
-  if (isResizeOnly) {
-    return null;
+  if (!absolute) {
+    return "";
   }
 
-  let normalizedPath =
-    originalPath;
+  let url;
 
-  // Standard Blogger resizing path.
-  normalizedPath =
-    normalizedPath.replace(
+  try {
+    url =
+      new URL(
+        absolute
+      );
+  } catch {
+    return "";
+  }
+
+  const pathname =
+    url.pathname;
+
+  // ----------------------------------------------------------
+  // Reject resize-only paths.
+  //
+  // Examples:
+  //
+  // /w1200/
+  // /h60/
+  // /w144-h144-p-k-no-nu/
+  // /s72-c/
+  //
+  // These are NOT complete image URLs.
+  // ----------------------------------------------------------
+
+  if (
+    /\/(?:w\d+|h\d+|s\d+(?:-c)?|w\d+-h\d+(?:-[^/]*)?)\/$/i.test(
+      pathname
+    )
+  ) {
+    return "";
+  }
+
+  // ----------------------------------------------------------
+  // Blogger resize path with actual filename.
+  // ----------------------------------------------------------
+
+  let normalized =
+    pathname;
+
+  normalized =
+    normalized.replace(
       /\/s\d+(?:-c)?\/([^/]+)$/i,
       "/s1600/$1"
     );
 
-  normalizedPath =
-    normalizedPath.replace(
-      /\/w\d+-h\d+(?:-p)?\/([^/]+)$/i,
+  normalized =
+    normalized.replace(
+      /\/w\d+-h\d+(?:-[^/]*)?\/([^/]+)$/i,
       "/s1600/$1"
     );
 
-  normalizedPath =
-    normalizedPath.replace(
+  normalized =
+    normalized.replace(
       /\/w\d+\/([^/]+)$/i,
       "/s1600/$1"
     );
 
-  normalizedPath =
-    normalizedPath.replace(
-      /\/s\d+(?:-c)?\/([^/]+)$/i,
+  normalized =
+    normalized.replace(
+      /\/h\d+\/([^/]+)$/i,
       "/s1600/$1"
     );
 
-  // Do not accept a resize directory without an image tail.
+  // ----------------------------------------------------------
+  // Query resize parameters.
+  // ----------------------------------------------------------
+
+  normalized =
+    normalized.replace(
+      /([?&])w=\d+/gi,
+      "$1"
+    );
+
+  normalized =
+    normalized.replace(
+      /([?&])h=\d+/gi,
+      "$1"
+    );
+
+  normalized =
+    normalized.replace(
+      /([?&])s=\d+/gi,
+      "$1"
+    );
+
+  // Remove dangling ? / &
+  normalized =
+    normalized.replace(
+      /[?&]+$/,
+      ""
+    );
+
+  // ----------------------------------------------------------
+  // Final safety check.
+  // ----------------------------------------------------------
+
   if (
-    /\/(?:w\d+|w\d+-h\d+(?:-p)?|s\d+(?:-c)?)\/$/i.test(
-      normalizedPath
+    /\/(?:w\d+|h\d+|s\d+(?:-c)?|w\d+-h\d+(?:-[^/]*)?)\/$/i.test(
+      normalized
     )
   ) {
-    return null;
+    return "";
   }
 
-  parsed.pathname =
-    normalizedPath;
+  url.pathname =
+    normalized;
 
-  return parsed.href;
+  return url.href;
 }
 
 // ============================================================
@@ -352,20 +482,23 @@ function normalizeBloggerImageUrl(
 
 function isObviouslyBadImageUrl(
   url,
-  pageUrl = null
+  pageUrl = ""
 ) {
   if (!url) {
     return true;
   }
 
   const value =
-    String(url).trim();
+    String(url)
+      .trim();
 
   const lower =
     value.toLowerCase();
 
   if (
-    /^data:/i.test(value)
+    /^data:/i.test(
+      value
+    )
   ) {
     return true;
   }
@@ -381,14 +514,25 @@ function isObviouslyBadImageUrl(
   }
 
   if (
-    /\.html?(?:[?#]|$)/i.test(lower)
+    /\.html?(?:[?#]|$)/i.test(
+      lower
+    )
   ) {
     return true;
   }
 
   if (
-    /\.json(?:[?#]|$)/i.test(lower) ||
-    /\.xml(?:[?#]|$)/i.test(lower)
+    /\.(json|xml)(?:[?#]|$)/i.test(
+      lower
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /\/(?:w\d+|h\d+|s\d+(?:-c)?|w\d+-h\d+(?:-[^/]*)?)\/$/i.test(
+      lower
+    )
   ) {
     return true;
   }
@@ -401,19 +545,16 @@ function isObviouslyBadImageUrl(
     "profile-picture",
     "profile_image",
     "profile-image",
-    "icon-",
-    "/icons/",
-    "/icon/",
+    "default-avatar",
+    "author-avatar",
+    "blogger-logo",
     "tracking",
     "pixel.gif",
     "tracking.gif",
-    "1x1",
     "transparent.gif",
     "spacer.gif",
     "blank.gif",
-    "default-avatar",
-    "author-avatar",
-    "blogger-logo"
+    "1x1"
   ];
 
   for (
@@ -421,22 +562,48 @@ function isObviouslyBadImageUrl(
     of badPatterns
   ) {
     if (
-      lower.includes(pattern)
+      lower.includes(
+        pattern
+      )
     ) {
       return true;
     }
   }
 
-  // Resize-only Blogger URLs.
+  return false;
+}
+
+function samePageUrl(
+  candidateUrl,
+  pageUrl
+) {
   if (
-    /\/(?:w\d+|w\d+-h\d+(?:-p)?|s\d+(?:-c)?)\/(?:[?#].*)?$/i.test(
-      lower
-    )
+    !candidateUrl ||
+    !pageUrl
   ) {
-    return true;
+    return false;
   }
 
-  return false;
+  try {
+    const candidate =
+      new URL(
+        candidateUrl
+      );
+
+    const page =
+      new URL(
+        pageUrl
+      );
+
+    return (
+      candidate.origin ===
+        page.origin &&
+      candidate.pathname ===
+        page.pathname
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isLikelyImageUrl(
@@ -447,7 +614,8 @@ function isLikelyImageUrl(
   }
 
   const lower =
-    String(url).toLowerCase();
+    String(url)
+      .toLowerCase();
 
   if (
     lower.includes(
@@ -477,149 +645,7 @@ function isLikelyImageUrl(
 }
 
 // ============================================================
-// Candidate scoring
-// ============================================================
-
-function getContextScore(
-  meta = {}
-) {
-  const text = [
-    meta.alt,
-    meta.title,
-    meta.className,
-    meta.id,
-    meta.parentClass,
-    meta.caption
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  let score = 0;
-
-  if (text.includes("hero")) {
-    score += 30;
-  }
-
-  if (text.includes("featured")) {
-    score += 25;
-  }
-
-  if (text.includes("post-body")) {
-    score += 25;
-  }
-
-  if (text.includes("entry-content")) {
-    score += 25;
-  }
-
-  if (text.includes("article")) {
-    score += 15;
-  }
-
-  if (text.includes("post-content")) {
-    score += 20;
-  }
-
-  if (text.includes("thumbnail")) {
-    score += 5;
-  }
-
-  if (text.includes("cover")) {
-    score += 10;
-  }
-
-  if (text.includes("image")) {
-    score += 5;
-  }
-
-  if (text.includes("logo")) {
-    score -= 80;
-  }
-
-  if (text.includes("avatar")) {
-    score -= 80;
-  }
-
-  if (text.includes("icon")) {
-    score -= 50;
-  }
-
-  if (text.includes("social")) {
-    score -= 40;
-  }
-
-  if (text.includes("related")) {
-    score -= 35;
-  }
-
-  if (text.includes("sidebar")) {
-    score -= 60;
-  }
-
-  if (text.includes("footer")) {
-    score -= 60;
-  }
-
-  if (text.includes("header")) {
-    score -= 35;
-  }
-
-  return score;
-}
-
-// ============================================================
-// srcset
-// ============================================================
-
-function extractSrcsetUrls(
-  srcset,
-  baseUrl
-) {
-  const result = [];
-
-  if (!srcset) {
-    return result;
-  }
-
-  const parts =
-    String(srcset)
-      .split(",")
-      .map(x => x.trim())
-      .filter(Boolean);
-
-  for (
-    const part
-    of parts
-  ) {
-    const match =
-      part.match(
-        /^(.+?)(?:\s+\d+(?:w|x))?$/
-      );
-
-    const rawUrl =
-      match?.[1]?.trim();
-
-    if (!rawUrl) {
-      continue;
-    }
-
-    const url =
-      absoluteUrl(
-        rawUrl,
-        baseUrl
-      );
-
-    if (url) {
-      result.push(url);
-    }
-  }
-
-  return result;
-}
-
-// ============================================================
-// HTML attribute helper
+// HTML attribute
 // ============================================================
 
 function getAttribute(
@@ -634,7 +660,9 @@ function getAttribute(
       )
     );
 
-  if (quoted?.[1]) {
+  if (
+    quoted?.[1]
+  ) {
     return quoted[1];
   }
 
@@ -646,24 +674,118 @@ function getAttribute(
       )
     );
 
-  return unquoted?.[1] || "";
+  return (
+    unquoted?.[1] ||
+    ""
+  );
+}
+
+// ============================================================
+// srcset
+// ============================================================
+
+function extractSrcsetUrls(
+  srcset,
+  baseUrl
+) {
+  if (!srcset) {
+    return [];
+  }
+
+  const results = [];
+
+  for (
+    const item
+    of String(srcset)
+      .split(",")
+  ) {
+    const value =
+      item.trim();
+
+    if (!value) {
+      continue;
+    }
+
+    const match =
+      value.match(
+        /^(.+?)(?:\s+\d+(?:w|x))?$/
+      );
+
+    if (!match?.[1]) {
+      continue;
+    }
+
+    const url =
+      absoluteUrl(
+        match[1].trim(),
+        baseUrl
+      );
+
+    if (url) {
+      results.push(
+        url
+      );
+    }
+  }
+
+  return results;
+}
+
+// ============================================================
+// Candidate helper
+// ============================================================
+
+function dedupeCandidates(
+  candidates
+) {
+  const map =
+    new Map();
+
+  for (
+    const candidate
+    of candidates
+  ) {
+    if (
+      !candidate?.url
+    ) {
+      continue;
+    }
+
+    if (
+      !map.has(
+        candidate.url
+      )
+    ) {
+      map.set(
+        candidate.url,
+        candidate
+      );
+    }
+  }
+
+  return Array.from(
+    map.values()
+  );
 }
 
 // ============================================================
 // HTML image extraction
 //
 // IMPORTANT:
-// Only parse actual HTML image attributes here.
 //
-// We deliberately do NOT globally scan arbitrary
-// blogger.googleusercontent.com strings.
+// We only accept URLs coming from actual HTML attributes.
+//
+// We DO NOT scan arbitrary:
+// blogger.googleusercontent.com
+//
+// strings in the whole page.
 // ============================================================
 
 function extractImagesFromHtml(
   html,
   baseUrl,
   source,
-  extraScore = 0
+  scoreBonus = 0
 ) {
   const candidates = [];
 
@@ -673,34 +795,14 @@ function extractImagesFromHtml(
 
   let order = 0;
 
-  function addCandidate(
+  function add(
     rawUrl,
-    meta = {}
+    meta = {},
+    score = scoreBonus
   ) {
-    if (!rawUrl) {
-      return;
-    }
-
-    let cleaned =
-      htmlDecode(
-        String(rawUrl)
-          .trim()
-          .replace(/^['"]|['"]$/g, "")
-      );
-
-    if (!cleaned) {
-      return;
-    }
-
-    cleaned =
-      cleaned.replace(
-        /[),.;]+$/g,
-        ""
-      );
-
     const absolute =
       absoluteUrl(
-        cleaned,
+        rawUrl,
         baseUrl
       );
 
@@ -734,17 +836,16 @@ function extractImagesFromHtml(
       return;
     }
 
-    const contextScore =
-      getContextScore(meta);
-
     candidates.push({
-      url: normalized,
+      url:
+        normalized,
       source,
-      order: order++,
       score:
-        extraScore +
-        contextScore -
-        Math.min(order, 30) * 1.2,
+        score +
+        getContextScore(
+          meta
+        ) -
+        order * 0.5,
       alt:
         meta.alt || "",
       title:
@@ -754,10 +855,12 @@ function extractImagesFromHtml(
       id:
         meta.id || ""
     });
+
+    order += 1;
   }
 
   // ----------------------------------------------------------
-  // IMG tags
+  // IMG
   // ----------------------------------------------------------
 
   const imgRegex =
@@ -765,40 +868,34 @@ function extractImagesFromHtml(
 
   for (
     const match
-    of html.matchAll(imgRegex)
+    of html.matchAll(
+      imgRegex
+    )
   ) {
     const tag =
       match[0];
 
-    const alt =
-      getAttribute(
-        tag,
-        "alt"
-      );
-
-    const title =
-      getAttribute(
-        tag,
-        "title"
-      );
-
-    const className =
-      getAttribute(
-        tag,
-        "class"
-      );
-
-    const id =
-      getAttribute(
-        tag,
-        "id"
-      );
-
     const meta = {
-      alt,
-      title,
-      className,
-      id
+      alt:
+        getAttribute(
+          tag,
+          "alt"
+        ),
+      title:
+        getAttribute(
+          tag,
+          "title"
+        ),
+      className:
+        getAttribute(
+          tag,
+          "class"
+        ),
+      id:
+        getAttribute(
+          tag,
+          "id"
+        )
     };
 
     const src =
@@ -820,9 +917,10 @@ function extractImagesFromHtml(
       );
 
     if (src) {
-      addCandidate(
+      add(
         src,
-        meta
+        meta,
+        scoreBonus + 20
       );
     }
 
@@ -847,9 +945,10 @@ function extractImagesFromHtml(
         );
 
       if (value) {
-        addCandidate(
+        add(
           value,
-          meta
+          meta,
+          scoreBonus + 18
         );
       }
     }
@@ -866,22 +965,23 @@ function extractImagesFromHtml(
       }
 
       for (
-        const srcsetUrl
+        const url
         of extractSrcsetUrls(
           value,
           baseUrl
         )
       ) {
-        addCandidate(
-          srcsetUrl,
-          meta
+        add(
+          url,
+          meta,
+          scoreBonus + 15
         );
       }
     }
   }
 
   // ----------------------------------------------------------
-  // SOURCE srcset
+  // <source srcset>
   // ----------------------------------------------------------
 
   const sourceRegex =
@@ -911,21 +1011,22 @@ function extractImagesFromHtml(
     }
 
     for (
-      const srcsetUrl
+      const url
       of extractSrcsetUrls(
         srcset,
         baseUrl
       )
     ) {
-      addCandidate(
-        srcsetUrl,
+      add(
+        url,
         {
           className:
             getAttribute(
               tag,
               "class"
             )
-        }
+        },
+        scoreBonus + 10
       );
     }
   }
@@ -943,12 +1044,13 @@ function extractImagesFromHtml(
       cssRegex
     )
   ) {
-    addCandidate(
+    add(
       match[1],
       {
         className:
           "background-image"
-      }
+      },
+      scoreBonus
     );
   }
 
@@ -986,75 +1088,49 @@ function extractImagesFromHtml(
         "content"
       );
 
-    if (
+    const isImageMeta =
       [
         "og:image",
         "og:image:url",
         "twitter:image",
         "twitter:image:src",
         "image_src"
-      ].includes(property) ||
+      ].includes(
+        property
+      ) ||
       [
         "twitter:image",
         "twitter:image:src",
         "image_src"
-      ].includes(name)
+      ].includes(
+        name
+      );
+
+    if (
+      isImageMeta &&
+      content
     ) {
-      addCandidate(
+      add(
         content,
         {
           className:
             "meta-image"
-        }
+        },
+        scoreBonus
       );
     }
   }
 
-  return candidates;
-}
-
-// ============================================================
-// Candidate de-duplication
-// ============================================================
-
-function dedupeCandidates(
-  candidates
-) {
-  const map =
-    new Map();
-
-  for (
-    const candidate
-    of candidates
-  ) {
-    if (
-      !candidate?.url
-    ) {
-      continue;
-    }
-
-    if (
-      !map.has(
-        candidate.url
-      )
-    ) {
-      map.set(
-        candidate.url,
-        candidate
-      );
-    }
-  }
-
-  return Array.from(
-    map.values()
+  return dedupeCandidates(
+    candidates
   );
 }
 
 // ============================================================
-// Feed extraction
+// Feed helpers
 // ============================================================
 
-function getFeedValue(
+function feedValue(
   value
 ) {
   if (
@@ -1065,40 +1141,41 @@ function getFeedValue(
   }
 
   if (
-    typeof value === "string"
+    typeof value ===
+    "string"
   ) {
     return value;
   }
 
   if (
-    typeof value === "object"
+    typeof value ===
+    "object"
   ) {
-    if (
-      typeof value.$t === "string"
-    ) {
-      return value.$t;
-    }
-
-    if (
-      typeof value["$t"] === "string"
-    ) {
-      return value["$t"];
-    }
+    return (
+      value.$t ||
+      value["$t"] ||
+      ""
+    );
   }
 
   return "";
 }
 
-function getArray(
+function asArray(
   value
 ) {
-  if (Array.isArray(value)) {
+  if (
+    Array.isArray(
+      value
+    )
+  ) {
     return value;
   }
 
   if (
     value &&
-    typeof value === "object"
+    typeof value ===
+      "object"
   ) {
     return [value];
   }
@@ -1106,9 +1183,13 @@ function getArray(
   return [];
 }
 
+// ============================================================
+// Feed image extraction
+// ============================================================
+
 function extractFeedCandidates(
   entry,
-  baseUrl
+  postUrl
 ) {
   const candidates = [];
 
@@ -1117,13 +1198,15 @@ function extractFeedCandidates(
   // ----------------------------------------------------------
 
   const thumbnail =
-    entry?.["media$thumbnail"];
+    entry?.[
+      "media$thumbnail"
+    ];
 
   if (thumbnail) {
     const url =
       thumbnail.url ||
       thumbnail.src ||
-      getFeedValue(
+      feedValue(
         thumbnail
       );
 
@@ -1132,23 +1215,24 @@ function extractFeedCandidates(
         url,
         source:
           "feed-thumbnail",
-        score: 20,
-        alt: "",
-        title: ""
+        score:
+          40
       });
     }
   }
 
   // ----------------------------------------------------------
-  // media$group / media$content
+  // media$group
   // ----------------------------------------------------------
 
   const mediaGroup =
-    entry?.["media$group"];
+    entry?.[
+      "media$group"
+    ];
 
   if (mediaGroup) {
-    const mediaContent =
-      getArray(
+    const content =
+      asArray(
         mediaGroup[
           "media$content"
         ]
@@ -1156,12 +1240,12 @@ function extractFeedCandidates(
 
     for (
       const media
-      of mediaContent
+      of content
     ) {
       const url =
         media?.url ||
         media?.src ||
-        getFeedValue(
+        feedValue(
           media
         );
 
@@ -1170,11 +1254,9 @@ function extractFeedCandidates(
           url,
           source:
             "feed-content",
-          score: 30,
+          score:
+            50,
           alt:
-            media?.title ||
-            "",
-          title:
             media?.title ||
             ""
         });
@@ -1187,8 +1269,10 @@ function extractFeedCandidates(
   // ----------------------------------------------------------
 
   const directMedia =
-    getArray(
-      entry?.["media$content"]
+    asArray(
+      entry?.[
+        "media$content"
+      ]
     );
 
   for (
@@ -1198,7 +1282,7 @@ function extractFeedCandidates(
     const url =
       media?.url ||
       media?.src ||
-      getFeedValue(
+      feedValue(
         media
       );
 
@@ -1207,11 +1291,9 @@ function extractFeedCandidates(
         url,
         source:
           "feed-content",
-        score: 30,
+        score:
+          50,
         alt:
-          media?.title ||
-          "",
-        title:
           media?.title ||
           ""
       });
@@ -1219,11 +1301,11 @@ function extractFeedCandidates(
   }
 
   // ----------------------------------------------------------
-  // Feed content HTML
+  // content HTML
   // ----------------------------------------------------------
 
   const content =
-    getFeedValue(
+    feedValue(
       entry?.content
     );
 
@@ -1231,19 +1313,19 @@ function extractFeedCandidates(
     candidates.push(
       ...extractImagesFromHtml(
         content,
-        baseUrl,
+        postUrl,
         "feed-content",
-        50
+        70
       )
     );
   }
 
   // ----------------------------------------------------------
-  // Feed summary HTML
+  // summary HTML
   // ----------------------------------------------------------
 
   const summary =
-    getFeedValue(
+    feedValue(
       entry?.summary
     );
 
@@ -1251,51 +1333,51 @@ function extractFeedCandidates(
     candidates.push(
       ...extractImagesFromHtml(
         summary,
-        baseUrl,
+        postUrl,
         "feed-summary",
-        35
+        40
       )
     );
   }
 
   const normalized =
-    candidates
-      .map(candidate => {
-        const url =
-          normalizeBloggerImageUrl(
-            absoluteUrl(
-              candidate.url,
-              baseUrl
-            )
-          );
+    [];
 
-        if (!url) {
-          return null;
-        }
+  for (
+    const candidate
+    of candidates
+  ) {
+    const url =
+      normalizeBloggerImageUrl(
+        candidate.url
+      );
 
-        if (
-          isObviouslyBadImageUrl(
-            url,
-            baseUrl
-          )
-        ) {
-          return null;
-        }
+    if (!url) {
+      continue;
+    }
 
-        if (
-          !isLikelyImageUrl(
-            url
-          )
-        ) {
-          return null;
-        }
+    if (
+      isObviouslyBadImageUrl(
+        url,
+        postUrl
+      )
+    ) {
+      continue;
+    }
 
-        return {
-          ...candidate,
-          url
-        };
-      })
-      .filter(Boolean);
+    if (
+      !isLikelyImageUrl(
+        url
+      )
+    ) {
+      continue;
+    }
+
+    normalized.push({
+      ...candidate,
+      url
+    });
+  }
 
   return dedupeCandidates(
     normalized
@@ -1303,7 +1385,7 @@ function extractFeedCandidates(
 }
 
 // ============================================================
-// Post container extraction
+// Balanced HTML element
 // ============================================================
 
 function extractBalancedElement(
@@ -1323,16 +1405,15 @@ function extractBalancedElement(
       "gi"
     );
 
-  openRegex.lastIndex =
-    startIndex;
-
-  closeRegex.lastIndex =
+  let cursor =
     startIndex;
 
   let depth = 0;
-  let cursor = startIndex;
 
-  while (cursor < html.length) {
+  while (
+    cursor <
+    html.length
+  ) {
     openRegex.lastIndex =
       cursor;
 
@@ -1340,12 +1421,19 @@ function extractBalancedElement(
       cursor;
 
     const open =
-      openRegex.exec(html);
+      openRegex.exec(
+        html
+      );
 
     const close =
-      closeRegex.exec(html);
+      closeRegex.exec(
+        html
+      );
 
-    if (!open && !close) {
+    if (
+      !open &&
+      !close
+    ) {
       break;
     }
 
@@ -1358,6 +1446,7 @@ function extractBalancedElement(
       )
     ) {
       depth += 1;
+
       cursor =
         open.index +
         open[0].length;
@@ -1371,24 +1460,48 @@ function extractBalancedElement(
       close.index +
       close[0].length;
 
-    if (depth <= 0) {
+    if (
+      depth <= 0
+    ) {
       return html.slice(
         startIndex,
         end
       );
     }
 
-    cursor = end;
+    cursor =
+      end;
   }
 
-  return null;
+  return "";
 }
 
-function findClassContainers(
-  html,
-  classNames
+// ============================================================
+// Scoped Blogger post body
+//
+// IMPORTANT:
+//
+// Do NOT use generic "hentry" as an image source container.
+// Blogger pages can contain multiple hentry/post fragments,
+// related posts, archives, etc.
+//
+// We only use:
+//   post-body
+//   entry-content
+//   post-content
+//   article
+// ============================================================
+
+function findScopedPostBodies(
+  html
 ) {
   const results = [];
+
+  const classNames = [
+    "post-body",
+    "entry-content",
+    "post-content"
+  ];
 
   for (
     const className
@@ -1425,35 +1538,50 @@ function findClassContainers(
           tagName
         );
 
-      if (container) {
-        results.push({
-          html: container,
-          className,
-          score:
-            className ===
-            "post-body"
-              ? 100
-              : 90
-        });
+      if (
+        !container
+      ) {
+        continue;
       }
+
+      const imageCount =
+        (
+          container.match(
+            /<img\b/gi
+          ) || []
+        ).length;
+
+      if (
+        imageCount === 0
+      ) {
+        continue;
+      }
+
+      results.push({
+        html:
+          container,
+        score:
+          className ===
+          "post-body"
+            ? 100
+            : 90,
+        type:
+          className
+      });
     }
   }
 
-  return results;
-}
+  // ----------------------------------------------------------
+  // article
+  // ----------------------------------------------------------
 
-function findArticles(
-  html
-) {
-  const results = [];
-
-  const regex =
+  const articleRegex =
     /<article\b[^>]*>/gi;
 
   for (
     const match
     of html.matchAll(
-      regex
+      articleRegex
     )
   ) {
     const start =
@@ -1472,237 +1600,94 @@ function findArticles(
         "article"
       );
 
-    if (container) {
-      results.push({
-        html: container,
-        className:
-          "article",
-        score: 95
-      });
-    }
-  }
-
-  return results;
-}
-
-// ============================================================
-// Title-scoped container selection
-// ============================================================
-
-function findTitleRelatedContainers(
-  html,
-  title
-) {
-  const results = [];
-
-  if (!title) {
-    return results;
-  }
-
-  const normalizedTitle =
-    normalizeText(
-      title
-    );
-
-  const titleWords =
-    normalizedTitle
-      .split(/\s+/)
-      .filter(
-        word =>
-          word.length >= 4
-      )
-      .slice(0, 10);
-
-  if (!titleWords.length) {
-    return results;
-  }
-
-  const headings =
-    /<(h1|h2|h3|h4|h5|h6)\b[^>]*>([\s\S]*?)<\/\1>/gi;
-
-  for (
-    const match
-    of html.matchAll(
-      headings
-    )
-  ) {
-    const headingText =
-      normalizeText(
-        stripHtml(
-          match[2]
-        )
-      );
-
-    if (!headingText) {
+    if (
+      !container
+    ) {
       continue;
     }
 
-    const overlap =
-      titleWords.filter(
-        word =>
-          headingText.includes(
-            word
-          )
+    const imageCount =
+      (
+        container.match(
+          /<img\b/gi
+        ) || []
       ).length;
 
     if (
-      overlap < 2 &&
-      !headingText.includes(
-        normalizedTitle
-      )
+      imageCount === 0
     ) {
       continue;
     }
 
-    const headingStart =
-      match.index;
-
-    if (
-      headingStart === undefined
-    ) {
-      continue;
-    }
-
-    // Search forward for a post/article container.
-    const after =
-      html.slice(
-        headingStart,
-        Math.min(
-          html.length,
-          headingStart + 200000
-        )
-      );
-
-    const localContainers =
-      [
-        ...findClassContainers(
-          after,
-          [
-            "post-body",
-            "entry-content",
-            "post-content",
-            "blog-post",
-            "hentry"
-          ]
-        ),
-        ...findArticles(after)
-      ];
-
-    for (
-      const container
-      of localContainers
-    ) {
-      const imageCount =
-        (
-          container.html.match(
-            /<img\b/gi
-          ) || []
-        ).length;
-
-      if (
-        imageCount > 0
-      ) {
-        results.push({
-          ...container,
-          score:
-            container.score +
-            overlap * 15 +
-            30
-        });
-      }
-    }
+    results.push({
+      html:
+        container,
+      score:
+        80,
+      type:
+        "article"
+    });
   }
 
   return results;
 }
 
 // ============================================================
-// Page-local extraction
+// Page-local candidates
 // ============================================================
 
 function extractPageCandidates(
   html,
   pageUrl,
-  title
+  postTitle
 ) {
-  const scoped = [];
-
-  // ----------------------------------------------------------
-  // 1. Title-related containers
-  // ----------------------------------------------------------
-
-  scoped.push(
-    ...findTitleRelatedContainers(
-      html,
-      title
-    )
-  );
-
-  // ----------------------------------------------------------
-  // 2. Standard Blogger post-body
-  // ----------------------------------------------------------
-
-  scoped.push(
-    ...findClassContainers(
-      html,
-      [
-        "post-body",
-        "entry-content",
-        "post-content",
-        "blog-post",
-        "hentry"
-      ]
-    )
-  );
-
-  // ----------------------------------------------------------
-  // 3. Articles
-  // ----------------------------------------------------------
-
-  scoped.push(
-    ...findArticles(
-      html
-    )
-  );
-
-  // Sort best scopes first.
-  scoped.sort(
-    (a, b) =>
-      b.score - a.score
-  );
-
   const candidates = [];
 
-  const seenScopes =
+  const scopes =
+    findScopedPostBodies(
+      html
+    );
+
+  console.log(
+    `Scoped post containers: ${scopes.length}`
+  );
+
+  // ----------------------------------------------------------
+  // Prefer post-body over article.
+  // ----------------------------------------------------------
+
+  scopes.sort(
+    (a, b) =>
+      b.score -
+      a.score
+  );
+
+  const seen =
     new Set();
 
   for (
     const scope
-    of scoped
+    of scopes
   ) {
-    const fingerprint =
+    const key =
       scope.html.slice(
         0,
-        300
+        500
       );
 
     if (
-      seenScopes.has(
-        fingerprint
-      )
+      seen.has(key)
     ) {
       continue;
     }
 
-    seenScopes.add(
-      fingerprint
-    );
+    seen.add(key);
 
     const images =
       extractImagesFromHtml(
         scope.html,
         pageUrl,
-        `post-${scope.className}`,
+        `post-${scope.type}`,
         scope.score
       );
 
@@ -1712,25 +1697,22 @@ function extractPageCandidates(
   }
 
   // ----------------------------------------------------------
-  // 4. Page metadata as a last resort.
+  // Do NOT fall back to page-wide Blogger CDN scanning.
   //
-  // IMPORTANT:
-  // Only meta image extraction is allowed here.
-  // We do NOT globally regex-search Blogger CDN URLs.
+  // Only use OG/Twitter meta if no post-body image exists.
   // ----------------------------------------------------------
 
-  const metaImages =
-    extractImagesFromHtml(
-      html,
-      pageUrl,
-      "post-meta",
-      10
-    );
-
-  // Only take meta candidates if scoped extraction found none.
   if (
     candidates.length === 0
   ) {
+    const metaImages =
+      extractImagesFromHtml(
+        html,
+        pageUrl,
+        "post-meta",
+        10
+      );
+
     candidates.push(
       ...metaImages
     );
@@ -1752,17 +1734,20 @@ async function fetchText(
     await fetch(
       url,
       {
-        redirect: "follow",
+        redirect:
+          "follow",
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (compatible; BlogAnalyzer/10.2)",
+            "Mozilla/5.0 (compatible; BlogAnalyzer/10.3)",
           "Accept":
             "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         }
       }
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `HTTP ${response.status} for ${url}`
     );
@@ -1778,17 +1763,20 @@ async function fetchJson(
     await fetch(
       url,
       {
-        redirect: "follow",
+        redirect:
+          "follow",
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (compatible; BlogAnalyzer/10.2)",
+            "Mozilla/5.0 (compatible; BlogAnalyzer/10.3)",
           "Accept":
             "application/json,text/plain,*/*"
         }
       }
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `HTTP ${response.status} for ${url}`
     );
@@ -1804,28 +1792,80 @@ async function fetchJson(
 function buildFeedUrl(
   blogUrl
 ) {
-  const parsed =
+  const url =
     new URL(
       blogUrl
     );
 
-  parsed.search = "";
-  parsed.hash = "";
-
-  parsed.pathname =
+  url.pathname =
     "/feeds/posts/default";
 
-  parsed.searchParams.set(
+  url.search = "";
+
+  url.searchParams.set(
     "alt",
     "json"
   );
 
-  parsed.searchParams.set(
+  url.searchParams.set(
     "max-results",
     "10"
   );
 
-  return parsed.href;
+  return url.href;
+}
+
+// ============================================================
+// ImageMagick identification
+//
+// THIS IS THE CRITICAL v10.3 FIX.
+//
+// Never:
+//   magick identify file
+//
+// Use:
+//   identify file
+//
+// on ImageMagick 6.
+// ============================================================
+
+function identifyImage(
+  filePath
+) {
+  try {
+    const output =
+      execFileSync(
+        IDENTIFY_COMMAND,
+        [
+          "-format",
+          "%m|%w|%h",
+          filePath
+        ],
+        {
+          encoding:
+            "utf8",
+          stdio: [
+            "ignore",
+            "pipe",
+            "pipe"
+          ]
+        }
+      ).trim();
+
+    if (
+      !output
+    ) {
+      throw new Error(
+        "ImageMagick returned empty identification"
+      );
+    }
+
+    return output;
+  } catch (error) {
+    throw new Error(
+      `ImageMagick could not identify image: ${error.message}`
+    );
+  }
 }
 
 // ============================================================
@@ -1844,17 +1884,20 @@ async function downloadImage(
     await fetch(
       url,
       {
-        redirect: "follow",
+        redirect:
+          "follow",
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (compatible; BlogAnalyzer/10.2)",
+            "Mozilla/5.0 (compatible; BlogAnalyzer/10.3)",
           "Accept":
             "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
         }
       }
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `HTTP ${response.status}`
     );
@@ -1865,14 +1908,15 @@ async function downloadImage(
       response.headers.get(
         "content-type"
       ) || ""
-    ).toLowerCase();
+    )
+      .toLowerCase();
 
   console.log(
     `Content-Type: ${contentType || "unknown"}`
   );
 
   // ----------------------------------------------------------
-  // Reject HTML/JSON/XML before ImageMagick.
+  // Reject known non-image responses.
   // ----------------------------------------------------------
 
   if (
@@ -1906,7 +1950,8 @@ async function downloadImage(
     );
 
   if (
-    buffer.length < 5000
+    buffer.length <
+    5000
   ) {
     throw new Error(
       `Image is too small: ${buffer.length} bytes`
@@ -1923,112 +1968,64 @@ async function downloadImage(
   );
 
   // ----------------------------------------------------------
-  // Validate with ImageMagick immediately.
+  // CRITICAL:
+  // Direct identify command.
   // ----------------------------------------------------------
 
-  try {
-    const identifyOutput =
-      execFileSync(
-        IMAGE_MAGICK,
-        [
-          "identify",
-          "-format",
-          "%m|%w|%h",
-          outputPath
-        ],
-        {
-          encoding: "utf8",
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe"
-          ]
-        }
-      ).trim();
-
-    if (!identifyOutput) {
-      throw new Error(
-        "ImageMagick returned no identification"
-      );
-    }
-
-    console.log(
-      `ImageMagick: ${identifyOutput}`
+  const identified =
+    identifyImage(
+      outputPath
     );
-  } catch {
-    try {
-      execFileSync(
-        IMAGE_MAGICK === "convert"
-          ? "identify"
-          : IMAGE_MAGICK,
-        [
-          outputPath
-        ],
-        {
-          stdio: "ignore"
-        }
-      );
-    } catch {
-      throw new Error(
-        "ImageMagick could not identify image"
-      );
-    }
-  }
+
+  console.log(
+    `ImageMagick: ${identified}`
+  );
 
   return {
     bytes:
       buffer.length,
-    contentType
+    contentType,
+    identified
   };
 }
 
 // ============================================================
-// Convert to final JPG
+// Convert to JPG
 // ============================================================
 
 function convertToJpg(
   sourcePath,
   outputPath
 ) {
-  const identifyCommand =
-    IMAGE_MAGICK === "convert"
-      ? "identify"
-      : "magick";
+  identifyImage(
+    sourcePath
+  );
 
   try {
     execFileSync(
-      identifyCommand,
-      [
-        sourcePath
-      ],
-      {
-        stdio: "ignore"
-      }
-    );
-  } catch {
-    throw new Error(
-      "Source image failed ImageMagick validation"
-    );
-  }
-
-  try {
-    execFileSync(
-      IMAGE_MAGICK,
+      CONVERT_COMMAND,
       [
         sourcePath,
         "-auto-orient",
         "-strip",
+        "-background",
+        "white",
+        "-alpha",
+        "remove",
+        "-alpha",
+        "off",
         "-quality",
         "90",
         outputPath
       ],
       {
-        stdio: "ignore"
+        stdio:
+          "ignore"
       }
     );
-  } catch {
+  } catch (error) {
     throw new Error(
-      "Failed to convert image to JPG"
+      `ImageMagick conversion failed: ${error.message}`
     );
   }
 
@@ -2038,7 +2035,7 @@ function convertToJpg(
     )
   ) {
     throw new Error(
-      "JPG output was not created"
+      "Converted JPG was not created"
     );
   }
 
@@ -2048,35 +2045,57 @@ function convertToJpg(
     );
 
   if (
-    stat.size < 5000
+    stat.size <
+    5000
   ) {
     throw new Error(
       `Converted JPG is too small: ${stat.size} bytes`
     );
   }
 
+  identifyImage(
+    outputPath
+  );
+
   return stat.size;
 }
 
 // ============================================================
-// Image fingerprint
-//
-// We use a small grayscale perceptual fingerprint so that
-// visually identical images with different encodings can also
-// be detected.
+// File hash
+// ============================================================
+
+function getFileHash(
+  filePath
+) {
+  return crypto
+    .createHash(
+      "sha256"
+    )
+    .update(
+      fs.readFileSync(
+        filePath
+      )
+    )
+    .digest(
+      "hex"
+    );
+}
+
+// ============================================================
+// Perceptual fingerprint
 // ============================================================
 
 function getImageFingerprint(
-  imagePath
+  filePath
 ) {
   const tempPath =
-    `${imagePath}.fingerprint.png`;
+    `${filePath}.fingerprint.png`;
 
   try {
     execFileSync(
-      IMAGE_MAGICK,
+      CONVERT_COMMAND,
       [
-        imagePath,
+        filePath,
         "-auto-orient",
         "-resize",
         "32x32!",
@@ -2087,19 +2106,26 @@ function getImageFingerprint(
         tempPath
       ],
       {
-        stdio: "ignore"
+        stdio:
+          "ignore"
       }
     );
 
-    const data =
+    const buffer =
       fs.readFileSync(
         tempPath
       );
 
     return crypto
-      .createHash("sha256")
-      .update(data)
-      .digest("hex");
+      .createHash(
+        "sha256"
+      )
+      .update(
+        buffer
+      )
+      .digest(
+        "hex"
+      );
   } finally {
     try {
       fs.unlinkSync(
@@ -2112,31 +2138,129 @@ function getImageFingerprint(
 }
 
 // ============================================================
-// Exact file hash
+// Context score
 // ============================================================
 
-function getFileHash(
-  filePath
+function getContextScore(
+  meta = {}
 ) {
-  return crypto
-    .createHash("sha256")
-    .update(
-      fs.readFileSync(
-        filePath
-      )
+  const text =
+    [
+      meta.alt,
+      meta.title,
+      meta.className,
+      meta.id
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+  let score = 0;
+
+  if (
+    text.includes(
+      "hero"
     )
-    .digest("hex");
+  ) {
+    score += 25;
+  }
+
+  if (
+    text.includes(
+      "featured"
+    )
+  ) {
+    score += 20;
+  }
+
+  if (
+    text.includes(
+      "cover"
+    )
+  ) {
+    score += 15;
+  }
+
+  if (
+    text.includes(
+      "post-body"
+    )
+  ) {
+    score += 20;
+  }
+
+  if (
+    text.includes(
+      "entry-content"
+    )
+  ) {
+    score += 20;
+  }
+
+  if (
+    text.includes(
+      "post-content"
+    )
+  ) {
+    score += 20;
+  }
+
+  if (
+    text.includes(
+      "logo"
+    )
+  ) {
+    score -= 100;
+  }
+
+  if (
+    text.includes(
+      "avatar"
+    )
+  ) {
+    score -= 100;
+  }
+
+  if (
+    text.includes(
+      "icon"
+    )
+  ) {
+    score -= 60;
+  }
+
+  if (
+    text.includes(
+      "sidebar"
+    )
+  ) {
+    score -= 80;
+  }
+
+  if (
+    text.includes(
+      "related"
+    )
+  ) {
+    score -= 50;
+  }
+
+  if (
+    text.includes(
+      "footer"
+    )
+  ) {
+    score -= 70;
+  }
+
+  return score;
 }
 
 // ============================================================
-// Semantic title matching
-//
-// This is not intended to prove that an image is semantically
-// correct. It only gives a modest preference to images whose
-// alt/title/caption contains words from the article title.
+// Title / image text score
 // ============================================================
 
-function titleImageScore(
+function getTitleImageScore(
   title,
   candidate
 ) {
@@ -2151,7 +2275,7 @@ function titleImageScore(
       );
 
   if (
-    titleWords.length === 0
+    !titleWords.length
   ) {
     return 0;
   }
@@ -2160,19 +2284,20 @@ function titleImageScore(
     normalizeText(
       [
         candidate.alt,
-        candidate.title,
-        candidate.className,
-        candidate.id
+        candidate.title
       ]
         .filter(Boolean)
         .join(" ")
     );
 
-  if (!imageText) {
+  if (
+    !imageText
+  ) {
     return 0;
   }
 
-  let matches = 0;
+  let matches =
+    0;
 
   for (
     const word
@@ -2194,54 +2319,53 @@ function titleImageScore(
 }
 
 // ============================================================
-// Candidate evaluation
+// Evaluate candidate
 // ============================================================
 
 async function evaluateCandidate(
   candidate,
   postIndex
 ) {
-  const tempPath =
+  const tempSource =
     path.join(
       IMAGE_DIR,
-      `.candidate-${postIndex}-${crypto.randomUUID()}.bin`
+      `.candidate-${postIndex}-${crypto.randomUUID()}.source`
+    );
+
+  const tempJpg =
+    path.join(
+      IMAGE_DIR,
+      `.candidate-${postIndex}-${crypto.randomUUID()}.jpg`
     );
 
   try {
     await downloadImage(
       candidate.url,
-      tempPath
+      tempSource
+    );
+
+    convertToJpg(
+      tempSource,
+      tempJpg
     );
 
     const sourceHash =
       getFileHash(
-        tempPath
+        tempJpg
       );
-
-    const finalTempPath =
-      path.join(
-        IMAGE_DIR,
-        `.candidate-${postIndex}-${crypto.randomUUID()}.jpg`
-      );
-
-    convertToJpg(
-      tempPath,
-      finalTempPath
-    );
 
     const fingerprint =
       getImageFingerprint(
-        finalTempPath
+        tempJpg
       );
 
-    const result = {
+    return {
       ...candidate,
+      tempPath:
+        tempJpg,
       sourceHash,
-      fingerprint,
-      tempPath: finalTempPath
+      fingerprint
     };
-
-    return result;
   } catch (error) {
     console.log(
       `Rejected: ${error.message}`
@@ -2249,7 +2373,15 @@ async function evaluateCandidate(
 
     try {
       fs.unlinkSync(
-        tempPath
+        tempSource
+      );
+    } catch {
+      // ignore
+    }
+
+    try {
+      fs.unlinkSync(
+        tempJpg
       );
     } catch {
       // ignore
@@ -2260,219 +2392,7 @@ async function evaluateCandidate(
 }
 
 // ============================================================
-// Post extraction
-// ============================================================
-
-function getEntryTitle(
-  entry
-) {
-  return getFeedValue(
-    entry?.title
-  ).trim();
-}
-
-function getEntryUrl(
-  entry,
-  fallbackBase
-) {
-  const links =
-    Array.isArray(
-      entry?.link
-    )
-      ? entry.link
-      : [];
-
-  const alternate =
-    links.find(
-      link =>
-        link?.rel ===
-        "alternate"
-    );
-
-  if (
-    alternate?.href
-  ) {
-    return alternate.href;
-  }
-
-  const self =
-    links.find(
-      link =>
-        link?.href
-    );
-
-  if (
-    self?.href
-  ) {
-    return self.href;
-  }
-
-  return fallbackBase;
-}
-
-function getEntryPublished(
-  entry
-) {
-  return (
-    getFeedValue(
-      entry?.published
-    ) ||
-    getFeedValue(
-      entry?.updated
-    ) ||
-    ""
-  );
-}
-
-function getCategories(
-  entry
-) {
-  const categories =
-    Array.isArray(
-      entry?.category
-    )
-      ? entry.category
-      : [];
-
-  return categories
-    .map(
-      item =>
-        item?.term ||
-        getFeedValue(
-          item
-        )
-    )
-    .filter(Boolean);
-}
-
-function getExcerpt(
-  entry
-) {
-  const summary =
-    getFeedValue(
-      entry?.summary
-    );
-
-  const content =
-    getFeedValue(
-      entry?.content
-    );
-
-  const text =
-    stripHtml(
-      summary ||
-      content
-    );
-
-  return text.slice(
-    0,
-    320
-  );
-}
-
-// ============================================================
-// Blog analysis
-// ============================================================
-
-function buildAnalysis(
-  siteTitle,
-  description,
-  posts
-) {
-  const topicWords =
-    new Map();
-
-  for (
-    const post
-    of posts
-  ) {
-    const text =
-      normalizeText(
-        `${post.title} ${post.excerpt}`
-      );
-
-    for (
-      const word
-      of text.split(/\s+/)
-    ) {
-      if (
-        word.length < 5
-      ) {
-        continue;
-      }
-
-      if (
-        [
-          "about",
-          "which",
-          "their",
-          "there",
-          "these",
-          "those",
-          "today",
-          "using",
-          "could",
-          "would",
-          "should",
-          "after",
-          "before",
-          "where",
-          "while",
-          "into",
-          "from"
-        ].includes(word)
-      ) {
-        continue;
-      }
-
-      topicWords.set(
-        word,
-        (
-          topicWords.get(
-            word
-          ) || 0
-        ) + 1
-      );
-    }
-  }
-
-  const topics =
-    Array.from(
-      topicWords.entries()
-    )
-      .sort(
-        (a, b) =>
-          b[1] - a[1]
-      )
-      .slice(0, 6)
-      .map(
-        ([word]) =>
-          word.toUpperCase()
-      );
-
-  return {
-    identity:
-      description ||
-      `${siteTitle} provides practical information and analysis.`,
-    topics:
-      topics.length
-        ? topics
-        : ["INSIGHTS"],
-    audience:
-      "Readers looking for practical information, analysis, and useful insights.",
-    contentStyle:
-      "Focused articles built around current topics, explanations, and practical information.",
-    valueProposition:
-      "Clear, useful information presented in an accessible format."
-  };
-}
-
-// ============================================================
-// Select image for one post
-//
-// IMPORTANT:
-// We do not borrow candidates from another post.
-// Each post is responsible for finding its own image.
+// Select image
 // ============================================================
 
 async function selectImageForPost(
@@ -2482,21 +2402,22 @@ async function selectImageForPost(
   postIndex,
   usedFingerprints
 ) {
-  const combined =
+  const candidates =
     dedupeCandidates([
       ...feedCandidates,
       ...pageCandidates
     ]);
 
   const scored =
-    combined.map(
+    candidates.map(
       candidate => ({
         ...candidate,
         score:
           Number(
-            candidate.score || 0
+            candidate.score ||
+              0
           ) +
-          titleImageScore(
+          getTitleImageScore(
             post.title,
             candidate
           )
@@ -2505,7 +2426,8 @@ async function selectImageForPost(
 
   scored.sort(
     (a, b) =>
-      b.score - a.score
+      b.score -
+      a.score
   );
 
   console.log(
@@ -2554,34 +2476,23 @@ async function selectImageForPost(
       evaluated.fingerprint
     );
 
-    const finalName =
+    const filename =
       `post-${postIndex}.jpg`;
 
     const finalPath =
       path.join(
         IMAGE_DIR,
-        finalName
+        filename
       );
 
-    try {
-      fs.renameSync(
-        evaluated.tempPath,
-        finalPath
-      );
-    } catch {
-      fs.copyFileSync(
-        evaluated.tempPath,
-        finalPath
-      );
-
-      fs.unlinkSync(
-        evaluated.tempPath
-      );
-    }
+    fs.renameSync(
+      evaluated.tempPath,
+      finalPath
+    );
 
     return {
       localImage:
-        `blog/images/${finalName}`,
+        `blog/images/${filename}`,
       imageSource:
         candidate.source,
       imageUrl:
@@ -2599,44 +2510,204 @@ async function selectImageForPost(
 }
 
 // ============================================================
-// Clean previous generated images
+// Entry metadata
 // ============================================================
 
-function cleanPreviousImages() {
-  if (
-    !fs.existsSync(
-      IMAGE_DIR
+function getEntryTitle(
+  entry
+) {
+  return feedValue(
+    entry?.title
+  ).trim();
+}
+
+function getEntryUrl(
+  entry,
+  fallback
+) {
+  const links =
+    Array.isArray(
+      entry?.link
     )
+      ? entry.link
+      : [];
+
+  const alternate =
+    links.find(
+      item =>
+        item?.rel ===
+        "alternate" &&
+        item?.href
+    );
+
+  if (
+    alternate?.href
   ) {
-    return;
+    return alternate.href;
   }
+
+  return fallback;
+}
+
+function getEntryPublished(
+  entry
+) {
+  return (
+    feedValue(
+      entry?.published
+    ) ||
+    feedValue(
+      entry?.updated
+    ) ||
+    ""
+  );
+}
+
+function getCategories(
+  entry
+) {
+  const categories =
+    Array.isArray(
+      entry?.category
+    )
+      ? entry.category
+      : [];
+
+  return categories
+    .map(
+      item =>
+        item?.term ||
+        feedValue(
+          item
+        )
+    )
+    .filter(Boolean);
+}
+
+function getExcerpt(
+  entry
+) {
+  const summary =
+    feedValue(
+      entry?.summary
+    );
+
+  const content =
+    feedValue(
+      entry?.content
+    );
+
+  return stripHtml(
+    summary ||
+      content
+  ).slice(
+    0,
+    320
+  );
+}
+
+// ============================================================
+// Analysis
+// ============================================================
+
+function buildAnalysis(
+  siteTitle,
+  description,
+  posts
+) {
+  const frequencies =
+    new Map();
 
   for (
-    const name
-    of fs.readdirSync(
-      IMAGE_DIR
-    )
+    const post
+    of posts
   ) {
-    const file =
-      path.join(
-        IMAGE_DIR,
-        name
-      );
-
-    try {
-      if (
-        fs.statSync(
-          file
-        ).isFile()
-      ) {
-        fs.unlinkSync(
-          file
+    const words =
+      normalizeText(
+        `${post.title} ${post.excerpt}`
+      )
+        .split(/\s+/)
+        .filter(
+          word =>
+            word.length >= 5
         );
+
+    for (
+      const word
+      of words
+    ) {
+      if (
+        [
+          "about",
+          "which",
+          "their",
+          "there",
+          "these",
+          "those",
+          "today",
+          "using",
+          "could",
+          "would",
+          "should",
+          "after",
+          "before",
+          "where",
+          "while",
+          "into",
+          "from"
+        ].includes(
+          word
+        )
+      ) {
+        continue;
       }
-    } catch {
-      // ignore
+
+      frequencies.set(
+        word,
+        (
+          frequencies.get(
+            word
+          ) || 0
+        ) + 1
+      );
     }
   }
+
+  const topics =
+    Array.from(
+      frequencies.entries()
+    )
+      .sort(
+        (a, b) =>
+          b[1] -
+          a[1]
+      )
+      .slice(
+        0,
+        6
+      )
+      .map(
+        ([word]) =>
+          word.toUpperCase()
+      );
+
+  return {
+    identity:
+      description ||
+      `${siteTitle} provides practical information and analysis.`,
+    topics:
+      topics.length
+        ? topics
+        : [
+            "INSIGHTS"
+          ],
+    audience:
+      "Readers looking for practical information, analysis, and useful insights.",
+    contentStyle:
+      "Focused articles built around current topics, explanations, and practical information.",
+    valueProposition:
+      "Clear, useful information presented in an accessible format."
+  };
 }
 
 // ============================================================
@@ -2649,7 +2720,7 @@ async function main() {
   );
 
   console.log(
-    "BLOG ANALYZER v10.2"
+    "BLOG ANALYZER v10.3"
   );
 
   console.log(
@@ -2657,35 +2728,41 @@ async function main() {
   );
 
   console.log(
+    `Output: ${OUTPUT_DIR}`
+  );
+
+  console.log(
     "============================================================"
   );
 
-  cleanPreviousImages();
-
-  const blogUrl =
-    new URL(
-      BLOG_URL
-    ).href;
-
   // ----------------------------------------------------------
-  // Fetch main blog page
+  // Main blog page
   // ----------------------------------------------------------
 
   console.log(
     "Fetching blog page..."
   );
 
-  const blogHtml =
-    await fetchText(
-      blogUrl
-    );
+  let blogHtml =
+    "";
 
-  console.log(
-    `Blog page fetched: ${blogHtml.length} bytes`
-  );
+  try {
+    blogHtml =
+      await fetchText(
+        BLOG_URL
+      );
+
+    console.log(
+      `Blog page fetched: ${blogHtml.length} bytes`
+    );
+  } catch (error) {
+    console.log(
+      `Home page fetch warning: ${error.message}`
+    );
+  }
 
   // ----------------------------------------------------------
-  // Basic metadata
+  // Site metadata
   // ----------------------------------------------------------
 
   const titleMatch =
@@ -2697,30 +2774,35 @@ async function main() {
     stripHtml(
       titleMatch?.[1] ||
       new URL(
-        blogUrl
+        BLOG_URL
       ).hostname
     );
 
-  const descriptionMatch =
+  let description =
+    "";
+
+  const descriptionMeta =
     blogHtml.match(
       /<meta\b[^>]*(?:name|property)=["'](?:description|og:description)["'][^>]*>/i
     );
 
-  const description =
-    descriptionMatch
-      ? getAttribute(
-          descriptionMatch[0],
-          "content"
-        )
-      : "";
+  if (
+    descriptionMeta
+  ) {
+    description =
+      getAttribute(
+        descriptionMeta[0],
+        "content"
+      );
+  }
 
   // ----------------------------------------------------------
-  // Fetch Blogger JSON feed
+  // Feed
   // ----------------------------------------------------------
 
   const feedUrl =
     buildFeedUrl(
-      blogUrl
+      BLOG_URL
     );
 
   console.log(
@@ -2739,11 +2821,9 @@ async function main() {
       "Feed fetched successfully."
     );
   } catch (error) {
-    console.log(
-      `Feed fetch failed: ${error.message}`
+    throw new Error(
+      `Unable to fetch Blogger feed: ${error.message}`
     );
-
-    feed = null;
   }
 
   const entries =
@@ -2758,31 +2838,33 @@ async function main() {
   );
 
   if (
-    entries.length < 5
+    entries.length <
+    5
   ) {
     throw new Error(
-      `Expected at least 5 feed entries, got ${entries.length}`
+      `Expected at least 5 posts, got ${entries.length}`
     );
   }
 
   // ----------------------------------------------------------
-  // Process first 5 posts
+  // Posts
   // ----------------------------------------------------------
 
-  const posts = [];
+  const posts =
+    [];
 
   const usedFingerprints =
     new Set();
 
   for (
-    let i = 0;
-    i < 5;
-    i++
+    let index = 0;
+    index < 5;
+    index += 1
   ) {
     const entry =
-      entries[i];
+      entries[index];
 
-    const postTitle =
+    const title =
       getEntryTitle(
         entry
       );
@@ -2790,7 +2872,7 @@ async function main() {
     const postUrl =
       getEntryUrl(
         entry,
-        blogUrl
+        BLOG_URL
       );
 
     const published =
@@ -2817,7 +2899,7 @@ async function main() {
     );
 
     console.log(
-      `Post ${i + 1}: ${postTitle}`
+      `Post ${index + 1}: ${title}`
     );
 
     console.log(
@@ -2842,23 +2924,24 @@ async function main() {
     // Article page
     // --------------------------------------------------------
 
-    let pageCandidates = [];
+    let pageCandidates =
+      [];
 
     try {
-      const postHtml =
+      const articleHtml =
         await fetchText(
           postUrl
         );
 
       console.log(
-        `Article page fetched: ${postHtml.length} bytes`
+        `Article page fetched: ${articleHtml.length} bytes`
       );
 
       pageCandidates =
         extractPageCandidates(
-          postHtml,
+          articleHtml,
           postUrl,
-          postTitle
+          title
         );
 
       console.log(
@@ -2866,31 +2949,30 @@ async function main() {
       );
     } catch (error) {
       console.log(
-        `Article page fetch failed: ${error.message}`
+        `Article page warning: ${error.message}`
       );
     }
 
     // --------------------------------------------------------
-    // Select only from this post's own candidates.
+    // Select image
     // --------------------------------------------------------
 
     const selected =
       await selectImageForPost(
         {
-          title:
-            postTitle,
+          title,
           url:
             postUrl
         },
         feedCandidates,
         pageCandidates,
-        i + 1,
+        index + 1,
         usedFingerprints
       );
 
     if (!selected) {
       throw new Error(
-        `All image candidates were rejected for Post ${i + 1}: ${postTitle}`
+        `All image candidates were rejected for Post ${index + 1}: ${title}`
       );
     }
 
@@ -2912,9 +2994,8 @@ async function main() {
 
     posts.push({
       index:
-        i + 1,
-      title:
-        postTitle,
+        index + 1,
+      title,
       url:
         postUrl,
       published,
@@ -2932,16 +3013,21 @@ async function main() {
       imageSource:
         selected.imageSource
     });
+
+    // Small delay to avoid hammering Blogger.
+    await sleep(
+      250
+    );
   }
 
-  // ----------------------------------------------------------
-  // Final duplicate verification
-  // ----------------------------------------------------------
-
-  const finalFingerprints =
-    new Set();
+  // ==========================================================
+  // Final validation
+  // ==========================================================
 
   const finalHashes =
+    new Set();
+
+  const finalFingerprints =
     new Set();
 
   for (
@@ -2971,12 +3057,17 @@ async function main() {
       );
 
     if (
-      stat.size < 5000
+      stat.size <
+      5000
     ) {
       throw new Error(
-        `Final image is too small: ${file}`
+        `Final image too small: ${file}`
       );
     }
+
+    identifyImage(
+      file
+    );
 
     const hash =
       getFileHash(
@@ -2994,7 +3085,7 @@ async function main() {
       )
     ) {
       throw new Error(
-        `Exact duplicate final image detected: ${file}`
+        `Exact duplicate image detected: ${file}`
       );
     }
 
@@ -3004,7 +3095,7 @@ async function main() {
       )
     ) {
       throw new Error(
-        `Visual duplicate final image detected: ${file}`
+        `Visual duplicate image detected: ${file}`
       );
     }
 
@@ -3017,57 +3108,48 @@ async function main() {
     );
   }
 
-  // ----------------------------------------------------------
-  // Site analysis
-  // ----------------------------------------------------------
-
-  const analysis =
-    buildAnalysis(
-      siteTitle,
-      description,
-      posts
-    );
-
-  // ----------------------------------------------------------
+  // ==========================================================
   // OG image
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  let ogImage = "";
+  let ogImage =
+    "";
 
   const ogTag =
     blogHtml.match(
       /<meta\b[^>]*(?:property|name)=["']og:image["'][^>]*>/i
     );
 
-  if (ogTag) {
+  if (
+    ogTag
+  ) {
     ogImage =
       absoluteUrl(
         getAttribute(
           ogTag[0],
           "content"
         ),
-        blogUrl
-      ) || "";
+        BLOG_URL
+      );
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // Final JSON
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const data = {
-    version: 10,
+    version:
+      10.3,
     capturedAt:
       new Date().toISOString(),
     url:
-      blogUrl,
+      BLOG_URL,
     hostname:
       new URL(
-        blogUrl
+        BLOG_URL
       ).hostname,
-    siteTitle:
-      siteTitle,
-    description:
-      description,
+    siteTitle,
+    description,
     pageHeading:
       siteTitle,
     ogImage,
@@ -3075,7 +3157,12 @@ async function main() {
       "en",
     postCount:
       posts.length,
-    analysis,
+    analysis:
+      buildAnalysis(
+        siteTitle,
+        description,
+        posts
+      ),
     posts
   };
 
@@ -3104,7 +3191,7 @@ async function main() {
   );
 
   console.log(
-    "BLOG ANALYZER v10.2 COMPLETE"
+    "BLOG ANALYZER v10.3 COMPLETE"
   );
 
   console.log(
@@ -3116,7 +3203,7 @@ async function main() {
   );
 
   console.log(
-    `Unique final images: ${finalFingerprints.size}`
+    `Unique images: ${finalFingerprints.size}`
   );
 
   console.log(
@@ -3135,7 +3222,7 @@ main().catch(
     );
 
     console.error(
-      "BLOG ANALYZER v10.2 FAILED"
+      "BLOG ANALYZER v10.3 FAILED"
     );
 
     console.error(
