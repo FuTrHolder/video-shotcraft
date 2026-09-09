@@ -616,29 +616,46 @@ function extractImageCandidatesFromHtml(html, options = {}) {
     );
   }
 
-  /*
-   * Nearby <a href="image">
-   *
-   * Only accept actual image-like URLs.
-   * Generic Unsplash attribution pages are rejected.
-   */
-  const anchorRegex = /<a\b[^>]*>/gi;
+  /* Nearby <a href="image">
+ * Only accept external image URLs or Blogger image-host URLs.
+ * Never treat Blogger article/label/navigation links as images.
+ */
+const anchorRegex = /<a\b[^>]*>/gi;
 
-  while ((match = anchorRegex.exec(html))) {
-    const attrs = parseAttributes(match[0]);
+while ((match = anchorRegex.exec(html))) {
+  const attrs = parseAttributes(match[0]);
+  const href = attrs.href ? normalizeUrl(attrs.href) : "";
 
-    if (attrs.href && isLikelyImageUrl(attrs.href)) {
-      addCandidate(
-        candidates,
-        attrs.href,
-        options.source || "article-body",
-        620,
-        {
-          attribute: "href",
-        }
-      );
-    }
+  if (!href) continue;
+
+  const lower = href.toLowerCase();
+
+  // Never accept the blog's own article/navigation/label URLs.
+  if (lower.startsWith("https://funds-up.blogspot.com/")) {
+    continue;
   }
+
+  // Explicitly allow known image hosts.
+  const isKnownImageHost =
+    lower.includes("blogger.googleusercontent.com/img/") ||
+    lower.includes("bp.blogspot.com/") ||
+    lower.includes("images.unsplash.com/") ||
+    lower.includes("images.pexels.com/");
+
+  if (!isKnownImageHost) {
+    continue;
+  }
+
+  addCandidate(
+    candidates,
+    href,
+    options.source || "article-body",
+    620,
+    {
+      attribute: "href",
+    }
+  );
+}
 
   return candidates;
 }
