@@ -624,7 +624,7 @@ const anchorRegex = /<a\b[^>]*>/gi;
 
 while ((match = anchorRegex.exec(html))) {
   const attrs = parseAttributes(match[0]);
-  const href = attrs.href ? decodeHtmlEntities(attrs.href).trim() : "";
+  const href = attrs.href ? attrs.href.trim() : "";
 
   if (!href) continue;
 
