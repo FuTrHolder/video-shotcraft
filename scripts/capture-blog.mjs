@@ -1,3247 +1,1520 @@
+#!/usr/bin/env node
+
+/**
+ * BLOG ANALYZER v10.6
+ *
+ * Goals
+ * - Capture the latest 5 Blogger posts from a public blog.
+ * - Extract an image that belongs to EACH specific post.
+ * - Prefer Blogger JSON feed data over article-page requests.
+ * - Never use site-wide OG/Twitter meta images as a normal image candidate.
+ * - Never borrow another post's image.
+ * - Handle Blogger HTTP 429 without excessive retries.
+ * - Validate downloaded files with ImageMagick.
+ * - Reject duplicate images.
+ * - Write blog.json + local image files for Remotion.
+ *
+ * Usage:
+ *   node scripts/capture-blog.mjs "$BLOG_URL"
+ */
+
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-
-// ============================================================
-// BLOG ANALYZER v10.5
-//
-// Main goals:
-//
-// 1. Do NOT require the blog homepage before reading the feed.
-// 2. Handle Blogger HTTP 429 with retries + exponential backoff.
-// 3. Use Blogger JSON Feed as the primary source.
-// 4. Extract images from the exact post only.
-// 5. Never mix images from other posts.
-// 6. Never scrape arbitrary Blogger CDN strings.
-// 7. Reject incomplete Blogger resize-only URLs.
-// 8. Validate downloaded files with Content-Type + ImageMagick.
-// 9. Prevent exact and perceptual duplicate images.
-// 10. Never borrow another post's image.
-// 11. Keep blog.json compatible with Remotion BlogPromo.
-//
-// ============================================================
-
-const VERSION = "10.5";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { execFileSync, spawnSync } from "node:child_process";
 
 const BLOG_URL = process.argv[2];
 
 if (!BLOG_URL) {
-  console.error(
-    "Usage: node scripts/capture-blog.mjs <BLOG_URL>"
-  );
+  console.error("Usage: node scripts/capture-blog.mjs <BLOG_URL>");
   process.exit(1);
 }
 
-// ============================================================
-// Paths
-// ============================================================
-
-const OUTPUT_DIR = path.resolve(
-  __dirname,
-  "../template/public/blog"
+const OUTPUT_ROOT = path.resolve(
+  process.env.GITHUB_WORKSPACE || process.cwd(),
+  "template/public/blog"
 );
 
-const IMAGE_DIR = path.join(
-  OUTPUT_DIR,
-  "images"
-);
-
-fs.rmSync(OUTPUT_DIR, {
-  recursive: true,
-  force: true
-});
-
-fs.mkdirSync(IMAGE_DIR, {
-  recursive: true
-});
-
-// ============================================================
-// Runtime configuration
-// ============================================================
+const IMAGE_DIR = path.join(OUTPUT_ROOT, "images");
+const BLOG_JSON_PATH = path.join(OUTPUT_ROOT, "blog.json");
 
 const MAX_POSTS = 5;
+const FEED_MAX_RESULTS = 10;
 
-const FETCH_RETRIES = 5;
+const USER_AGENT =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-const INITIAL_RETRY_DELAY = 1500;
-
-const REQUEST_TIMEOUT = 30000;
-
-const IMAGE_TIMEOUT = 30000;
+const REQUEST_TIMEOUT_MS = 30000;
+const MAX_ARTICLE_RETRIES = 1;
 
 const MIN_IMAGE_BYTES = 5000;
 
-const MIN_IMAGE_WIDTH = 320;
+const BAD_IMAGE_EXTENSIONS = new Set([
+  ".html",
+  ".htm",
+  ".xml",
+  ".json",
+  ".txt",
+  ".svg",
+]);
 
-const MIN_IMAGE_HEIGHT = 180;
+const IMAGE_CONTENT_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+  "image/bmp",
+  "image/tiff",
+]);
 
-const MAX_IMAGE_WIDTH = 6000;
-
-const MAX_IMAGE_HEIGHT = 6000;
-
-// ============================================================
+// ------------------------------------------------------------
 // ImageMagick detection
-// ============================================================
+// ------------------------------------------------------------
 
-function commandExists(command) {
-  try {
-    execFileSync(
-      "bash",
-      [
-        "-lc",
-        `command -v ${command}`
-      ],
-      {
-        stdio: "ignore"
+function findCommand(commands) {
+  for (const command of commands) {
+    try {
+      const result = spawnSync(command, ["-version"], {
+        stdio: "ignore",
+      });
+
+      if (result.status === 0) {
+        return command;
       }
-    );
+    } catch {
+      // Continue.
+    }
+  }
 
-    return true;
+  return null;
+}
+
+const IDENTIFY_COMMAND = findCommand(["magick", "identify"]);
+const CONVERT_COMMAND = findCommand(["magick", "convert"]);
+
+if (!IDENTIFY_COMMAND || !CONVERT_COMMAND) {
+  throw new Error(
+    "ImageMagick is required but identify/convert commands were not found."
+  );
+}
+
+function getImageMagickVersion() {
+  try {
+    return execFileSync(IDENTIFY_COMMAND, ["-version"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+      .split("\n")[0]
+      .trim();
   } catch {
-    return false;
+    return "unknown";
   }
 }
 
-const HAS_IDENTIFY = commandExists("identify");
+console.log(`ImageMagick identify command: ${IDENTIFY_COMMAND}`);
+console.log(`ImageMagick convert command: ${CONVERT_COMMAND}`);
+console.log(`Version: ${getImageMagickVersion()}`);
+console.log("============================================================");
+console.log("BLOG ANALYZER v10.6");
+console.log(`Blog URL: ${BLOG_URL}`);
+console.log(`Output: ${OUTPUT_ROOT}`);
+console.log("============================================================");
 
-const HAS_MAGICK = commandExists("magick");
-
-const HAS_CONVERT = commandExists("convert");
-
-if (!HAS_IDENTIFY && !HAS_MAGICK) {
-  console.error(
-    "ERROR: ImageMagick identify/magick was not found."
-  );
-  process.exit(1);
-}
-
-const IDENTIFY_COMMAND = HAS_IDENTIFY
-  ? "identify"
-  : "magick";
-
-const CONVERT_COMMAND = HAS_CONVERT
-  ? "convert"
-  : "magick";
-
-console.log(
-  `ImageMagick identify command: ${IDENTIFY_COMMAND}`
-);
-
-console.log(
-  `ImageMagick convert command: ${CONVERT_COMMAND}`
-);
-
-try {
-  const version = execFileSync(
-    IDENTIFY_COMMAND,
-    [
-      "-version"
-    ],
-    {
-      encoding: "utf8"
-    }
-  );
-
-  console.log(
-    version.split("\n")[0]
-  );
-} catch {
-  // Ignore version failure.
-}
-
-// ============================================================
-// General helpers
-// ============================================================
+// ------------------------------------------------------------
+// Generic helpers
+// ------------------------------------------------------------
 
 function sleep(ms) {
-  return new Promise(
-    resolve => setTimeout(resolve, ms)
-  );
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function normalizeText(value) {
+function normalizeWhitespace(value) {
   return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function htmlDecode(value) {
-  return String(value || "")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, "\"")
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x27;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(
-      /&#(\d+);/g,
-      (_, value) => {
-        try {
-          return String.fromCodePoint(
-            Number(value)
-          );
-        } catch {
-          return _;
-        }
-      }
-    )
-    .replace(
-      /&#x([0-9a-f]+);/gi,
-      (_, value) => {
-        try {
-          return String.fromCodePoint(
-            parseInt(value, 16)
-          );
-        } catch {
-          return _;
-        }
-      }
-    );
-}
-
-function stripHtml(html) {
-  return htmlDecode(
-    String(html || "")
-      .replace(
-        /<script[\s\S]*?<\/script>/gi,
-        " "
-      )
-      .replace(
-        /<style[\s\S]*?<\/style>/gi,
-        " "
-      )
-      .replace(
-        /<noscript[\s\S]*?<\/noscript>/gi,
-        " "
-      )
-      .replace(
-        /<[^>]+>/g,
-        " "
-      )
-  )
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function absoluteUrl(rawUrl, baseUrl) {
-  if (!rawUrl) {
-    return "";
-  }
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#x2F;/gi, "/")
+    .replace(/&#47;/gi, "/")
+    .replace(/&#(\d+);/g, (_, n) => {
+      try {
+        return String.fromCodePoint(Number(n));
+      } catch {
+        return _;
+      }
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => {
+      try {
+        return String.fromCodePoint(parseInt(n, 16));
+      } catch {
+        return _;
+      }
+    });
+}
 
-  let value = htmlDecode(
-    String(rawUrl)
-      .trim()
-      .replace(
-        /^['"]|['"]$/g,
-        ""
-      )
+function htmlToText(html) {
+  return normalizeWhitespace(
+    decodeHtmlEntities(
+      String(html || "")
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+        .replace(/<[^>]+>/g, " ")
+    )
   );
+}
 
-  if (!value) {
-    return "";
-  }
+function normalizeTitle(title) {
+  return normalizeWhitespace(title)
+    .toLowerCase()
+    .replace(/[“”"'`]/g, "")
+    .replace(/[—–−-]/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  if (
-    /^(javascript|data|blob):/i.test(value)
-  ) {
-    return "";
-  }
+function titleSimilarity(a, b) {
+  const x = normalizeTitle(a);
+  const y = normalizeTitle(b);
 
-  if (value.startsWith("//")) {
-    value = `https:${value}`;
+  if (!x || !y) return 0;
+  if (x === y) return 1;
+
+  const ax = new Set(x.split(" "));
+  const by = new Set(y.split(" "));
+
+  const intersection = [...ax].filter((word) => by.has(word)).length;
+  const union = new Set([...ax, ...by]).size;
+
+  return union ? intersection / union : 0;
+}
+
+function isAbsoluteHttpUrl(url) {
+  return /^https?:\/\//i.test(String(url || "").trim());
+}
+
+function safeUrl(value, baseUrl = BLOG_URL) {
+  if (!value) return null;
+
+  let decoded = decodeHtmlEntities(String(value).trim());
+
+  decoded = decoded
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/&amp;/gi, "&");
+
+  if (!decoded || decoded.startsWith("data:")) {
+    return null;
   }
 
   try {
-    const url = new URL(
-      value,
-      baseUrl
-    );
+    const result = new URL(decoded, baseUrl);
+
+    if (!["http:", "https:"].includes(result.protocol)) {
+      return null;
+    }
+
+    return result.href;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeBloggerImageUrl(url) {
+  const normalized = safeUrl(url);
+
+  if (!normalized) return null;
+
+  try {
+    const u = new URL(normalized);
 
     if (
-      ![
-        "http:",
-        "https:"
-      ].includes(url.protocol)
+      u.hostname === "blogger.googleusercontent.com" ||
+      u.hostname.endsWith(".googleusercontent.com")
     ) {
-      return "";
+      // Blogger image URLs often contain:
+      // /s72-c/
+      // /s320/
+      // /w1200/
+      // /w400-h300/
+      // etc.
+      //
+      // Request the original/larger image where possible.
+      u.pathname = u.pathname
+        .replace(/\/s\d+(?:-[a-z0-9]+)?(?=\/)/gi, "/s1600")
+        .replace(/\/w\d+(?:-h\d+)?(?=\/)/gi, "/s1600")
+        .replace(/\/h\d+(?:-w\d+)?(?=\/)/gi, "/s1600")
+        .replace(/\/s\d+-c(?=\/)/gi, "/s1600");
+
+      return u.href;
     }
 
-    return url.href;
+    return u.href;
   } catch {
-    return "";
+    return normalized;
   }
 }
 
-function samePageUrl(candidateUrl, pageUrl) {
-  if (!candidateUrl || !pageUrl) {
-    return false;
-  }
+function isObviouslyBadImageUrl(url) {
+  if (!url) return true;
+
+  const lower = url.toLowerCase();
+
+  if (lower.startsWith("data:")) return true;
 
   try {
-    const candidate = new URL(candidateUrl);
-    const page = new URL(pageUrl);
+    const u = new URL(url);
 
-    return (
-      candidate.origin === page.origin &&
-      candidate.pathname === page.pathname
-    );
-  } catch {
+    if (!["http:", "https:"].includes(u.protocol)) {
+      return true;
+    }
+
+    const pathname = u.pathname.toLowerCase();
+
+    for (const ext of BAD_IMAGE_EXTENSIONS) {
+      if (pathname.endsWith(ext)) {
+        return true;
+      }
+    }
+
+    if (
+      pathname.includes("/feeds/") ||
+      pathname.includes("/search") ||
+      pathname.includes("/label/") ||
+      pathname.includes("/archive/") ||
+      pathname.includes("/p/")
+    ) {
+      return true;
+    }
+
     return false;
+  } catch {
+    return true;
   }
 }
 
-function uniqueStrings(values) {
-  const seen = new Set();
-  const result = [];
+// ------------------------------------------------------------
+// HTTP
+// ------------------------------------------------------------
 
-  for (const value of values) {
-    if (!value) {
-      continue;
-    }
-
-    const key = String(value).trim();
-
-    if (!key || seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    result.push(key);
-  }
-
-  return result;
-}
-
-// ============================================================
-// HTTP request helpers
-// ============================================================
-
-function buildHeaders(url, {
-  accept = "*/*",
-  referer = ""
-} = {}) {
+function buildHeaders(targetUrl, accept = "*/*") {
   const headers = {
-    "User-Agent":
-      "Mozilla/5.0 (X11; Linux x86_64) " +
-      "AppleWebKit/537.36 (KHTML, like Gecko) " +
-      "Chrome/131.0.0.0 Safari/537.36",
-
-    "Accept": accept,
-
-    "Accept-Language":
-      "en-US,en;q=0.9,ko;q=0.8",
-
-    "Cache-Control":
-      "no-cache",
-
-    "Pragma":
-      "no-cache"
+    "User-Agent": USER_AGENT,
+    Accept: accept,
+    "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
   };
 
-  if (referer) {
-    headers.Referer = referer;
-  }
-
   try {
-    const parsed = new URL(url);
+    const host = new URL(targetUrl).hostname;
 
     if (
-      parsed.hostname.includes(
-        "blogspot.com"
-      )
+      host.endsWith("blogspot.com") ||
+      host.endsWith("blogspot.kr") ||
+      host.endsWith("blogger.com") ||
+      host.endsWith("googleusercontent.com")
     ) {
-      headers["Sec-Fetch-Dest"] = "document";
-      headers["Sec-Fetch-Mode"] = "navigate";
-      headers["Sec-Fetch-Site"] = "same-origin";
+      headers.Referer = BLOG_URL;
     }
   } catch {
-    // Ignore.
+    // Ignore invalid host.
   }
 
   return headers;
 }
 
-async function fetchWithRetry(
-  url,
-  {
-    accept = "*/*",
-    referer = "",
-    timeout = REQUEST_TIMEOUT,
-    retries = FETCH_RETRIES,
-    label = "HTTP request"
-  } = {}
-) {
-  let lastError = null;
+async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
 
-  for (
-    let attempt = 1;
-    attempt <= retries;
-    attempt++
-  ) {
-    let response = null;
-
-    try {
-      const controller =
-        new AbortController();
-
-      const timer = setTimeout(
-        () => controller.abort(),
-        timeout
-      );
-
-      response = await fetch(
-        url,
-        {
-          method: "GET",
-          headers: buildHeaders(
-            url,
-            {
-              accept,
-              referer
-            }
-          ),
-          redirect: "follow",
-          signal: controller.signal
-        }
-      );
-
-      clearTimeout(timer);
-
-      if (response.ok) {
-        return response;
-      }
-
-      const status =
-        response.status;
-
-      const retryable =
-        status === 429 ||
-        status === 408 ||
-        status === 425 ||
-        status >= 500;
-
-      if (!retryable) {
-        throw new Error(
-          `${label}: HTTP ${status} ${response.statusText}`
-        );
-      }
-
-      const retryAfter =
-        response.headers.get(
-          "retry-after"
-        );
-
-      let delay =
-        INITIAL_RETRY_DELAY *
-        Math.pow(
-          2,
-          attempt - 1
-        );
-
-      if (retryAfter) {
-        const seconds =
-          Number(retryAfter);
-
-        if (
-          Number.isFinite(seconds) &&
-          seconds >= 0
-        ) {
-          delay =
-            Math.max(
-              delay,
-              seconds * 1000
-            );
-        }
-      }
-
-      // Small deterministic jitter.
-      delay +=
-        Math.floor(
-          Math.random() * 500
-        );
-
-      console.warn(
-        `${label}: HTTP ${status}. ` +
-        `Retry ${attempt}/${retries} ` +
-        `after ${delay}ms`
-      );
-
-      if (
-        attempt < retries
-      ) {
-        await sleep(delay);
-        continue;
-      }
-
-      throw new Error(
-        `${label}: HTTP ${status} ${response.statusText}`
-      );
-    } catch (error) {
-      lastError = error;
-
-      const message =
-        error?.name === "AbortError"
-          ? "request timeout"
-          : error?.message ||
-            String(error);
-
-      if (
-        attempt >= retries
-      ) {
-        throw new Error(
-          `${label}: ${message}`
-        );
-      }
-
-      const delay =
-        INITIAL_RETRY_DELAY *
-          Math.pow(
-            2,
-            attempt - 1
-          ) +
-        Math.floor(
-          Math.random() * 500
-        );
-
-      console.warn(
-        `${label}: ${message}. ` +
-        `Retry ${attempt}/${retries} ` +
-        `after ${delay}ms`
-      );
-
-      await sleep(delay);
-    }
-  }
-
-  throw (
-    lastError ||
-    new Error(`${label}: request failed`)
-  );
-}
-
-// ============================================================
-// Blogger image URL normalization
-// ============================================================
-
-function isResizeOnlyPath(pathname) {
-  if (!pathname) {
-    return true;
-  }
-
-  return /\/(?:w\d+|h\d+|s\d+(?:-c)?|w\d+-h\d+(?:-[^/]*)?)\/?$/i.test(
-    pathname
-  );
-}
-
-function normalizeBloggerImageUrl(
-  rawUrl,
-  baseUrl = BLOG_URL
-) {
-  const absolute =
-    absoluteUrl(
-      rawUrl,
-      baseUrl
-    );
-
-  if (!absolute) {
-    return "";
-  }
-
-  let url;
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
 
   try {
-    url = new URL(absolute);
-  } catch {
-    return "";
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        ...buildHeaders(url, options.accept || "*/*"),
+        ...(options.headers || {}),
+      },
+    });
+
+    return response;
+  } finally {
+    clearTimeout(timer);
   }
-
-  const host =
-    url.hostname.toLowerCase();
-
-  const isBloggerHost =
-    host.includes(
-      "blogger.googleusercontent.com"
-    ) ||
-    host === "bp.blogspot.com" ||
-    host.endsWith(".bp.blogspot.com");
-
-  if (!isBloggerHost) {
-    return url.href;
-  }
-
-  let pathname =
-    url.pathname;
-
-  // Reject:
-  //
-  // /w1200/
-  // /s1600/
-  // /s72-c/
-  // /w144-h144-p-k-no-nu/
-  //
-  // These are incomplete image URLs.
-  if (
-    isResizeOnlyPath(pathname)
-  ) {
-    return "";
-  }
-
-  // Convert:
-  //
-  // /s72-c/file.jpg
-  // /s1600/file.jpg
-  // /w1200/file.jpg
-  // /w1200-h800/file.jpg
-  //
-  // into:
-  //
-  // /s1600/file.jpg
-
-  pathname =
-    pathname.replace(
-      /\/s\d+(?:-c)?\/([^/]+)$/i,
-      "/s1600/$1"
-    );
-
-  pathname =
-    pathname.replace(
-      /\/w\d+-h\d+(?:-[^/]*)?\/([^/]+)$/i,
-      "/s1600/$1"
-    );
-
-  pathname =
-    pathname.replace(
-      /\/w\d+\/([^/]+)$/i,
-      "/s1600/$1"
-    );
-
-  pathname =
-    pathname.replace(
-      /\/h\d+\/([^/]+)$/i,
-      "/s1600/$1"
-    );
-
-  url.pathname =
-    pathname;
-
-  for (
-    const parameter
-    of [
-      "w",
-      "h",
-      "s",
-      "resize"
-    ]
-  ) {
-    url.searchParams.delete(
-      parameter
-    );
-  }
-
-  return url.href;
 }
 
-// ============================================================
-// URL validation
-// ============================================================
+async function fetchTextOnce(url, options = {}) {
+  const response = await fetchWithTimeout(url, {
+    ...options,
+    accept:
+      options.accept ||
+      "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  });
 
-function isObviouslyBadImageUrl(
-  url,
-  pageUrl = ""
-) {
-  if (!url) {
-    return true;
-  }
-
-  const value =
-    String(url).trim();
-
-  const lower =
-    value.toLowerCase();
-
-  if (
-    /^data:/i.test(value) ||
-    /^javascript:/i.test(value) ||
-    /^blob:/i.test(value)
-  ) {
-    return true;
-  }
-
-  if (
-    pageUrl &&
-    samePageUrl(
-      value,
-      pageUrl
-    )
-  ) {
-    return true;
-  }
-
-  if (
-    /\.html?(?:[?#]|$)/i.test(
-      lower
-    )
-  ) {
-    return true;
-  }
-
-  if (
-    /\.(json|xml)(?:[?#]|$)/i.test(
-      lower
-    )
-  ) {
-    return true;
-  }
-
-  if (
-    isResizeOnlyPath(
-      (() => {
-        try {
-          return new URL(value).pathname;
-        } catch {
-          return "";
-        }
-      })()
-    )
-  ) {
-    return true;
-  }
-
-  const badPatterns = [
-    "favicon",
-    "sprite",
-    "emoji",
-    "avatar",
-    "profile-picture",
-    "profile_image",
-    "profile-image",
-    "default-avatar",
-    "author-avatar",
-    "blogger-logo",
-    "tracking",
-    "pixel.gif",
-    "tracking.gif",
-    "transparent.gif",
-    "spacer.gif",
-    "blank.gif",
-    "1x1"
-  ];
-
-  return badPatterns.some(
-    pattern =>
-      lower.includes(pattern)
-  );
-}
-
-function isLikelyImageUrl(url) {
-  if (!url) {
-    return false;
-  }
-
-  const lower =
-    String(url).toLowerCase();
-
-  if (
-    lower.includes(
-      "blogger.googleusercontent.com/img/"
-    )
-  ) {
-    return true;
-  }
-
-  if (
-    lower.includes(
-      "bp.blogspot.com/"
-    )
-  ) {
-    return true;
-  }
-
-  return /\.(jpg|jpeg|png|webp|gif|avif)(?:[?#]|$)/i.test(
-    lower
-  );
-}
-
-// ============================================================
-// Candidate creation
-// ============================================================
-
-function makeCandidate(
-  rawUrl,
-  {
-    baseUrl,
-    source,
-    score = 0,
-    context = "",
-    alt = "",
-    title = ""
-  }
-) {
-  const normalized =
-    normalizeBloggerImageUrl(
-      rawUrl,
-      baseUrl
-    );
-
-  if (!normalized) {
-    return null;
-  }
-
-  if (
-    isObviouslyBadImageUrl(
-      normalized,
-      baseUrl
-    )
-  ) {
-    return null;
-  }
-
-  if (
-    !isLikelyImageUrl(
-      normalized
-    )
-  ) {
-    return null;
-  }
+  const text = await response.text();
 
   return {
-    url: normalized,
-    source,
-    score,
-    context: String(
-      context || ""
-    ),
-    alt: String(
-      alt || ""
-    ),
-    title: String(
-      title || ""
-    )
+    response,
+    text,
   };
 }
 
-function mergeCandidates(
-  candidates
-) {
-  const map = new Map();
+async function fetchTextWithLimitedRetry(url, label) {
+  let lastError = null;
 
-  for (
-    const candidate
-    of candidates
-  ) {
-    if (!candidate?.url) {
+  for (let attempt = 0; attempt <= MAX_ARTICLE_RETRIES; attempt++) {
+    try {
+      const { response, text } = await fetchTextOnce(url);
+
+      if (response.ok) {
+        return {
+          status: response.status,
+          text,
+          headers: response.headers,
+        };
+      }
+
+      if (response.status === 429) {
+        if (attempt < MAX_ARTICLE_RETRIES) {
+          const retryAfter = Number(response.headers.get("retry-after"));
+
+          const waitMs = Number.isFinite(retryAfter)
+            ? Math.min(Math.max(retryAfter * 1000, 1000), 12000)
+            : 2500;
+
+          console.log(
+            `${label}: HTTP 429. Retry ${attempt + 1}/${MAX_ARTICLE_RETRIES} after ${waitMs}ms`
+          );
+
+          await sleep(waitMs);
+          continue;
+        }
+
+        throw new Error(`${label}: HTTP 429 Too Many Requests`);
+      }
+
+      throw new Error(`${label}: HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < MAX_ARTICLE_RETRIES) {
+        const waitMs = 1500 + attempt * 1000;
+
+        console.log(
+          `${label}: ${error.message}. Retry ${attempt + 1}/${MAX_ARTICLE_RETRIES} after ${waitMs}ms`
+        );
+
+        await sleep(waitMs);
+      }
+    }
+  }
+
+  throw lastError || new Error(`${label}: request failed`);
+}
+
+async function downloadImage(url, outputPath) {
+  const response = await fetchWithTimeout(url, {
+    accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+  });
+
+  const contentType = (response.headers.get("content-type") || "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  if (!IMAGE_CONTENT_TYPES.has(contentType)) {
+    throw new Error(`Invalid Content-Type: ${contentType || "unknown"}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  if (buffer.length < MIN_IMAGE_BYTES) {
+    throw new Error(`Image too small: ${buffer.length} bytes`);
+  }
+
+  fs.writeFileSync(outputPath, buffer);
+
+  return {
+    contentType,
+    bytes: buffer.length,
+  };
+}
+
+// ------------------------------------------------------------
+// Lightweight HTML parser
+// ------------------------------------------------------------
+
+class HtmlNode {
+  constructor(type, tagName = null, attributes = {}) {
+    this.type = type;
+    this.tagName = tagName;
+    this.attributes = attributes;
+    this.children = [];
+    this.parent = null;
+    this.text = "";
+  }
+}
+
+function parseAttributes(tagText) {
+  const attrs = {};
+
+  const attrRegex =
+    /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+
+  let match;
+
+  while ((match = attrRegex.exec(tagText))) {
+    const name = match[1].toLowerCase();
+
+    if (name === "img" || name === "div" || name === "span") {
       continue;
     }
 
-    const existing =
-      map.get(candidate.url);
+    attrs[name] = decodeHtmlEntities(
+      match[2] ?? match[3] ?? match[4] ?? ""
+    );
+  }
 
-    if (
-      !existing ||
-      candidate.score >
-        existing.score
-    ) {
-      map.set(
-        candidate.url,
-        candidate
+  return attrs;
+}
+
+function parseHtml(html) {
+  const root = new HtmlNode("root");
+  const stack = [root];
+
+  const tokenRegex =
+    /<!--[\s\S]*?-->|<![^>]*>|<\/?[a-zA-Z][^>]*>/g;
+
+  let cursor = 0;
+  let match;
+
+  const voidTags = new Set([
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+  ]);
+
+  while ((match = tokenRegex.exec(html))) {
+    const token = match[0];
+
+    if (match.index > cursor) {
+      const text = html.slice(cursor, match.index);
+
+      if (text.trim()) {
+        const node = new HtmlNode("text");
+        node.text = decodeHtmlEntities(text);
+        node.parent = stack[stack.length - 1];
+        stack[stack.length - 1].children.push(node);
+      }
+    }
+
+    cursor = tokenRegex.lastIndex;
+
+    if (token.startsWith("<!--") || token.startsWith("<!")) {
+      continue;
+    }
+
+    if (/^<\//.test(token)) {
+      const closingName = token
+        .slice(2, -1)
+        .trim()
+        .toLowerCase();
+
+      for (let i = stack.length - 1; i > 0; i--) {
+        if (stack[i].tagName === closingName) {
+          stack.length = i;
+          break;
+        }
+      }
+
+      continue;
+    }
+
+    const selfClosing = /\/>$/.test(token);
+
+    const inner = token
+      .slice(1, token.length - (selfClosing ? 2 : 1))
+      .trim();
+
+    const nameMatch = inner.match(/^([^\s/>]+)/);
+
+    if (!nameMatch) continue;
+
+    const tagName = nameMatch[1].toLowerCase();
+
+    const node = new HtmlNode(
+      "element",
+      tagName,
+      parseAttributes(inner)
+    );
+
+    node.parent = stack[stack.length - 1];
+    stack[stack.length - 1].children.push(node);
+
+    if (!selfClosing && !voidTags.has(tagName)) {
+      stack.push(node);
+    }
+  }
+
+  if (cursor < html.length) {
+    const text = html.slice(cursor);
+
+    if (text.trim()) {
+      const node = new HtmlNode("text");
+      node.text = decodeHtmlEntities(text);
+      node.parent = stack[stack.length - 1];
+      stack[stack.length - 1].children.push(node);
+    }
+  }
+
+  return root;
+}
+
+function walkNodes(root, callback) {
+  callback(root);
+
+  for (const child of root.children || []) {
+    walkNodes(child, callback);
+  }
+}
+
+function elementNodes(root) {
+  const result = [];
+
+  walkNodes(root, (node) => {
+    if (node.type === "element") {
+      result.push(node);
+    }
+  });
+
+  return result;
+}
+
+function nodeText(node) {
+  if (!node) return "";
+
+  if (node.type === "text") {
+    return node.text;
+  }
+
+  let result = "";
+
+  for (const child of node.children || []) {
+    result += " " + nodeText(child);
+  }
+
+  return normalizeWhitespace(result);
+}
+
+function hasClassOrId(node, patterns) {
+  if (!node || node.type !== "element") return false;
+
+  const value = [
+    node.attributes.class || "",
+    node.attributes.id || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return patterns.some((pattern) => value.includes(pattern));
+}
+
+function getAncestorChain(node) {
+  const result = [];
+
+  let current = node;
+
+  while (current) {
+    result.push(current);
+    current = current.parent;
+  }
+
+  return result;
+}
+
+// ------------------------------------------------------------
+// Image extraction from HTML
+// ------------------------------------------------------------
+
+function addCandidate(list, url, source, score = 0) {
+  const normalized = normalizeBloggerImageUrl(url);
+
+  if (!normalized || isObviouslyBadImageUrl(normalized)) {
+    return;
+  }
+
+  if (!list.some((item) => item.url === normalized)) {
+    list.push({
+      url: normalized,
+      source,
+      score,
+    });
+  }
+}
+
+function extractUrlsFromSrcset(value) {
+  if (!value) return [];
+
+  return String(value)
+    .split(",")
+    .map((part) => {
+      const pieces = part.trim().split(/\s+/);
+      return pieces[0];
+    })
+    .filter(Boolean);
+}
+
+function extractImageCandidatesFromNode(root, sourcePrefix) {
+  const candidates = [];
+
+  const nodes = elementNodes(root);
+
+  for (const node of nodes) {
+    if (node.tagName === "img") {
+      const attrs = node.attributes;
+
+      const srcAttributes = [
+        ["src", 100],
+        ["data-src", 95],
+        ["data-original", 94],
+        ["data-lazy-src", 93],
+        ["data-lazy", 92],
+        ["data-image", 91],
+        ["data-image-url", 90],
+        ["data-url", 89],
+      ];
+
+      for (const [attribute, score] of srcAttributes) {
+        if (attrs[attribute]) {
+          addCandidate(
+            candidates,
+            attrs[attribute],
+            `${sourcePrefix}-img`,
+            score
+          );
+        }
+      }
+
+      for (const attribute of ["srcset", "data-srcset"]) {
+        if (attrs[attribute]) {
+          for (const url of extractUrlsFromSrcset(attrs[attribute])) {
+            addCandidate(
+              candidates,
+              url,
+              `${sourcePrefix}-srcset`,
+              85
+            );
+          }
+        }
+      }
+    }
+
+    if (node.tagName === "source") {
+      for (const attribute of ["src", "srcset", "data-src", "data-srcset"]) {
+        if (!attrsSafe(node, attribute)) continue;
+
+        const value = node.attributes[attribute];
+
+        if (attribute.includes("srcset")) {
+          for (const url of extractUrlsFromSrcset(value)) {
+            addCandidate(
+              candidates,
+              url,
+              `${sourcePrefix}-source`,
+              70
+            );
+          }
+        } else {
+          addCandidate(
+            candidates,
+            value,
+            `${sourcePrefix}-source`,
+            70
+          );
+        }
+      }
+    }
+
+    // CSS background-image only inside the exact post content scope.
+    const style = node.attributes.style || "";
+
+    const backgroundRegex =
+      /background-image\s*:\s*url\(\s*(['"]?)(.*?)\1\s*\)/gi;
+
+    let match;
+
+    while ((match = backgroundRegex.exec(style))) {
+      addCandidate(
+        candidates,
+        match[2],
+        `${sourcePrefix}-background`,
+        50
       );
     }
   }
 
-  return Array.from(
-    map.values()
-  ).sort(
-    (a, b) =>
-      b.score - a.score
+  return candidates;
+}
+
+function attrsSafe(node, attribute) {
+  return Boolean(
+    node &&
+      node.attributes &&
+      node.attributes[attribute]
   );
 }
 
-// ============================================================
-// HTML attribute helpers
-// ============================================================
+// ------------------------------------------------------------
+// Feed image extraction
+// ------------------------------------------------------------
 
-function getAttribute(
-  tag,
-  name
-) {
-  const quoted =
-    tag.match(
-      new RegExp(
-        `\\b${name}\\s*=\\s*["']([^"']+)["']`,
-        "i"
-      )
-    );
+function extractFeedImageCandidates(entry) {
+  const candidates = [];
 
-  if (quoted?.[1]) {
-    return htmlDecode(
-      quoted[1]
+  const thumbnail =
+    entry?.media$thumbnail?.url ||
+    entry?.media$thumbnail?.["url"];
+
+  if (thumbnail) {
+    addCandidate(
+      candidates,
+      thumbnail,
+      "feed-thumbnail",
+      120
     );
   }
 
-  const unquoted =
-    tag.match(
-      new RegExp(
-        `\\b${name}\\s*=\\s*([^\\s>]+)`,
-        "i"
-      )
-    );
+  const mediaGroup =
+    entry?.media$group?.["media$content"] ||
+    entry?.media$group?.media$content ||
+    [];
 
-  return htmlDecode(
-    unquoted?.[1] || ""
-  );
+  for (const item of Array.isArray(mediaGroup) ? mediaGroup : []) {
+    if (item?.url) {
+      addCandidate(
+        candidates,
+        item.url,
+        "feed-media-content",
+        115
+      );
+    }
+  }
+
+  const mediaContent =
+    entry?.["media$content"] ||
+    entry?.media$content ||
+    [];
+
+  for (const item of Array.isArray(mediaContent) ? mediaContent : []) {
+    if (item?.url) {
+      addCandidate(
+        candidates,
+        item.url,
+        "feed-media-content",
+        115
+      );
+    }
+  }
+
+  const htmlFragments = [];
+
+  if (entry?.content?.$t) {
+    htmlFragments.push(entry.content.$t);
+  }
+
+  if (entry?.summary?.$t) {
+    htmlFragments.push(entry.summary.$t);
+  }
+
+  for (const fragment of htmlFragments) {
+    if (!fragment) continue;
+
+    try {
+      const root = parseHtml(fragment);
+
+      const fragmentCandidates =
+        extractImageCandidatesFromNode(root, "feed-content");
+
+      for (const candidate of fragmentCandidates) {
+        addCandidate(
+          candidates,
+          candidate.url,
+          candidate.source,
+          Math.max(candidate.score, 100)
+        );
+      }
+    } catch (error) {
+      console.warn(
+        `Feed HTML parsing warning: ${error.message}`
+      );
+    }
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+
+  return candidates;
 }
 
-// ============================================================
-// srcset
-// ============================================================
+// ------------------------------------------------------------
+// Exact article container detection
+// ------------------------------------------------------------
 
-function extractSrcsetUrls(
-  srcset,
-  baseUrl
-) {
-  if (!srcset) {
+const POST_CONTAINER_HINTS = [
+  "post-body",
+  "post-content",
+  "post-body-container",
+  "post-outer",
+  "post",
+  "entry-content",
+  "entry",
+  "hentry",
+  "blog-post",
+  "article-body",
+  "article-content",
+  "blog-posts",
+];
+
+function isLikelyPostContainer(node) {
+  if (!node || node.type !== "element") {
+    return false;
+  }
+
+  if (
+    node.tagName === "article" ||
+    node.tagName === "main"
+  ) {
+    return true;
+  }
+
+  return hasClassOrId(node, POST_CONTAINER_HINTS);
+}
+
+function findTitleNodes(root, title) {
+  const target = normalizeTitle(title);
+
+  if (!target) return [];
+
+  const headings = elementNodes(root).filter((node) =>
+    ["h1", "h2", "h3", "h4"].includes(node.tagName)
+  );
+
+  return headings
+    .map((node) => ({
+      node,
+      similarity: titleSimilarity(nodeText(node), title),
+    }))
+    .filter((item) => item.similarity >= 0.75)
+    .sort((a, b) => b.similarity - a.similarity);
+}
+
+function findPermalinkNodes(root, postUrl) {
+  const target = safeUrl(postUrl);
+
+  if (!target) return [];
+
+  let targetObj;
+
+  try {
+    targetObj = new URL(target);
+  } catch {
     return [];
   }
 
-  const results = [];
+  const anchors = elementNodes(root).filter(
+    (node) => node.tagName === "a"
+  );
 
-  for (
-    const item
-    of String(srcset).split(",")
-  ) {
-    const value =
-      item.trim();
+  return anchors
+    .map((node) => {
+      const href = safeUrl(node.attributes.href);
 
-    if (!value) {
-      continue;
-    }
+      if (!href) {
+        return null;
+      }
 
-    const parts =
-      value.split(/\s+/);
+      try {
+        const hrefObj = new URL(href);
 
-    const rawUrl =
-      parts[0];
+        const same =
+          hrefObj.hostname === targetObj.hostname &&
+          hrefObj.pathname === targetObj.pathname;
 
-    const url =
-      absoluteUrl(
-        rawUrl,
-        baseUrl
-      );
-
-    if (url) {
-      results.push(url);
-    }
-  }
-
-  return results;
+        return same ? node : null;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 }
 
-// ============================================================
-// Extract image URLs ONLY from real HTML attributes.
-//
-// IMPORTANT:
-// We intentionally do NOT use a global regex such as:
-//
-// https://*.blogspot.com/...
-//
-// because that was causing unrelated / malformed URLs to
-// become candidates.
-// ============================================================
+function scoreContainer(node, title) {
+  if (!node || node.type !== "element") {
+    return -Infinity;
+  }
 
-function extractImagesFromHtml(
-  html,
-  baseUrl,
-  {
-    source = "html",
-    score = 0,
-    pageUrl = baseUrl
-  } = {}
-) {
+  let score = 0;
+
+  if (node.tagName === "article") score += 50;
+  if (node.tagName === "main") score += 10;
+
+  if (hasClassOrId(node, ["post-body"])) {
+    score += 80;
+  }
+
+  if (hasClassOrId(node, ["entry-content"])) {
+    score += 75;
+  }
+
+  if (hasClassOrId(node, ["post-content"])) {
+    score += 75;
+  }
+
+  if (hasClassOrId(node, ["hentry"])) {
+    score += 60;
+  }
+
+  if (hasClassOrId(node, ["post-outer"])) {
+    score += 55;
+  }
+
+  if (hasClassOrId(node, ["blog-post"])) {
+    score += 55;
+  }
+
+  const text = nodeText(node);
+
+  const similarity = titleSimilarity(text, title);
+
+  score += similarity * 40;
+
+  const images = extractImageCandidatesFromNode(
+    node,
+    "container"
+  );
+
+  score += Math.min(images.length, 5) * 5;
+
+  return score;
+}
+
+function findExactPostContainer(root, post) {
   const candidates = [];
 
-  const imageTagRegex =
-    /<img\b[^>]*>/gi;
+  // ----------------------------------------------------------
+  // Method 1: Exact title heading → ancestor post container
+  // ----------------------------------------------------------
 
-  let match;
+  const titleNodes = findTitleNodes(root, post.title);
 
-  while (
-    (match =
-      imageTagRegex.exec(html))
-  ) {
-    const tag =
-      match[0];
+  for (const item of titleNodes) {
+    const ancestors = getAncestorChain(item.node);
 
-    const alt =
-      getAttribute(
-        tag,
-        "alt"
-      );
-
-    const title =
-      getAttribute(
-        tag,
-        "title"
-      );
-
-    const className =
-      getAttribute(
-        tag,
-        "class"
-      );
-
-    const id =
-      getAttribute(
-        tag,
-        "id"
-      );
-
-    const context =
-      [
-        alt,
-        title,
-        className,
-        id
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-    const attributes = [
-      "src",
-      "data-src",
-      "data-original",
-      "data-lazy-src",
-      "data-lazy",
-      "data-image",
-      "data-image-url",
-      "data-url",
-      "data-fallback-src"
-    ];
-
-    for (
-      const attribute
-      of attributes
-    ) {
-      const raw =
-        getAttribute(
-          tag,
-          attribute
-        );
-
-      if (!raw) {
-        continue;
-      }
-
-      const candidate =
-        makeCandidate(
-          raw,
-          {
-            baseUrl,
-            source,
-            score:
-              score +
-              (
-                attribute ===
-                "src"
-                  ? 10
-                  : 5
-              ),
-            context,
-            alt,
-            title
-          }
-        );
-
-      if (candidate) {
-        candidates.push(
-          candidate
-        );
-      }
-    }
-
-    for (
-      const attribute
-      of [
-        "srcset",
-        "data-srcset"
-      ]
-    ) {
-      const raw =
-        getAttribute(
-          tag,
-          attribute
-        );
-
-      if (!raw) {
-        continue;
-      }
-
-      for (
-        const imageUrl
-        of extractSrcsetUrls(
-          raw,
-          baseUrl
-        )
-      ) {
-        const candidate =
-          makeCandidate(
-            imageUrl,
-            {
-              baseUrl,
-              source,
-              score:
-                score + 7,
-              context,
-              alt,
-              title
-            }
-          );
-
-        if (candidate) {
-          candidates.push(
-            candidate
-          );
-        }
-      }
-    }
-  }
-
-  // <source srcset="...">
-  const sourceRegex =
-    /<source\b[^>]*>/gi;
-
-  while (
-    (match =
-      sourceRegex.exec(html))
-  ) {
-    const tag =
-      match[0];
-
-    const srcset =
-      getAttribute(
-        tag,
-        "srcset"
-      );
-
-    if (!srcset) {
-      continue;
-    }
-
-    for (
-      const imageUrl
-      of extractSrcsetUrls(
-        srcset,
-        baseUrl
-      )
-    ) {
-      const candidate =
-        makeCandidate(
-          imageUrl,
-          {
-            baseUrl,
-            source,
-            score:
-              score + 4
-          }
-        );
-
-      if (candidate) {
-        candidates.push(
-          candidate
-        );
-      }
-    }
-  }
-
-  // CSS background-image.
-  const backgroundRegex =
-    /background-image\s*:\s*url\(\s*['"]?([^'")]+)['"]?\s*\)/gi;
-
-  while (
-    (match =
-      backgroundRegex.exec(html))
-  ) {
-    const candidate =
-      makeCandidate(
-        match[1],
-        {
-          baseUrl,
-          source:
-            `${source}-background`,
+    for (const ancestor of ancestors) {
+      if (isLikelyPostContainer(ancestor)) {
+        candidates.push({
+          node: ancestor,
           score:
-            score - 10
-        }
-      );
+            scoreContainer(ancestor, post.title) +
+            item.similarity * 100,
+          reason: "title-ancestor",
+        });
 
-    if (candidate) {
-      candidates.push(
-        candidate
-      );
+        break;
+      }
     }
   }
 
-  // Image metadata.
-  const metaRegex =
-    /<meta\b[^>]*>/gi;
+  // ----------------------------------------------------------
+  // Method 2: Exact permalink → ancestor post container
+  // ----------------------------------------------------------
 
-  while (
-    (match =
-      metaRegex.exec(html))
-  ) {
-    const tag =
-      match[0];
+  const permalinkNodes = findPermalinkNodes(root, post.url);
 
-    const property =
-      getAttribute(
-        tag,
-        "property"
-      );
+  for (const node of permalinkNodes) {
+    const ancestors = getAncestorChain(node);
 
-    const name =
-      getAttribute(
-        tag,
-        "name"
-      );
-
-    if (
-      ![
-        "og:image",
-        "og:image:url",
-        "twitter:image",
-        "twitter:image:src",
-        "image_src"
-      ].includes(
-        String(
-          property || name
-        ).toLowerCase()
-      )
-    ) {
-      continue;
-    }
-
-    const raw =
-      getAttribute(
-        tag,
-        "content"
-      );
-
-    const candidate =
-      makeCandidate(
-        raw,
-        {
-          baseUrl,
-          source:
-            `${source}-meta`,
+    for (const ancestor of ancestors) {
+      if (isLikelyPostContainer(ancestor)) {
+        candidates.push({
+          node: ancestor,
           score:
-            score + 15
-        }
-      );
+            scoreContainer(ancestor, post.title) + 80,
+          reason: "permalink-ancestor",
+        });
 
-    if (candidate) {
-      candidates.push(
-        candidate
-      );
+        break;
+      }
     }
   }
 
-  return mergeCandidates(
-    candidates
+  // ----------------------------------------------------------
+  // Method 3: If the page has <article>, inspect each article.
+  // ----------------------------------------------------------
+
+  const articles = elementNodes(root).filter(
+    (node) => node.tagName === "article"
   );
-}
 
-// ============================================================
-// Post title matching
-// ============================================================
-
-function titleSimilarity(
-  target,
-  candidate
-) {
-  const a =
-    normalizeText(target);
-
-  const b =
-    normalizeText(candidate);
-
-  if (!a || !b) {
-    return 0;
-  }
-
-  if (a === b) {
-    return 100;
-  }
-
-  if (
-    b.includes(a) ||
-    a.includes(b)
-  ) {
-    return 80;
-  }
-
-  const aWords =
-    new Set(
-      a
-        .split(/\s+/)
-        .filter(
-          word =>
-            word.length > 2
-        )
-    );
-
-  const bWords =
-    new Set(
-      b
-        .split(/\s+/)
-        .filter(
-          word =>
-            word.length > 2
-        )
-    );
-
-  if (
-    !aWords.size ||
-    !bWords.size
-  ) {
-    return 0;
-  }
-
-  let common = 0;
-
-  for (
-    const word
-    of aWords
-  ) {
-    if (
-      bWords.has(word)
-    ) {
-      common++;
-    }
-  }
-
-  return Math.round(
-    (common /
-      Math.max(
-        aWords.size,
-        bWords.size
-      )) *
-      100
-  );
-}
-
-// ============================================================
-// Exact post container extraction
-//
-// The important difference from v10.4:
-//
-// v10.4 collected ALL .post-body / article containers.
-//
-// v10.5 first tries to locate the container whose text/title
-// belongs to the requested post.
-// ============================================================
-
-function findExactPostScopes(
-  html,
-  post
-) {
-  const scopes = [];
-
-  const title =
-    normalizeText(
+  for (const article of articles) {
+    const similarity = titleSimilarity(
+      nodeText(article),
       post.title
     );
 
-  const postUrl =
-    post.url || "";
-
-  // ----------------------------------------------------------
-  // 1. <article> blocks
-  // ----------------------------------------------------------
-
-  const articleRegex =
-    /<article\b[^>]*>[\s\S]*?<\/article>/gi;
-
-  let match;
-
-  while (
-    (match =
-      articleRegex.exec(html))
-  ) {
-    const block =
-      match[0];
-
-    const text =
-      normalizeText(
-        stripHtml(block)
-      );
-
-    const score =
-      titleSimilarity(
-        title,
-        text
-      );
-
-    if (score >= 35) {
-      scopes.push({
-        html: block,
-        score:
-          100 + score,
-        source:
-          "post-article-title"
+    if (similarity >= 0.35) {
+      candidates.push({
+        node: article,
+        score: scoreContainer(article, post.title) + 60,
+        reason: "article-title-similarity",
       });
     }
   }
 
   // ----------------------------------------------------------
-  // 2. Known Blogger post containers
+  // Choose the highest-scoring candidate.
   // ----------------------------------------------------------
 
-  const classPatterns = [
-    "post-body",
-    "entry-content",
-    "post-content",
-    "hentry",
-    "blog-post"
-  ];
+  candidates.sort((a, b) => b.score - a.score);
 
-  for (
-    const className
-    of classPatterns
-  ) {
-    const regex =
-      new RegExp(
-        `<[^>]+class=["'][^"']*\\b${className}\\b[^"']*["'][^>]*>[\\s\\S]*?<\\/[^>]+>`,
-        "gi"
-      );
-
-    while (
-      (match =
-        regex.exec(html))
-    ) {
-      const block =
-        match[0];
-
-      const text =
-        normalizeText(
-          stripHtml(block)
-        );
-
-      const score =
-        titleSimilarity(
-          title,
-          text
-        );
-
-      if (score >= 35) {
-        scopes.push({
-          html: block,
-          score:
-            80 + score,
-          source:
-            `post-${className}`
-        });
-      }
-    }
+  if (!candidates.length) {
+    return null;
   }
 
-  // ----------------------------------------------------------
-  // 3. Exact URL occurrence.
-  //
-  // This helps when Blogger's DOM does not expose the post
-  // title in a conventional container.
-  // ----------------------------------------------------------
-
-  if (postUrl) {
-    const normalizedPostUrl =
-      normalizeText(
-        postUrl
-      );
-
-    const index =
-      html.indexOf(
-        postUrl
-      );
-
-    if (index >= 0) {
-      const start =
-        Math.max(
-          0,
-          index - 15000
-        );
-
-      const end =
-        Math.min(
-          html.length,
-          index + 15000
-        );
-
-      const nearby =
-        html.slice(
-          start,
-          end
-        );
-
-      const nearbyCandidates =
-        extractImagesFromHtml(
-          nearby,
-          postUrl,
-          {
-            source:
-              "post-url-nearby",
-            score: 30,
-            pageUrl:
-              postUrl
-          }
-        );
-
-      if (
-        nearbyCandidates.length
-      ) {
-        scopes.push({
-          html: nearby,
-          score: 70,
-          source:
-            "post-url-nearby"
-        });
-      }
-
-      void normalizedPostUrl;
-    }
-  }
-
-  scopes.sort(
-    (a, b) =>
-      b.score - a.score
-  );
-
-  return scopes;
+  return candidates[0];
 }
 
-// ============================================================
-// Feed image extraction
-// ============================================================
+// ------------------------------------------------------------
+// Article-page image extraction
+// ------------------------------------------------------------
 
-function getFeedContent(
-  entry
-) {
-  const values = [];
+function extractArticleScopedCandidates(html, post) {
+  const root = parseHtml(html);
 
-  const content =
-    entry?.content?.$t;
+  const containerResult = findExactPostContainer(root, post);
 
-  const summary =
-    entry?.summary?.$t;
+  if (!containerResult) {
+    console.log("Exact post container: NOT FOUND");
 
-  if (content) {
-    values.push(content);
+    return {
+      container: null,
+      candidates: [],
+    };
   }
-
-  if (summary) {
-    values.push(summary);
-  }
-
-  return values;
-}
-
-function getFeedMediaUrls(
-  entry
-) {
-  const urls = [];
-
-  const thumbnail =
-    entry?.media$thumbnail?.url;
-
-  if (thumbnail) {
-    urls.push(thumbnail);
-  }
-
-  const mediaGroup =
-    entry?.media$group;
-
-  if (
-    mediaGroup?.["media$content"]
-  ) {
-    for (
-      const item
-      of mediaGroup[
-        "media$content"
-      ]
-    ) {
-      if (item?.url) {
-        urls.push(item.url);
-      }
-    }
-  }
-
-  if (
-    Array.isArray(
-      entry?.["media$content"]
-    )
-  ) {
-    for (
-      const item
-      of entry[
-        "media$content"
-      ]
-    ) {
-      if (item?.url) {
-        urls.push(item.url);
-      }
-    }
-  }
-
-  return uniqueStrings(
-    urls
-  );
-}
-
-function extractFeedImageCandidates(
-  entry,
-  postUrl
-) {
-  const candidates = [];
-
-  // ----------------------------------------------------------
-  // Feed media
-  // ----------------------------------------------------------
-
-  for (
-    const url
-    of getFeedMediaUrls(
-      entry
-    )
-  ) {
-    const candidate =
-      makeCandidate(
-        url,
-        {
-          baseUrl:
-            postUrl,
-          source:
-            "feed-media",
-          score: 100
-        }
-      );
-
-    if (candidate) {
-      candidates.push(
-        candidate
-      );
-    }
-  }
-
-  // ----------------------------------------------------------
-  // Feed content
-  // ----------------------------------------------------------
-
-  for (
-    const content
-    of getFeedContent(
-      entry
-    )
-  ) {
-    const contentCandidates =
-      extractImagesFromHtml(
-        content,
-        postUrl,
-        {
-          source:
-            "feed-content",
-          score: 95,
-          pageUrl:
-            postUrl
-        }
-      );
-
-    candidates.push(
-      ...contentCandidates
-    );
-  }
-
-  return mergeCandidates(
-    candidates
-  );
-}
-
-// ============================================================
-// Extract candidates from the exact post page
-// ============================================================
-
-function extractPostPageCandidates(
-  html,
-  post
-) {
-  const candidates = [];
-
-  const scopes =
-    findExactPostScopes(
-      html,
-      post
-    );
 
   console.log(
-    `Scoped post containers: ${scopes.length}`
+    `Exact post container: FOUND (${containerResult.reason}, score=${containerResult.score.toFixed(
+      1
+    )})`
   );
 
-  // Only the best matching scope(s).
-  //
-  // Do NOT collect every .post-body from the page.
-  const bestScopes =
-    scopes
-      .slice(
-        0,
-        2
-      );
-
-  for (
-    const scope
-    of bestScopes
-  ) {
-    const extracted =
-      extractImagesFromHtml(
-        scope.html,
-        post.url,
-        {
-          source:
-            scope.source,
-          score:
-            scope.score,
-          pageUrl:
-            post.url
-        }
-      );
-
-    candidates.push(
-      ...extracted
-    );
-  }
-
-  // ----------------------------------------------------------
-  // Post-level metadata is safe because it belongs to this
-  // exact fetched post URL.
-  // ----------------------------------------------------------
-
-  const metaCandidates =
-    extractImagesFromHtml(
-      html,
-      post.url,
-      {
-        source:
-          "post-meta",
-        score: 60,
-        pageUrl:
-          post.url
-      }
-    ).filter(
-      candidate =>
-        candidate.source
-          .includes("meta")
-    );
-
-  candidates.push(
-    ...metaCandidates
+  const candidates = extractImageCandidatesFromNode(
+    containerResult.node,
+    "article-container"
   );
 
-  return mergeCandidates(
-    candidates
-  );
-}
-
-// ============================================================
-// Download image
-// ============================================================
-
-async function downloadImage(
-  url,
-  destination,
-  referer
-) {
-  console.log(
-    `Downloading image: ${url}`
-  );
-
-  const response =
-    await fetchWithRetry(
-      url,
-      {
-        accept:
-          "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        referer,
-        timeout:
-          IMAGE_TIMEOUT,
-        retries: 3,
-        label:
-          "Image download"
-      }
-    );
-
-  const contentType =
-    (
-      response.headers.get(
-        "content-type"
-      ) || ""
-    ).toLowerCase();
-
-  console.log(
-    `Content-Type: ${contentType || "unknown"}`
-  );
-
-  if (
-    contentType.includes(
-      "text/html"
-    ) ||
-    contentType.includes(
-      "application/json"
-    ) ||
-    contentType.includes(
-      "application/xml"
-    ) ||
-    contentType.includes(
-      "text/xml"
-    )
-  ) {
-    throw new Error(
-      `Downloaded response is not an image: ${contentType}`
-    );
-  }
-
-  const buffer =
-    Buffer.from(
-      await response.arrayBuffer()
-    );
-
-  console.log(
-    `Downloaded: ${buffer.length} bytes`
-  );
-
-  if (
-    buffer.length <
-    MIN_IMAGE_BYTES
-  ) {
-    throw new Error(
-      `Image is too small: ${buffer.length} bytes`
-    );
-  }
-
-  fs.writeFileSync(
-    destination,
-    buffer
-  );
+  candidates.sort((a, b) => b.score - a.score);
 
   return {
-    bytes:
-      buffer.length,
-    contentType
+    container: containerResult.node,
+    candidates,
   };
 }
 
-// ============================================================
-// ImageMagick inspection
-// ============================================================
+// ------------------------------------------------------------
+// Metadata extraction
+// ------------------------------------------------------------
 
-function identifyImage(
-  filePath
-) {
+function getEntryLink(entry) {
+  const links = Array.isArray(entry?.link)
+    ? entry.link
+    : [];
+
+  const alternate = links.find(
+    (link) => link.rel === "alternate" && link.href
+  );
+
+  return alternate?.href || null;
+}
+
+function getPublishedDate(entry) {
+  return (
+    entry?.published?.$t ||
+    entry?.updated?.$t ||
+    null
+  );
+}
+
+function formatDate(dateString) {
+  if (!dateString) return null;
+
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function getCategories(entry) {
+  const categories = Array.isArray(entry?.category)
+    ? entry.category
+    : [];
+
+  return categories
+    .map((category) => category?.term)
+    .filter(Boolean);
+}
+
+function getExcerpt(entry) {
+  const html =
+    entry?.summary?.$t ||
+    entry?.content?.$t ||
+    "";
+
+  const text = htmlToText(html);
+
+  if (text.length <= 280) {
+    return text;
+  }
+
+  return `${text.slice(0, 277).trim()}...`;
+}
+
+function getSiteTitle(feed) {
+  return (
+    feed?.feed?.title?.$t ||
+    new URL(BLOG_URL).hostname
+  );
+}
+
+function getSiteDescription(feed) {
+  return (
+    feed?.feed?.subtitle?.$t ||
+    feed?.feed?.description?.$t ||
+    ""
+  );
+}
+
+// ------------------------------------------------------------
+// Image validation
+// ------------------------------------------------------------
+
+function identifyImage(filePath) {
   try {
-    const output =
-      execFileSync(
-        IDENTIFY_COMMAND,
-        [
-          "-format",
-          "%m|%w|%h",
-          filePath
-        ],
-        {
-          encoding: "utf8",
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe"
-          ]
-        }
-      )
-        .trim();
+    const output = execFileSync(
+      IDENTIFY_COMMAND,
+      [
+        "-format",
+        "%m|%w|%h",
+        filePath,
+      ],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    ).trim();
 
-    const [
-      format,
-      widthText,
-      heightText
-    ] =
-      output.split("|");
-
-    const width =
-      Number(widthText);
-
-    const height =
-      Number(heightText);
-
-    if (
-      !format ||
-      !Number.isFinite(width) ||
-      !Number.isFinite(height)
-    ) {
-      throw new Error(
-        "ImageMagick returned invalid image information"
-      );
+    if (!output) {
+      throw new Error("ImageMagick returned no information");
     }
+
+    const [format, width, height] = output.split("|");
 
     return {
       format,
-      width,
-      height
+      width: Number(width),
+      height: Number(height),
     };
-  } catch {
+  } catch (error) {
     throw new Error(
-      "ImageMagick could not identify image"
+      `ImageMagick could not identify image: ${error.message}`
     );
   }
 }
 
-function convertToJpeg(
-  sourcePath,
-  destinationPath
-) {
-  execFileSync(
-    CONVERT_COMMAND,
-    [
-      sourcePath,
-      "-auto-orient",
-      "-strip",
-      "-quality",
-      "88",
-      destinationPath
-    ],
-    {
-      stdio: "pipe"
-    }
-  );
+function sha256File(filePath) {
+  const hash = crypto.createHash("sha256");
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest("hex");
 }
 
-function validateImageFile(
-  filePath
-) {
-  const stat =
-    fs.statSync(
-      filePath
-    );
-
-  if (
-    stat.size <
-    MIN_IMAGE_BYTES
-  ) {
-    throw new Error(
-      `Image file is too small: ${stat.size} bytes`
-    );
-  }
-
-  const info =
-    identifyImage(
-      filePath
-    );
-
-  console.log(
-    `ImageMagick: ${info.format}|${info.width}|${info.height}`
-  );
-
-  if (
-    info.width <
-    MIN_IMAGE_WIDTH ||
-    info.height <
-    MIN_IMAGE_HEIGHT
-  ) {
-    throw new Error(
-      `Image dimensions too small: ${info.width}x${info.height}`
-    );
-  }
-
-  if (
-    info.width >
-    MAX_IMAGE_WIDTH ||
-    info.height >
-    MAX_IMAGE_HEIGHT
-  ) {
-    throw new Error(
-      `Image dimensions too large: ${info.width}x${info.height}`
-    );
-  }
-
-  return {
-    ...info,
-    bytes:
-      stat.size
-  };
-}
-
-// ============================================================
-// SHA-256
-// ============================================================
-
-function sha256File(
-  filePath
-) {
-  const hash =
-    crypto.createHash(
-      "sha256"
-    );
-
-  hash.update(
-    fs.readFileSync(
-      filePath
-    )
-  );
-
-  return hash.digest(
-    "hex"
-  );
-}
-
-// ============================================================
-// Perceptual fingerprint
-//
-// ImageMagick converts the image into a small grayscale PNG.
-// The resulting pixels are hashed.
-//
-// This catches visually identical images saved with different
-// file encodings or dimensions better than SHA-256 alone.
-// ============================================================
-
-function visualFingerprint(
-  filePath
-) {
-  const tempPath =
-    `${filePath}.fingerprint.png`;
+/**
+ * Generate a small grayscale perceptual fingerprint.
+ *
+ * Instead of hashing the original encoded file bytes, resize the
+ * image to a tiny grayscale representation. This helps detect
+ * visually identical images saved with different JPEG/PNG encoding.
+ */
+function perceptualFingerprint(filePath) {
+  const tempPath = `${filePath}.fingerprint.raw`;
 
   try {
     execFileSync(
       CONVERT_COMMAND,
       [
         filePath,
-        "-auto-orient",
         "-resize",
         "32x32!",
         "-colorspace",
         "Gray",
         "-depth",
         "8",
-        "PNG24:" + tempPath
+        "gray:" + tempPath,
       ],
       {
-        stdio: "pipe"
+        stdio: ["ignore", "pipe", "pipe"],
       }
     );
 
-    return sha256File(
-      tempPath
-    );
+    const buffer = fs.readFileSync(tempPath);
+
+    return crypto
+      .createHash("sha256")
+      .update(buffer)
+      .digest("hex");
+  } catch {
+    return null;
   } finally {
     try {
-      fs.rmSync(
-        tempPath,
-        {
-          force: true
-        }
-      );
+      fs.unlinkSync(tempPath);
     } catch {
       // Ignore.
     }
   }
 }
 
-// ============================================================
-// Candidate download + validation
-// ============================================================
+function validateImage(filePath) {
+  const stat = fs.statSync(filePath);
+
+  if (stat.size < MIN_IMAGE_BYTES) {
+    throw new Error(
+      `Image file too small: ${stat.size} bytes`
+    );
+  }
+
+  const info = identifyImage(filePath);
+
+  if (!Number.isFinite(info.width) || !Number.isFinite(info.height)) {
+    throw new Error("Invalid image dimensions");
+  }
+
+  if (info.width < 200 || info.height < 150) {
+    throw new Error(
+      `Image dimensions too small: ${info.width}x${info.height}`
+    );
+  }
+
+  const sha256 = sha256File(filePath);
+  const perceptual = perceptualFingerprint(filePath);
+
+  return {
+    bytes: stat.size,
+    ...info,
+    sha256,
+    perceptual,
+  };
+}
+
+// ------------------------------------------------------------
+// Candidate selection
+// ------------------------------------------------------------
 
 async function tryCandidate(
   candidate,
-  index,
-  post
+  postIndex,
+  candidateIndex
 ) {
-  const temporaryPath =
+  const extensionPath =
     path.join(
       IMAGE_DIR,
-      `.candidate-${index}.bin`
+      `.candidate-${postIndex}-${candidateIndex}.bin`
     );
 
-  const convertedPath =
-    path.join(
-      IMAGE_DIR,
-      `.candidate-${index}.jpg`
-    );
+  console.log(
+    `Candidate ${candidateIndex}: ${candidate.url}`
+  );
 
   try {
-    await downloadImage(
+    console.log(
+      `Downloading image: ${candidate.url}`
+    );
+
+    const downloaded = await downloadImage(
       candidate.url,
-      temporaryPath,
-      post.url
+      extensionPath
     );
 
-    const originalInfo =
-      validateImageFile(
-        temporaryPath
-      );
-
-    convertToJpeg(
-      temporaryPath,
-      convertedPath
+    console.log(
+      `Content-Type: ${downloaded.contentType}`
     );
 
-    const finalInfo =
-      validateImageFile(
-        convertedPath
-      );
+    console.log(
+      `Downloaded: ${downloaded.bytes} bytes`
+    );
 
-    const hash =
-      sha256File(
-        convertedPath
-      );
+    const info = validateImage(extensionPath);
 
-    const fingerprint =
-      visualFingerprint(
-        convertedPath
-      );
+    console.log(
+      `ImageMagick: ${info.format}|${info.width}|${info.height}`
+    );
 
     return {
-      temporaryPath,
-      convertedPath,
-      originalInfo,
-      finalInfo,
-      hash,
-      fingerprint
+      ...candidate,
+      filePath: extensionPath,
+      validation: info,
     };
   } catch (error) {
+    console.log(`Rejected: ${error.message}`);
+
     try {
-      fs.rmSync(
-        temporaryPath,
-        {
-          force: true
-        }
-      );
+      fs.unlinkSync(extensionPath);
     } catch {
       // Ignore.
     }
-
-    try {
-      fs.rmSync(
-        convertedPath,
-        {
-          force: true
-        }
-      );
-    } catch {
-      // Ignore.
-    }
-
-    console.warn(
-      `Rejected: ${error.message}`
-    );
 
     return null;
   }
 }
 
-// ============================================================
-// Feed URL
-// ============================================================
+function isDuplicateImage(validation, usedImages) {
+  if (!validation) return false;
 
-function buildFeedUrl(
-  blogUrl
-) {
-  const url =
-    new URL(
-      blogUrl
-    );
-
-  url.pathname =
-    "/feeds/posts/default";
-
-  url.search = "";
-
-  url.searchParams.set(
-    "alt",
-    "json"
-  );
-
-  url.searchParams.set(
-    "max-results",
-    "10"
-  );
-
-  return url.href;
-}
-
-// ============================================================
-// Parse Blogger feed
-// ============================================================
-
-function parseFeed(
-  json
-) {
-  if (
-    !json ||
-    typeof json !== "object"
-  ) {
-    throw new Error(
-      "Invalid Blogger feed JSON"
-    );
-  }
-
-  const feed =
-    json.feed;
-
-  if (!feed) {
-    throw new Error(
-      "Blogger feed does not contain feed object"
-    );
-  }
-
-  const entries =
-    Array.isArray(
-      feed.entry
-    )
-      ? feed.entry
-      : [];
-
-  return {
-    feed,
-    entries
-  };
-}
-
-function getEntryText(
-  entry,
-  key
-) {
-  return (
-    entry?.[key]?.$t ||
-    ""
-  );
-}
-
-function getEntryUrl(
-  entry
-) {
-  const links =
-    Array.isArray(
-      entry?.link
-    )
-      ? entry.link
-      : [];
-
-  const alternate =
-    links.find(
-      link =>
-        link?.rel ===
-        "alternate"
-    );
-
-  return (
-    alternate?.href ||
-    ""
-  );
-}
-
-function getEntryCategories(
-  entry
-) {
-  if (
-    !Array.isArray(
-      entry?.category
-    )
-  ) {
-    return [];
-  }
-
-  return entry.category
-    .map(
-      category =>
-        category?.term
-    )
-    .filter(Boolean);
-}
-
-function getEntryDate(
-  entry
-) {
-  const published =
-    getEntryText(
-      entry,
-      "published"
-    );
-
-  if (!published) {
-    return "";
-  }
-
-  try {
-    return new Date(
-      published
-    )
-      .toISOString()
-      .slice(
-        0,
-        10
-      );
-  } catch {
-    return published.slice(
-      0,
-      10
-    );
-  }
-}
-
-// ============================================================
-// Blog metadata
-// ============================================================
-
-function getBlogMetadata(
-  feed
-) {
-  const title =
-    getEntryText(
-      feed,
-      "title"
-    );
-
-  const description =
-    getEntryText(
-      feed,
-      "subtitle"
-    );
-
-  return {
-    siteTitle:
-      title ||
-      "",
-    description:
-      description ||
-      ""
-  };
-}
-
-// ============================================================
-// Main
-// ============================================================
-
-async function main() {
-  console.log(
-    "============================================================"
-  );
-
-  console.log(
-    `BLOG ANALYZER v${VERSION}`
-  );
-
-  console.log(
-    `Blog URL: ${BLOG_URL}`
-  );
-
-  console.log(
-    `Output: ${OUTPUT_DIR}`
-  );
-
-  console.log(
-    "============================================================"
-  );
-
-  // ----------------------------------------------------------
-  // IMPORTANT v10.5 CHANGE:
-  //
-  // Do NOT fetch the blog homepage first.
-  //
-  // The v10.4 failure happened here:
-  //
-  // Fetching blog page...
-  // Error: HTTP 429 Too Many Requests
-  //
-  // The homepage is not required to obtain the posts.
-  // Blogger's JSON feed is sufficient.
-  // ----------------------------------------------------------
-
-  const feedUrl =
-    buildFeedUrl(
-      BLOG_URL
-    );
-
-  console.log(
-    "Fetching Blogger JSON Feed..."
-  );
-
-  console.log(
-    `Feed URL: ${feedUrl}`
-  );
-
-  let feedResponse;
-
-  try {
-    feedResponse =
-      await fetchWithRetry(
-        feedUrl,
-        {
-          accept:
-            "application/atom+json, application/json, text/json, */*",
-          referer:
-            BLOG_URL,
-          retries:
-            FETCH_RETRIES,
-          label:
-            "Blogger feed"
-        }
-      );
-  } catch (error) {
-    // --------------------------------------------------------
-    // Only if the feed fails, try the homepage as a fallback.
-    // --------------------------------------------------------
-
-    console.warn(
-      `Feed request failed: ${error.message}`
-    );
-
-    console.warn(
-      "Attempting blog homepage as fallback..."
-    );
-
-    let blogResponse;
-
-    try {
-      blogResponse =
-        await fetchWithRetry(
-          BLOG_URL,
-          {
-            accept:
-              "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            referer:
-              "",
-            retries:
-              FETCH_RETRIES,
-            label:
-              "Blog homepage"
-          }
-        );
-    } catch (homepageError) {
-      throw new Error(
-        `Unable to access Blogger feed or homepage. ` +
-        `Feed: ${error.message}. ` +
-        `Homepage: ${homepageError.message}`
-      );
-    }
-
-    const homepageHtml =
-      await blogResponse.text();
-
-    console.log(
-      `Blog homepage fetched: ${homepageHtml.length} bytes`
-    );
-
-    // Try feed again after a successful homepage request.
-    await sleep(1500);
-
-    feedResponse =
-      await fetchWithRetry(
-        feedUrl,
-        {
-          accept:
-            "application/atom+json, application/json, text/json, */*",
-          referer:
-            BLOG_URL,
-          retries:
-            3,
-          label:
-            "Blogger feed retry"
-        }
-      );
-  }
-
-  const feedText =
-    await feedResponse.text();
-
-  let feedJson;
-
-  try {
-    feedJson =
-      JSON.parse(
-        feedText
-      );
-  } catch {
-    throw new Error(
-      "Blogger feed returned non-JSON content"
-    );
-  }
-
-  const {
-    feed,
-    entries
-  } =
-    parseFeed(
-      feedJson
-    );
-
-  console.log(
-    "Feed fetched successfully."
-  );
-
-  console.log(
-    `Feed entries: ${entries.length}`
-  );
-
-  if (
-    entries.length === 0
-  ) {
-    throw new Error(
-      "No Blogger posts found in feed."
-    );
-  }
-
-  const metadata =
-    getBlogMetadata(
-      feed
-    );
-
-  const selectedPosts = [];
-
-  const usedHashes =
-    new Set();
-
-  const usedFingerprints =
-    new Set();
-
-  // ----------------------------------------------------------
-  // Process first MAX_POSTS posts.
-  // ----------------------------------------------------------
-
-  for (
-    let i = 0;
-    i <
-      Math.min(
-        MAX_POSTS,
-        entries.length
-      );
-    i++
-  ) {
-    const entry =
-      entries[i];
-
-    const title =
-      getEntryText(
-        entry,
-        "title"
-      );
-
-    const postUrl =
-      getEntryUrl(
-        entry
-      );
-
+  for (const used of usedImages) {
+    // Exact encoded bytes.
     if (
-      !title ||
-      !postUrl
+      validation.sha256 &&
+      used.sha256 &&
+      validation.sha256 === used.sha256
     ) {
-      console.warn(
-        `Skipping feed entry ${i + 1}: missing title or URL`
-      );
-
-      continue;
+      return true;
     }
 
-    const published =
-      getEntryText(
-        entry,
-        "published"
-      );
-
-    const updated =
-      getEntryText(
-        entry,
-        "updated"
-      );
-
-    const excerpt =
-      stripHtml(
-        getEntryText(
-          entry,
-          "summary"
-        ) ||
-        getEntryText(
-          entry,
-          "content"
-        )
-      )
-        .slice(
-          0,
-          500
-        );
-
-    const categories =
-      getEntryCategories(
-        entry
-      );
-
-    const date =
-      getEntryDate(
-        entry
-      );
-
-    console.log(
-      "\n------------------------------------------------------------"
-    );
-
-    console.log(
-      `Post ${selectedPosts.length + 1}: ${title}`
-    );
-
-    console.log(
-      `URL: ${postUrl}`
-    );
-
-    // --------------------------------------------------------
-    // 1. Feed image candidates
-    // --------------------------------------------------------
-
-    let candidates =
-      extractFeedImageCandidates(
-        entry,
-        postUrl
-      );
-
-    console.log(
-      `Feed image candidates: ${candidates.length}`
-    );
-
-    // --------------------------------------------------------
-    // 2. Exact post page
-    //
-    // Fetch only if feed did not provide a good image.
-    // --------------------------------------------------------
-
+    // Same normalized grayscale fingerprint.
     if (
-      candidates.length === 0
+      validation.perceptual &&
+      used.perceptual &&
+      validation.perceptual === used.perceptual
     ) {
-      console.log(
-        "Fetching exact article page..."
-      );
-
-      try {
-        const articleResponse =
-          await fetchWithRetry(
-            postUrl,
-            {
-              accept:
-                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-              referer:
-                BLOG_URL,
-              retries:
-                4,
-              label:
-                `Article page ${i + 1}`
-            }
-          );
-
-        const articleHtml =
-          await articleResponse.text();
-
-        console.log(
-          `Article page fetched: ${articleHtml.length} bytes`
-        );
-
-        const pageCandidates =
-          extractPostPageCandidates(
-            articleHtml,
-            {
-              title,
-              url:
-                postUrl
-            }
-          );
-
-        console.log(
-          `Page-local image candidates: ${pageCandidates.length}`
-        );
-
-        candidates =
-          mergeCandidates(
-            pageCandidates
-          );
-      } catch (error) {
-        console.warn(
-          `Article page fetch failed: ${error.message}`
-        );
-      }
+      return true;
     }
-
-    // --------------------------------------------------------
-    // If feed candidates exist, still allow article candidates
-    // to be used if every feed image fails validation.
-    // --------------------------------------------------------
-
-    if (
-      candidates.length > 0
-    ) {
-      console.log(
-        `Image candidates for Post ${selectedPosts.length + 1}: ${candidates.length}`
-      );
-    }
-
-    // --------------------------------------------------------
-    // 3. If feed candidates exist but cannot be downloaded,
-    //    fetch the exact article as a second chance.
-    // --------------------------------------------------------
-
-    let result =
-      await selectImageForPost(
-        candidates,
-        {
-          title,
-          url:
-            postUrl,
-          postIndex:
-            selectedPosts.length + 1,
-          usedHashes,
-          usedFingerprints
-        }
-      );
-
-    if (
-      !result
-    ) {
-      console.log(
-        "Feed candidates failed. Fetching exact article page for fallback..."
-      );
-
-      try {
-        const articleResponse =
-          await fetchWithRetry(
-            postUrl,
-            {
-              accept:
-                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-              referer:
-                BLOG_URL,
-              retries:
-                4,
-              label:
-                `Article fallback ${i + 1}`
-            }
-          );
-
-        const articleHtml =
-          await articleResponse.text();
-
-        console.log(
-          `Article page fetched: ${articleHtml.length} bytes`
-        );
-
-        const pageCandidates =
-          extractPostPageCandidates(
-            articleHtml,
-            {
-              title,
-              url:
-                postUrl
-            }
-          );
-
-        console.log(
-          `Page-local image candidates: ${pageCandidates.length}`
-        );
-
-        result =
-          await selectImageForPost(
-            pageCandidates,
-            {
-              title,
-              url:
-                postUrl,
-              postIndex:
-                selectedPosts.length + 1,
-              usedHashes,
-              usedFingerprints
-            }
-          );
-      } catch (error) {
-        console.warn(
-          `Article fallback failed: ${error.message}`
-        );
-      }
-    }
-
-    if (!result) {
-      throw new Error(
-        `All image candidates were rejected for Post ${selectedPosts.length + 1}: ${title}`
-      );
-    }
-
-    const finalPath =
-      path.join(
-        IMAGE_DIR,
-        `post-${selectedPosts.length + 1}.jpg`
-      );
-
-    fs.copyFileSync(
-      result.convertedPath,
-      finalPath
-    );
-
-    // Remove temporary files.
-    try {
-      fs.rmSync(
-        result.convertedPath,
-        {
-          force:
-            true
-        }
-      );
-    } catch {
-      // Ignore.
-    }
-
-    try {
-      fs.rmSync(
-        result.temporaryPath,
-        {
-          force:
-            true
-        }
-      );
-    } catch {
-      // Ignore.
-    }
-
-    const localImage =
-      `blog/images/post-${selectedPosts.length + 1}.jpg`;
-
-    usedHashes.add(
-      result.hash
-    );
-
-    usedFingerprints.add(
-      result.fingerprint
-    );
-
-    selectedPosts.push({
-      index:
-        selectedPosts.length + 1,
-      title,
-      url:
-        postUrl,
-      published,
-      date,
-      excerpt,
-      categories,
-      localImage,
-      imageSource:
-        result.candidate.source,
-      imageUrl:
-        result.candidate.url
-    });
-
-    console.log(
-      `Selected image: ${localImage}`
-    );
-
-    console.log(
-      `Selected source: ${result.candidate.source}`
-    );
-
-    console.log(
-      `Selected URL: ${result.candidate.url}`
-    );
-
-    console.log(
-      `Selected bytes: ${result.finalInfo.bytes}`
-    );
   }
 
-  // ----------------------------------------------------------
-  // Require exactly MAX_POSTS.
-  // ----------------------------------------------------------
-
-  if (
-    selectedPosts.length <
-    MAX_POSTS
-  ) {
-    throw new Error(
-      `Only ${selectedPosts.length} valid posts/images were captured. Required: ${MAX_POSTS}.`
-    );
-  }
-
-  // ----------------------------------------------------------
-  // Final validation
-  // ----------------------------------------------------------
-
-  console.log(
-    "\n============================================================"
-  );
-
-  console.log(
-    "Final image validation"
-  );
-
-  console.log(
-    "============================================================"
-  );
-
-  const finalHashes =
-    new Set();
-
-  const finalFingerprints =
-    new Set();
-
-  for (
-    const post
-    of selectedPosts
-  ) {
-    const filePath =
-      path.resolve(
-        OUTPUT_DIR,
-        "..",
-        post.localImage
-      );
-
-    if (
-      !fs.existsSync(
-        filePath
-      )
-    ) {
-      throw new Error(
-        `Missing final image: ${filePath}`
-      );
-    }
-
-    const hash =
-      sha256File(
-        filePath
-      );
-
-    const fingerprint =
-      visualFingerprint(
-        filePath
-      );
-
-    if (
-      finalHashes.has(
-        hash
-      )
-    ) {
-      throw new Error(
-        `Exact duplicate image detected: ${filePath}`
-      );
-    }
-
-    if (
-      finalFingerprints.has(
-        fingerprint
-      )
-    ) {
-      throw new Error(
-        `Visual duplicate image detected: ${filePath}`
-      );
-    }
-
-    finalHashes.add(
-      hash
-    );
-
-    finalFingerprints.add(
-      fingerprint
-    );
-
-    const info =
-      validateImageFile(
-        filePath
-      );
-
-    console.log(
-      `${post.index}. ${post.title}`
-    );
-
-    console.log(
-      `   ${info.width}x${info.height}, ${info.bytes} bytes`
-    );
-  }
-
-  // ----------------------------------------------------------
-  // blog.json
-  // ----------------------------------------------------------
-
-  const blogJson = {
-    version:
-      10.5,
-
-    capturedAt:
-      new Date().toISOString(),
-
-    url:
-      BLOG_URL,
-
-    hostname:
-      (() => {
-        try {
-          return new URL(
-            BLOG_URL
-          ).hostname;
-        } catch {
-          return "";
-        }
-      })(),
-
-    siteTitle:
-      metadata.siteTitle,
-
-    description:
-      metadata.description,
-
-    pageHeading:
-      metadata.siteTitle,
-
-    ogImage:
-      "",
-
-    language:
-      "en",
-
-    postCount:
-      selectedPosts.length,
-
-    analysis: {
-      identity:
-        metadata.siteTitle ||
-        "Financial market blog",
-
-      topics: [
-        "stock market",
-        "financial markets",
-        "market news",
-        "economic indicators"
-      ],
-
-      audience:
-        "Readers interested in financial markets and investing",
-
-      contentStyle:
-        "Short-form market news and analysis",
-
-      valueProposition:
-        "Concise financial market information and analysis"
-    },
-
-    posts:
-      selectedPosts
-  };
-
-  const blogJsonPath =
-    path.join(
-      OUTPUT_DIR,
-      "blog.json"
-    );
-
-  fs.writeFileSync(
-    blogJsonPath,
-    JSON.stringify(
-      blogJson,
-      null,
-      2
-    ),
-    "utf8"
-  );
-
-  console.log(
-    "\n============================================================"
-  );
-
-  console.log(
-    `BLOG ANALYZER v${VERSION} COMPLETE`
-  );
-
-  console.log(
-    `Posts: ${selectedPosts.length}`
-  );
-
-  console.log(
-    `blog.json: ${blogJsonPath}`
-  );
-
-  console.log(
-    "============================================================"
-  );
+  return false;
 }
-
-// ============================================================
-// Select image for one post
-//
-// CRITICAL:
-// If an image is a duplicate of an earlier post, we simply
-// reject it and try the NEXT candidate belonging to THIS post.
-//
-// We never search another post's image.
-// ============================================================
 
 async function selectImageForPost(
-  candidates,
-  {
-    title,
-    url,
-    postIndex,
-    usedHashes,
-    usedFingerprints
-  }
+  post,
+  postIndex,
+  feedCandidates,
+  articleCandidates,
+  usedImages
 ) {
-  if (
-    !candidates ||
-    candidates.length === 0
-  ) {
+  const allCandidates = [];
+
+  // Feed candidates get the highest priority.
+  for (const candidate of feedCandidates) {
+    allCandidates.push({
+      ...candidate,
+      priority: 300,
+    });
+  }
+
+  // Article candidates are second priority.
+  for (const candidate of articleCandidates) {
+    allCandidates.push({
+      ...candidate,
+      priority: 200,
+    });
+  }
+
+  // De-duplicate candidate URLs.
+  const unique = [];
+
+  for (const candidate of allCandidates) {
+    if (!unique.some((x) => x.url === candidate.url)) {
+      unique.push(candidate);
+    }
+  }
+
+  unique.sort(
+    (a, b) =>
+      b.priority +
+      b.score -
+      (a.priority + a.score)
+  );
+
+  console.log(
+    `Image candidates for Post ${postIndex}: ${unique.length}`
+  );
+
+  if (!unique.length) {
     return null;
   }
 
-  let candidateIndex = 0;
+  let candidateNumber = 0;
 
-  for (
-    const candidate
-    of candidates
-  ) {
-    candidateIndex++;
+  for (const candidate of unique) {
+    candidateNumber++;
 
-    console.log(
-      `Candidate ${candidateIndex}: ${candidate.url}`
+    const result = await tryCandidate(
+      candidate,
+      postIndex,
+      candidateNumber
     );
-
-    // --------------------------------------------------------
-    // Candidate title/context scoring.
-    // --------------------------------------------------------
-
-    const context =
-      [
-        candidate.alt,
-        candidate.title,
-        candidate.context
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-    const similarity =
-      titleSimilarity(
-        title,
-        context
-      );
-
-    let effectiveScore =
-      candidate.score;
-
-    if (
-      similarity >= 80
-    ) {
-      effectiveScore += 50;
-    } else if (
-      similarity >= 50
-    ) {
-      effectiveScore += 25;
-    }
-
-    candidate.effectiveScore =
-      effectiveScore;
-
-    // --------------------------------------------------------
-    // Download + validate.
-    // --------------------------------------------------------
-
-    const result =
-      await tryCandidate(
-        candidate,
-        candidateIndex,
-        {
-          title,
-          url
-        }
-      );
 
     if (!result) {
       continue;
     }
 
-    // --------------------------------------------------------
-    // Exact duplicate.
-    // --------------------------------------------------------
-
     if (
-      usedHashes.has(
-        result.hash
+      isDuplicateImage(
+        result.validation,
+        usedImages
       )
     ) {
-      console.warn(
-        `Rejected duplicate SHA-256 image for Post ${postIndex}`
+      console.log(
+        "Rejected: image is a duplicate of an already selected post image"
       );
 
       try {
-        fs.rmSync(
-          result.convertedPath,
-          {
-            force:
-              true
-          }
-        );
-      } catch {
-        // Ignore.
-      }
-
-      try {
-        fs.rmSync(
-          result.temporaryPath,
-          {
-            force:
-              true
-          }
-        );
+        fs.unlinkSync(result.filePath);
       } catch {
         // Ignore.
       }
 
       continue;
     }
-
-    // --------------------------------------------------------
-    // Visual duplicate.
-    // --------------------------------------------------------
-
-    if (
-      usedFingerprints.has(
-        result.fingerprint
-      )
-    ) {
-      console.warn(
-        `Rejected visually duplicate image for Post ${postIndex}`
-      );
-
-      try {
-        fs.rmSync(
-          result.convertedPath,
-          {
-            force:
-              true
-          }
-        );
-      } catch {
-        // Ignore.
-      }
-
-      try {
-        fs.rmSync(
-          result.temporaryPath,
-          {
-            force:
-              true
-          }
-        );
-      } catch {
-        // Ignore.
-      }
-
-      continue;
-    }
-
-    result.candidate =
-      candidate;
 
     return result;
   }
@@ -3249,28 +1522,520 @@ async function selectImageForPost(
   return null;
 }
 
-// ============================================================
-// Execute
-// ============================================================
+// ------------------------------------------------------------
+// Feed URL
+// ------------------------------------------------------------
 
-main().catch(
-  error => {
-    console.error(
-      "\n============================================================"
-    );
+function buildFeedUrls(blogUrl) {
+  const base = new URL(blogUrl);
 
-    console.error(
-      `BLOG ANALYZER v${VERSION} FAILED`
-    );
+  const origin = `${base.protocol}//${base.host}`;
 
-    console.error(
-      `Error: ${error.message}`
-    );
+  return [
+    `${origin}/feeds/posts/default?alt=json&max-results=${FEED_MAX_RESULTS}`,
+    `${origin}/feeds/posts/default?alt=json-in-script&max-results=${FEED_MAX_RESULTS}`,
+  ];
+}
 
-    console.error(
-      "============================================================"
-    );
+async function fetchBloggerFeed() {
+  const urls = buildFeedUrls(BLOG_URL);
 
-    process.exit(1);
+  let lastError = null;
+
+  for (const feedUrl of urls) {
+    console.log(`Feed URL: ${feedUrl}`);
+
+    try {
+      const response = await fetchWithTimeout(feedUrl, {
+        accept:
+          "application/json,application/javascript,text/javascript,*/*;q=0.8",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `Feed HTTP ${response.status}`
+        );
+      }
+
+      const text = await response.text();
+
+      let jsonText = text.trim();
+
+      // Handle JSON-in-script style response if encountered.
+      jsonText = jsonText
+        .replace(/^callback\s*\(/i, "")
+        .replace(/\);\s*$/i, "")
+        .trim();
+
+      const data = JSON.parse(jsonText);
+
+      return {
+        data,
+        feedUrl,
+      };
+    } catch (error) {
+      lastError = error;
+
+      console.log(
+        `Feed request failed: ${error.message}`
+      );
+
+      // Do not hammer Blogger with repeated requests.
+      await sleep(1200);
+    }
   }
-);
+
+  throw (
+    lastError ||
+    new Error("Unable to fetch Blogger JSON feed")
+  );
+}
+
+// ------------------------------------------------------------
+// Cleanup
+// ------------------------------------------------------------
+
+function cleanOutputDirectory() {
+  fs.mkdirSync(IMAGE_DIR, {
+    recursive: true,
+  });
+
+  for (const file of fs.readdirSync(IMAGE_DIR)) {
+    const fullPath = path.join(IMAGE_DIR, file);
+
+    if (
+      file.startsWith(".candidate-") ||
+      /^post-\d+\.(jpg|jpeg|png|webp)$/i.test(file)
+    ) {
+      try {
+        fs.unlinkSync(fullPath);
+      } catch {
+        // Ignore.
+      }
+    }
+  }
+}
+
+// ------------------------------------------------------------
+// Main
+// ------------------------------------------------------------
+
+async function main() {
+  cleanOutputDirectory();
+
+  console.log("Fetching Blogger JSON Feed...");
+
+  const { data: feed, feedUrl } =
+    await fetchBloggerFeed();
+
+  const entries = Array.isArray(feed?.feed?.entry)
+    ? feed.feed.entry
+    : [];
+
+  console.log("Feed fetched successfully.");
+  console.log(`Feed entries: ${entries.length}`);
+
+  if (entries.length < MAX_POSTS) {
+    throw new Error(
+      `Blogger feed returned only ${entries.length} posts. Required: ${MAX_POSTS}`
+    );
+  }
+
+  const selectedPosts = [];
+  const usedImages = [];
+
+  for (
+    let index = 0;
+    index < MAX_POSTS;
+    index++
+  ) {
+    const entry = entries[index];
+
+    const title =
+      entry?.title?.$t ||
+      `Untitled Post ${index + 1}`;
+
+    const postUrl = getEntryLink(entry);
+
+    if (!postUrl) {
+      throw new Error(
+        `Post ${index + 1} has no alternate URL: ${title}`
+      );
+    }
+
+    console.log(
+      "------------------------------------------------------------"
+    );
+
+    console.log(
+      `Post ${index + 1}: ${title}`
+    );
+
+    console.log(`URL: ${postUrl}`);
+
+    // --------------------------------------------------------
+    // 1. Feed-level image extraction
+    // --------------------------------------------------------
+
+    const feedCandidates =
+      extractFeedImageCandidates(entry);
+
+    console.log(
+      `Feed image candidates: ${feedCandidates.length}`
+    );
+
+    // --------------------------------------------------------
+    // 2. Try Feed candidates FIRST.
+    // --------------------------------------------------------
+
+    let selected = await selectImageForPost(
+      {
+        title,
+        url: postUrl,
+      },
+      index + 1,
+      feedCandidates,
+      [],
+      usedImages
+    );
+
+    // --------------------------------------------------------
+    // 3. Only if Feed images fail, request exact article.
+    // --------------------------------------------------------
+
+    let articleHtml = null;
+
+    if (!selected) {
+      console.log(
+        "Feed candidates failed. Fetching exact article page for fallback..."
+      );
+
+      try {
+        const result =
+          await fetchTextWithLimitedRetry(
+            postUrl,
+            `Article page ${index + 1}`
+          );
+
+        articleHtml = result.text;
+
+        console.log(
+          `Article page fetched: ${articleHtml.length} bytes`
+        );
+      } catch (error) {
+        console.log(
+          `Article page fetch failed: ${error.message}`
+        );
+      }
+    }
+
+    // --------------------------------------------------------
+    // 4. Exact post container only.
+    // --------------------------------------------------------
+
+    let articleCandidates = [];
+
+    if (!selected && articleHtml) {
+      const scoped =
+        extractArticleScopedCandidates(
+          articleHtml,
+          {
+            title,
+            url: postUrl,
+          }
+        );
+
+      articleCandidates =
+        scoped.candidates;
+
+      console.log(
+        `Page-local image candidates: ${articleCandidates.length}`
+      );
+
+      selected = await selectImageForPost(
+        {
+          title,
+          url: postUrl,
+        },
+        index + 1,
+        [],
+        articleCandidates,
+        usedImages
+      );
+    }
+
+    // --------------------------------------------------------
+    // 5. Do NOT use site-wide OG/Twitter metadata.
+    // --------------------------------------------------------
+
+    if (!selected) {
+      throw new Error(
+        `All image candidates were rejected for Post ${
+          index + 1
+        }: ${title}`
+      );
+    }
+
+    // --------------------------------------------------------
+    // 6. Save final image.
+    // --------------------------------------------------------
+
+    const finalPath = path.join(
+      IMAGE_DIR,
+      `post-${index + 1}.jpg`
+    );
+
+    // Convert every accepted source to JPEG.
+    try {
+      execFileSync(
+        CONVERT_COMMAND,
+        [
+          selected.filePath,
+          "-auto-orient",
+          "-strip",
+          "-quality",
+          "92",
+          finalPath,
+        ],
+        {
+          stdio: ["ignore", "pipe", "pipe"],
+        }
+      );
+    } catch (error) {
+      throw new Error(
+        `Failed to convert image to JPEG: ${error.message}`
+      );
+    }
+
+    try {
+      fs.unlinkSync(selected.filePath);
+    } catch {
+      // Ignore.
+    }
+
+    const finalValidation =
+      validateImage(finalPath);
+
+    if (
+      isDuplicateImage(
+        finalValidation,
+        usedImages
+      )
+    ) {
+      throw new Error(
+        `Exact/visual duplicate image detected after conversion for Post ${
+          index + 1
+        }: ${title}`
+      );
+    }
+
+    usedImages.push({
+      sha256: finalValidation.sha256,
+      perceptual: finalValidation.perceptual,
+    });
+
+    console.log(
+      `Selected image: blog/images/post-${index + 1}.jpg`
+    );
+
+    console.log(
+      `Selected source: ${selected.source}`
+    );
+
+    console.log(
+      `Selected URL: ${selected.url}`
+    );
+
+    console.log(
+      `Selected bytes: ${finalValidation.bytes}`
+    );
+
+    // --------------------------------------------------------
+    // 7. Build post data.
+    // --------------------------------------------------------
+
+    selectedPosts.push({
+      index: index + 1,
+      title,
+      url: postUrl,
+      published: getPublishedDate(entry),
+      date: formatDate(
+        getPublishedDate(entry)
+      ),
+      excerpt: getExcerpt(entry),
+      categories: getCategories(entry),
+      localImage:
+        `blog/images/post-${index + 1}.jpg`,
+      imageSource: selected.source,
+    });
+
+    // Small delay between article requests.
+    // Feed extraction normally means this is not reached.
+    await sleep(350);
+  }
+
+  // ----------------------------------------------------------
+  // Final validation
+  // ----------------------------------------------------------
+
+  if (selectedPosts.length !== MAX_POSTS) {
+    throw new Error(
+      `Expected ${MAX_POSTS} posts, got ${selectedPosts.length}`
+    );
+  }
+
+  const imagePaths = selectedPosts.map(
+    (post) =>
+      path.join(
+        OUTPUT_ROOT,
+        post.localImage.replace(
+          /^blog[\\/]/,
+          ""
+        )
+      )
+  );
+
+  const imageHashes = new Set();
+  const perceptualHashes = new Set();
+
+  for (let i = 0; i < imagePaths.length; i++) {
+    const filePath = imagePaths[i];
+
+    if (!fs.existsSync(filePath)) {
+      throw new Error(
+        `Missing image file: ${filePath}`
+      );
+    }
+
+    const validation =
+      validateImage(filePath);
+
+    if (imageHashes.has(validation.sha256)) {
+      throw new Error(
+        `Exact duplicate image detected: ${filePath}`
+      );
+    }
+
+    if (
+      validation.perceptual &&
+      perceptualHashes.has(
+        validation.perceptual
+      )
+    ) {
+      throw new Error(
+        `Visual duplicate image detected: ${filePath}`
+      );
+    }
+
+    imageHashes.add(validation.sha256);
+
+    if (validation.perceptual) {
+      perceptualHashes.add(
+        validation.perceptual
+      );
+    }
+  }
+
+  // ----------------------------------------------------------
+  // Blog metadata
+  // ----------------------------------------------------------
+
+  const hostname = new URL(BLOG_URL).hostname;
+
+  const siteTitle =
+    getSiteTitle(feed);
+
+  const description =
+    getSiteDescription(feed);
+
+  const firstPostTitle =
+    selectedPosts[0]?.title || "";
+
+  const blogJson = {
+    version: 10.6,
+    capturedAt: new Date().toISOString(),
+    url: BLOG_URL,
+    hostname,
+    siteTitle,
+    description,
+    pageHeading: siteTitle,
+    ogImage: null,
+    language: "en",
+    postCount: selectedPosts.length,
+
+    analysis: {
+      identity:
+        "English-language financial and U.S. market content",
+      topics: [
+        "U.S. stock market",
+        "financial markets",
+        "market news",
+        "economic indicators",
+        "investing",
+      ],
+      audience:
+        "Readers interested in financial markets, investing, and market-moving news",
+      contentStyle:
+        "Short, information-focused financial news and market analysis",
+      valueProposition:
+        "Concise market updates and actionable context for investors",
+    },
+
+    feed: {
+      url: feedUrl,
+      entriesFetched: entries.length,
+    },
+
+    posts: selectedPosts,
+  };
+
+  fs.writeFileSync(
+    BLOG_JSON_PATH,
+    JSON.stringify(blogJson, null, 2),
+    "utf8"
+  );
+
+  console.log(
+    "============================================================"
+  );
+
+  console.log(
+    `BLOG ANALYZER v10.6 SUCCESS`
+  );
+
+  console.log(
+    `Posts captured: ${selectedPosts.length}`
+  );
+
+  console.log(
+    `blog.json: ${BLOG_JSON_PATH}`
+  );
+
+  console.log(
+    `Images: ${IMAGE_DIR}`
+  );
+
+  console.log(
+    "============================================================"
+  );
+}
+
+main().catch((error) => {
+  console.error(
+    "============================================================"
+  );
+
+  console.error(
+    "BLOG ANALYZER v10.6 FAILED"
+  );
+
+  console.error(
+    `Error: ${error.message}`
+  );
+
+  console.error(
+    "============================================================"
+  );
+
+  process.exit(1);
+});
