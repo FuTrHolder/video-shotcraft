@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 // ============================================================
-// BLOG ANALYZER v9
+// BLOG ANALYZER v10.1
 // ============================================================
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,23 +23,40 @@ const OUTPUT_DIR = path.resolve(
   "../template/public/blog"
 );
 
-const IMAGE_DIR = path.join(OUTPUT_DIR, "images");
+const IMAGE_DIR = path.join(
+  OUTPUT_DIR,
+  "images"
+);
 
-fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-fs.mkdirSync(IMAGE_DIR, { recursive: true });
+fs.mkdirSync(
+  OUTPUT_DIR,
+  { recursive: true }
+);
 
-// ------------------------------------------------------------
+fs.mkdirSync(
+  IMAGE_DIR,
+  { recursive: true }
+);
+
+// ============================================================
 // ImageMagick detection
-// ------------------------------------------------------------
+// ============================================================
 
 function findImageMagick() {
-  const candidates = ["magick", "convert"];
+  const candidates = [
+    "magick",
+    "convert"
+  ];
 
   for (const command of candidates) {
     try {
-      execFileSync(command, ["-version"], {
-        stdio: "ignore"
-      });
+      execFileSync(
+        command,
+        ["-version"],
+        {
+          stdio: "ignore"
+        }
+      );
 
       return command;
     } catch {
@@ -50,34 +67,50 @@ function findImageMagick() {
   return null;
 }
 
-const IMAGE_MAGICK = findImageMagick();
+const IMAGE_MAGICK =
+  findImageMagick();
 
 if (!IMAGE_MAGICK) {
-  console.error("ERROR: ImageMagick was not found.");
-  console.error("Expected either 'magick' or 'convert'.");
+  console.error(
+    "ERROR: ImageMagick was not found."
+  );
+
+  console.error(
+    "Expected either 'magick' or 'convert'."
+  );
+
   process.exit(1);
 }
 
-console.log(`ImageMagick command: ${IMAGE_MAGICK}`);
+console.log(
+  `ImageMagick command: ${IMAGE_MAGICK}`
+);
 
 try {
-  const version = execFileSync(
-    IMAGE_MAGICK,
-    ["-version"],
-    { encoding: "utf8" }
-  );
+  const version =
+    execFileSync(
+      IMAGE_MAGICK,
+      ["-version"],
+      {
+        encoding: "utf8"
+      }
+    );
 
-  console.log(version.split("\n")[0]);
+  console.log(
+    version.split("\n")[0]
+  );
 } catch {
   // ignore
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // General helpers
-// ------------------------------------------------------------
+// ============================================================
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(
+    resolve => setTimeout(resolve, ms)
+  );
 }
 
 function normalizeText(value) {
@@ -95,16 +128,22 @@ function htmlDecode(value) {
     .replace(/&#x27;/gi, "'")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u003d/gi, "=")
     .replace(/&#(\d+);/g, (_, n) => {
       try {
-        return String.fromCodePoint(Number(n));
+        return String.fromCodePoint(
+          Number(n)
+        );
       } catch {
         return _;
       }
     })
     .replace(/&#x([0-9a-f]+);/gi, (_, n) => {
       try {
-        return String.fromCodePoint(parseInt(n, 16));
+        return String.fromCodePoint(
+          parseInt(n, 16)
+        );
       } catch {
         return _;
       }
@@ -114,123 +153,267 @@ function htmlDecode(value) {
 function stripHtml(html) {
   return htmlDecode(
     String(html || "")
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
+      .replace(
+        /<script[\s\S]*?<\/script>/gi,
+        " "
+      )
+      .replace(
+        /<style[\s\S]*?<\/style>/gi,
+        " "
+      )
+      .replace(
+        /<noscript[\s\S]*?<\/noscript>/gi,
+        " "
+      )
+      .replace(
+        /<[^>]+>/g,
+        " "
+      )
   )
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function escapeRegExp(value) {
-  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+function absoluteUrl(
+  url,
+  baseUrl
+) {
+  if (!url) {
+    return null;
+  }
 
-function absoluteUrl(url, baseUrl) {
-  if (!url) return null;
+  let value =
+    htmlDecode(
+      String(url)
+        .trim()
+        .replace(/^['"]|['"]$/g, "")
+    );
 
-  let value = htmlDecode(String(url).trim());
+  if (!value) {
+    return null;
+  }
 
-  if (!value) return null;
-
-  if (value.startsWith("//")) {
-    value = "https:" + value;
+  if (
+    value.startsWith("//")
+  ) {
+    value =
+      "https:" + value;
   }
 
   try {
-    return new URL(value, baseUrl).href;
+    return new URL(
+      value,
+      baseUrl
+    ).href;
   } catch {
     return null;
   }
 }
 
-// ------------------------------------------------------------
-// Blogger image URL normalization
-// ------------------------------------------------------------
+// ============================================================
+// URL helpers
+// ============================================================
 
-function normalizeImageUrl(url) {
-  if (!url) return null;
-
-  let value = htmlDecode(String(url).trim());
-
-  if (!value) return null;
-
-  if (value.startsWith("//")) {
-    value = "https:" + value;
+function samePageUrl(
+  candidateUrl,
+  pageUrl
+) {
+  if (
+    !candidateUrl ||
+    !pageUrl
+  ) {
+    return false;
   }
 
   try {
-    const parsed = new URL(value);
+    const candidate =
+      new URL(candidateUrl);
 
-    // Blogger / Google image resizing
-    parsed.pathname = parsed.pathname
-      .replace(/\/s\d+(?:-c)?\//i, "/s1600/")
-      .replace(/\/w\d+-h\d+(?:-p)?\//i, "/s1600/")
-      .replace(/\/s\d+-c\//i, "/s1600/")
-      .replace(/\/s\d+\//i, "/s1600/");
+    const page =
+      new URL(pageUrl);
+
+    return (
+      candidate.origin === page.origin &&
+      candidate.pathname === page.pathname
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeImageUrl(url) {
+  if (!url) {
+    return null;
+  }
+
+  let value =
+    htmlDecode(
+      String(url).trim()
+    );
+
+  if (!value) {
+    return null;
+  }
+
+  if (
+    value.startsWith("//")
+  ) {
+    value =
+      "https:" + value;
+  }
+
+  try {
+    const parsed =
+      new URL(value);
+
+    // Blogger image resizing
+    parsed.pathname =
+      parsed.pathname
+        .replace(
+          /\/s\d+(?:-c)?\//i,
+          "/s1600/"
+        )
+        .replace(
+          /\/w\d+-h\d+(?:-p)?\//i,
+          "/s1600/"
+        )
+        .replace(
+          /\/s\d+-c\//i,
+          "/s1600/"
+        )
+        .replace(
+          /\/s\d+\//i,
+          "/s1600/"
+        );
 
     return parsed.href;
   } catch {
-    return value;
+    return null;
   }
 }
 
-function isDataImage(url) {
-  return /^data:image\//i.test(String(url || ""));
-}
+// ============================================================
+// Image URL validation
+// ============================================================
 
-function isObviouslyBadImageUrl(url, pageUrl = null) {
-  if (!url) return true;
-
-  const lower = String(url).toLowerCase();
-
-  // Base64 / data URI
-  if (/^data:image\//i.test(String(url))) {
+function isObviouslyBadImageUrl(
+  url,
+  pageUrl = null
+) {
+  if (!url) {
     return true;
   }
 
-  // 현재 게시물 페이지 자체가 이미지 후보로 들어온 경우
-  if (pageUrl) {
-    try {
-      const candidateUrl = new URL(url);
-      const currentPageUrl = new URL(pageUrl);
+  const value =
+    String(url).trim();
 
-      if (
-        candidateUrl.origin === currentPageUrl.origin &&
-        candidateUrl.pathname === currentPageUrl.pathname
-      ) {
-        return true;
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const lower =
+    value.toLowerCase();
 
-  // HTML 페이지 자체
+  // Data URI
   if (
-    lower.endsWith(".html") ||
-    lower.endsWith(".htm") ||
-    lower.includes("/2026/") && lower.includes(".html")
+    /^data:/i.test(value)
   ) {
     return true;
   }
 
-  // 명백한 비이미지 URL
+  // Current page itself
   if (
-    lower.includes("favicon") ||
-    lower.includes("sprite") ||
-    lower.includes("emoji") ||
-    lower.includes("avatar") ||
-    lower.includes("profile-picture") ||
-    lower.includes("profile_image") ||
-    lower.includes("icon-") ||
-    lower.includes("/icons/") ||
-    lower.includes("/icon/") ||
-    lower.includes("tracking") ||
-    lower.includes("pixel.gif") ||
-    lower.includes("1x1") ||
-    lower.includes("transparent.gif")
+    pageUrl &&
+    samePageUrl(
+      value,
+      pageUrl
+    )
+  ) {
+    return true;
+  }
+
+  // HTML pages
+  if (
+    /\.html?(?:[?#]|$)/i.test(
+      lower
+    )
+  ) {
+    return true;
+  }
+
+  // JSON / XML endpoints
+  if (
+    /\.json(?:[?#]|$)/i.test(
+      lower
+    ) ||
+    /\.xml(?:[?#]|$)/i.test(
+      lower
+    )
+  ) {
+    return true;
+  }
+
+  // Obvious non-content assets
+  const badPatterns = [
+    "favicon",
+    "sprite",
+    "emoji",
+    "avatar",
+    "profile-picture",
+    "profile_image",
+    "profile-image",
+    "icon-",
+    "/icons/",
+    "/icon/",
+    "tracking",
+    "pixel.gif",
+    "tracking.gif",
+    "1x1",
+    "transparent.gif",
+    "spacer.gif",
+    "blank.gif"
+  ];
+
+  for (
+    const pattern
+    of badPatterns
+  ) {
+    if (
+      lower.includes(pattern)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isLikelyImageUrl(
+  url
+) {
+  if (!url) {
+    return false;
+  }
+
+  const lower =
+    String(url).toLowerCase();
+
+  if (
+    lower.includes(
+      "blogger.googleusercontent.com/img/"
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    lower.includes(
+      ".bp.blogspot.com/"
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /\.(jpg|jpeg|png|webp|gif|avif)(?:[?#]|$)/i.test(
+      lower
+    )
   ) {
     return true;
   }
@@ -238,11 +421,13 @@ function isObviouslyBadImageUrl(url, pageUrl = null) {
   return false;
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Candidate scoring
-// ------------------------------------------------------------
+// ============================================================
 
-function getContextScore(meta = {}) {
+function getContextScore(
+  meta = {}
+) {
   const text = [
     meta.alt,
     meta.title,
@@ -257,45 +442,142 @@ function getContextScore(meta = {}) {
 
   let score = 0;
 
-  if (text.includes("hero")) score += 20;
-  if (text.includes("featured")) score += 15;
-  if (text.includes("thumbnail")) score += 5;
-  if (text.includes("cover")) score += 10;
-  if (text.includes("article")) score += 8;
-  if (text.includes("post-body")) score += 10;
-  if (text.includes("entry-content")) score += 10;
+  if (
+    text.includes("hero")
+  ) {
+    score += 25;
+  }
 
-  if (text.includes("logo")) score -= 50;
-  if (text.includes("avatar")) score -= 50;
-  if (text.includes("icon")) score -= 30;
-  if (text.includes("social")) score -= 30;
-  if (text.includes("related")) score -= 20;
-  if (text.includes("sidebar")) score -= 30;
-  if (text.includes("footer")) score -= 30;
-  if (text.includes("header")) score -= 20;
+  if (
+    text.includes("featured")
+  ) {
+    score += 20;
+  }
+
+  if (
+    text.includes("thumbnail")
+  ) {
+    score += 5;
+  }
+
+  if (
+    text.includes("cover")
+  ) {
+    score += 10;
+  }
+
+  if (
+    text.includes("article")
+  ) {
+    score += 8;
+  }
+
+  if (
+    text.includes("post-body")
+  ) {
+    score += 15;
+  }
+
+  if (
+    text.includes("entry-content")
+  ) {
+    score += 15;
+  }
+
+  if (
+    text.includes("image")
+  ) {
+    score += 3;
+  }
+
+  if (
+    text.includes("logo")
+  ) {
+    score -= 60;
+  }
+
+  if (
+    text.includes("avatar")
+  ) {
+    score -= 60;
+  }
+
+  if (
+    text.includes("icon")
+  ) {
+    score -= 40;
+  }
+
+  if (
+    text.includes("social")
+  ) {
+    score -= 30;
+  }
+
+  if (
+    text.includes("related")
+  ) {
+    score -= 25;
+  }
+
+  if (
+    text.includes("sidebar")
+  ) {
+    score -= 40;
+  }
+
+  if (
+    text.includes("footer")
+  ) {
+    score -= 40;
+  }
+
+  if (
+    text.includes("header")
+  ) {
+    score -= 25;
+  }
 
   return score;
 }
 
-// ------------------------------------------------------------
-// srcset parser
-// ------------------------------------------------------------
+// ============================================================
+// srcset
+// ============================================================
 
-function extractSrcsetUrls(srcset, baseUrl) {
+function extractSrcsetUrls(
+  srcset,
+  baseUrl
+) {
   const result = [];
 
-  if (!srcset) return result;
+  if (!srcset) {
+    return result;
+  }
 
-  const parts = String(srcset)
-    .split(",")
-    .map(x => x.trim())
-    .filter(Boolean);
+  const parts =
+    String(srcset)
+      .split(",")
+      .map(
+        x => x.trim()
+      )
+      .filter(Boolean);
 
-  for (const part of parts) {
-    const pieces = part.split(/\s+/);
-    const rawUrl = pieces[0];
+  for (
+    const part
+    of parts
+  ) {
+    const pieces =
+      part.split(/\s+/);
 
-    const url = absoluteUrl(rawUrl, baseUrl);
+    const rawUrl =
+      pieces[0];
+
+    const url =
+      absoluteUrl(
+        rawUrl,
+        baseUrl
+      );
 
     if (url) {
       result.push(url);
@@ -305,47 +587,476 @@ function extractSrcsetUrls(srcset, baseUrl) {
   return result;
 }
 
-// ------------------------------------------------------------
-// HTML image extraction
-// ------------------------------------------------------------
-function extractBloggerImageUrls(html, baseUrl) {
+// ============================================================
+// Generic HTML image extraction
+// ============================================================
+
+function extractImagesFromHtml(
+  html,
+  baseUrl,
+  source,
+  extraScore = 0
+) {
   const candidates = [];
 
-  if (!html) return candidates;
+  if (!html) {
+    return candidates;
+  }
+
+  let order = 0;
+
+  function addCandidate(
+    rawUrl,
+    meta = {}
+  ) {
+    if (!rawUrl) {
+      return;
+    }
+
+    let cleaned =
+      htmlDecode(
+        String(rawUrl)
+          .trim()
+          .replace(
+            /^['"]|['"]$/g,
+            ""
+          )
+      );
+
+    if (!cleaned) {
+      return;
+    }
+
+    // Remove common trailing HTML characters
+    cleaned =
+      cleaned.replace(
+        /[),.;]+$/g,
+        ""
+      );
+
+    const absolute =
+      absoluteUrl(
+        cleaned,
+        baseUrl
+      );
+
+    if (!absolute) {
+      return;
+    }
+
+    const normalized =
+      normalizeImageUrl(
+        absolute
+      );
+
+    if (!normalized) {
+      return;
+    }
+
+    if (
+      isObviouslyBadImageUrl(
+        normalized,
+        baseUrl
+      )
+    ) {
+      return;
+    }
+
+    const contextScore =
+      getContextScore(meta);
+
+    candidates.push({
+      url: normalized,
+      source,
+      order: order++,
+      score:
+        extraScore +
+        contextScore -
+        Math.min(order, 30) * 1.5,
+      alt:
+        meta.alt || "",
+      title:
+        meta.title || "",
+      className:
+        meta.className || "",
+      id:
+        meta.id || ""
+    });
+  }
+
+  // ==========================================================
+  // IMG
+  // ==========================================================
+
+  const imgRegex =
+    /<img\b[^>]*>/gi;
+
+  for (
+    const match
+    of html.matchAll(
+      imgRegex
+    )
+  ) {
+    const tag =
+      match[0];
+
+    const src =
+      tag.match(
+        /\bsrc\s*=\s*["']([^"']+)["']/i
+      )?.[1] ||
+      tag.match(
+        /\bsrc\s*=\s*([^\s>]+)/i
+      )?.[1];
+
+    const lazyAttributes = [
+      "data-src",
+      "data-original",
+      "data-lazy-src",
+      "data-lazy",
+      "data-image",
+      "data-image-url",
+      "data-url"
+    ];
+
+    const lazyUrls = [];
+
+    for (
+      const attribute
+      of lazyAttributes
+    ) {
+      const match =
+        tag.match(
+          new RegExp(
+            `\\b${attribute}\\s*=\\s*["']([^"']+)["']`,
+            "i"
+          )
+        );
+
+      if (
+        match?.[1]
+      ) {
+        lazyUrls.push(
+          match[1]
+        );
+      }
+    }
+
+    const srcset =
+      tag.match(
+        /\bsrcset\s*=\s*["']([^"']+)["']/i
+      )?.[1] ||
+      tag.match(
+        /\bdata-srcset\s*=\s*["']([^"']+)["']/i
+      )?.[1];
+
+    const alt =
+      tag.match(
+        /\balt\s*=\s*["']([^"']*)["']/i
+      )?.[1] || "";
+
+    const title =
+      tag.match(
+        /\btitle\s*=\s*["']([^"']*)["']/i
+      )?.[1] || "";
+
+    const className =
+      tag.match(
+        /\bclass\s*=\s*["']([^"']*)["']/i
+      )?.[1] || "";
+
+    const id =
+      tag.match(
+        /\bid\s*=\s*["']([^"']*)["']/i
+      )?.[1] || "";
+
+    const meta = {
+      alt,
+      title,
+      className,
+      id
+    };
+
+    if (src) {
+      addCandidate(
+        src,
+        meta
+      );
+    }
+
+    for (
+      const lazyUrl
+      of lazyUrls
+    ) {
+      addCandidate(
+        lazyUrl,
+        meta
+      );
+    }
+
+    if (srcset) {
+      for (
+        const url
+        of extractSrcsetUrls(
+          srcset,
+          baseUrl
+        )
+      ) {
+        addCandidate(
+          url,
+          meta
+        );
+      }
+    }
+  }
+
+  // ==========================================================
+  // SOURCE
+  // ==========================================================
+
+  const sourceRegex =
+    /<source\b[^>]*>/gi;
+
+  for (
+    const match
+    of html.matchAll(
+      sourceRegex
+    )
+  ) {
+    const tag =
+      match[0];
+
+    const src =
+      tag.match(
+        /\bsrc\s*=\s*["']([^"']+)["']/i
+      )?.[1];
+
+    const srcset =
+      tag.match(
+        /\bsrcset\s*=\s*["']([^"']+)["']/i
+      )?.[1];
+
+    if (src) {
+      addCandidate(
+        src,
+        {
+          className:
+            "source"
+        }
+      );
+    }
+
+    if (srcset) {
+      for (
+        const url
+        of extractSrcsetUrls(
+          srcset,
+          baseUrl
+        )
+      ) {
+        addCandidate(
+          url,
+          {
+            className:
+              "source"
+          }
+        );
+      }
+    }
+  }
+
+  // ==========================================================
+  // META OG IMAGE
+  // ==========================================================
+
+  const metaRegex =
+    /<meta\b[^>]*>/gi;
+
+  for (
+    const match
+    of html.matchAll(
+      metaRegex
+    )
+  ) {
+    const tag =
+      match[0];
+
+    const property =
+      tag.match(
+        /\bproperty\s*=\s*["']([^"']+)["']/i
+      )?.[1] ||
+      tag.match(
+        /\bname\s*=\s*["']([^"']+)["']/i
+      )?.[1] ||
+      "";
+
+    const content =
+      tag.match(
+        /\bcontent\s*=\s*["']([^"']+)["']/i
+      )?.[1] || "";
+
+    const key =
+      property.toLowerCase();
+
+    if (
+      key === "og:image"
+    ) {
+      addCandidate(
+        content,
+        {
+          className:
+            "og-image"
+        }
+      );
+    }
+
+    if (
+      key === "twitter:image" ||
+      key === "twitter:image:src"
+    ) {
+      addCandidate(
+        content,
+        {
+          className:
+            "twitter-image"
+        }
+      );
+    }
+
+    if (
+      key === "image_src"
+    ) {
+      addCandidate(
+        content,
+        {
+          className:
+            "image-src"
+        }
+      );
+    }
+  }
+
+  // ==========================================================
+  // CSS background image
+  // ==========================================================
+
+  const bgRegex =
+    /background(?:-image)?\s*:\s*[^;{}]*url\(\s*['"]?([^'")]+)['"]?\s*\)/gi;
+
+  for (
+    const match
+    of html.matchAll(
+      bgRegex
+    )
+  ) {
+    addCandidate(
+      match[1],
+      {
+        className:
+          "background-image"
+      }
+    );
+  }
+
+  // ==========================================================
+  // data-* outside img
+  // ==========================================================
+
+  const dataRegex =
+    /\b(?:data-image|data-image-url|data-original|data-src|data-lazy-src|data-url)\s*=\s*["']([^"']+)["']/gi;
+
+  for (
+    const match
+    of html.matchAll(
+      dataRegex
+    )
+  ) {
+    addCandidate(
+      match[1],
+      {
+        className:
+          "data-image"
+      }
+    );
+  }
+
+  return dedupeCandidates(
+    candidates
+  );
+}
+
+// ============================================================
+// Direct Blogger CDN extraction
+// ============================================================
+
+function extractBloggerImageUrls(
+  html,
+  baseUrl
+) {
+  const candidates = [];
+
+  if (!html) {
+    return candidates;
+  }
 
   const patterns = [
-    // blogger.googleusercontent.com
-    /https?:\/\/blogger\.googleusercontent\.com\/img\/[^\s"'<>\\)]+/gi,
 
-    // blogspot CDN
-    /https?:\/\/[^"'<>\\\s]+\.bp\.blogspot\.com\/[^\s"'<>\\)]+/gi,
+    // Blogger Googleusercontent
+    /https?:\/\/blogger\.googleusercontent\.com\/img\/[^"'<>\\\s)]+/gi,
 
-    // 일반 blogspot image URL
-    /https?:\/\/[^"'<>\\\s]+\.blogspot\.com\/[^\s"'<>\\)]+/gi,
+    // bp.blogspot.com
+    /https?:\/\/[^"'<>\\\s]+\.bp\.blogspot\.com\/[^"'<>\\\s)]+/gi,
 
-    // protocol-relative
-    /\/\/blogger\.googleusercontent\.com\/img\/[^\s"'<>\\)]+/gi
+    // protocol-relative Googleusercontent
+    /\/\/blogger\.googleusercontent\.com\/img\/[^"'<>\\\s)]+/gi,
+
+    // generic image extension
+    /https?:\/\/[^"'<>\\\s)]+\.(?:jpg|jpeg|png|webp|gif|avif)(?:\?[^"'<>\\\s)]*)?/gi
   ];
 
-  for (const regex of patterns) {
-    for (const match of html.matchAll(regex)) {
-      let url = match[0];
+  for (
+    const regex
+    of patterns
+  ) {
+    for (
+      const match
+      of html.matchAll(
+        regex
+      )
+    ) {
+      let rawUrl =
+        match[0];
 
-      // URL 뒤에 붙는 HTML 문자 제거
-      url = url
-        .replace(/[),.;]+$/g, "")
-        .replace(/\\u0026/gi, "&")
-        .replace(/&amp;/gi, "&");
+      rawUrl =
+        htmlDecode(
+          rawUrl
+        )
+          .replace(
+            /[),.;]+$/g,
+            ""
+          )
+          .replace(
+            /\\u0026/gi,
+            "&"
+          );
 
       const absolute =
-        absoluteUrl(url, baseUrl);
+        absoluteUrl(
+          rawUrl,
+          baseUrl
+        );
 
-      if (!absolute) continue;
+      if (!absolute) {
+        continue;
+      }
 
       const normalized =
-        normalizeImageUrl(absolute);
+        normalizeImageUrl(
+          absolute
+        );
 
-      if (!normalized) continue;
+      if (!normalized) {
+        continue;
+      }
 
       if (
         isObviouslyBadImageUrl(
@@ -356,228 +1067,148 @@ function extractBloggerImageUrls(html, baseUrl) {
         continue;
       }
 
+      if (
+        !isLikelyImageUrl(
+          normalized
+        )
+      ) {
+        continue;
+      }
+
       candidates.push({
         url: normalized,
-        source: "blogger-image",
-        order: candidates.length,
-        score: 140
+        source:
+          "blogger-image",
+        order:
+          candidates.length,
+        score: 150
       });
     }
   }
 
-  return dedupeCandidates(candidates);
+  return dedupeCandidates(
+    candidates
+  );
 }
 
-
-function extractImagesFromHtml(
-  html,
-  baseUrl,
-  source,
-  extraScore = 0
-) {
-  const candidates = [];
-
-  if (!html) return candidates;
-
-  let order = 0;
-
-  function addCandidate(rawUrl, meta = {}) {
-    if (!rawUrl) return;
-
-    const absolute = absoluteUrl(rawUrl, baseUrl);
-
-    if (!absolute) return;
-
-    const normalized = normalizeImageUrl(absolute);
-
-    if (!normalized) return;
-    if (isObviouslyBadImageUrl(normalized, baseUrl)) return;
-
-    const contextScore = getContextScore(meta);
-
-    candidates.push({
-      url: normalized,
-      source,
-      order: order++,
-      score:
-        extraScore +
-        contextScore -
-        Math.min(order, 30) * 1.5,
-      alt: meta.alt || "",
-      title: meta.title || "",
-      className: meta.className || "",
-      id: meta.id || ""
-    });
-  }
-
-  // ----------------------------------------------------------
-  // IMG elements
-  // ----------------------------------------------------------
-
-  const imgRegex = /<img\b[^>]*>/gi;
-
-  for (const match of html.matchAll(imgRegex)) {
-    const tag = match[0];
-
-    const src =
-      tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bsrc\s*=\s*([^\s>]+)/i)?.[1];
-
-    const dataSrc =
-      tag.match(/\bdata-src\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bdata-original\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bdata-lazy-src\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bdata-lazy\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bdata-image\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bdata-image-url\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bdata-url\s*=\s*["']([^"']+)["']/i)?.[1];
-
-    const srcset =
-      tag.match(/\bsrcset\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      tag.match(/\bdata-srcset\s*=\s*["']([^"']+)["']/i)?.[1];
-
-    const alt =
-      tag.match(/\balt\s*=\s*["']([^"']*)["']/i)?.[1] || "";
-
-    const title =
-      tag.match(/\btitle\s*=\s*["']([^"']*)["']/i)?.[1] || "";
-
-    const className =
-      tag.match(/\bclass\s*=\s*["']([^"']*)["']/i)?.[1] || "";
-
-    const id =
-      tag.match(/\bid\s*=\s*["']([^"']*)["']/i)?.[1] || "";
-
-    const meta = {
-      alt,
-      title,
-      className,
-      id
-    };
-
-    if (src) {
-      addCandidate(src, meta);
-    }
-
-    if (dataSrc) {
-      addCandidate(dataSrc, meta);
-    }
-
-    if (srcset) {
-      for (const url of extractSrcsetUrls(srcset, baseUrl)) {
-        addCandidate(url, meta);
-      }
-    }
-  }
-
-  // ----------------------------------------------------------
-  // SOURCE elements
-  // ----------------------------------------------------------
-
-  const sourceRegex = /<source\b[^>]*>/gi;
-
-  for (const match of html.matchAll(sourceRegex)) {
-    const tag = match[0];
-
-    const src =
-      tag.match(/\bsrc\s*=\s*["']([^"']+)["']/i)?.[1];
-
-    const srcset =
-      tag.match(/\bsrcset\s*=\s*["']([^"']+)["']/i)?.[1];
-
-    if (src) {
-      addCandidate(src, {
-        className: "source"
-      });
-    }
-
-    if (srcset) {
-      for (const url of extractSrcsetUrls(srcset, baseUrl)) {
-        addCandidate(url, {
-          className: "source"
-        });
-      }
-    }
-  }
-
-  // ----------------------------------------------------------
-  // CSS background-image
-  // ----------------------------------------------------------
-
-  const bgRegex =
-    /background(?:-image)?\s*:\s*[^;{}]*url\(\s*['"]?([^'")]+)['"]?\s*\)/gi;
-
-  for (const match of html.matchAll(bgRegex)) {
-    addCandidate(match[1], {
-      className: "background-image"
-    });
-  }
-
-  // ----------------------------------------------------------
-  // data-image / data-url outside IMG
-  // ----------------------------------------------------------
-
-  const dataImageRegex =
-    /\b(?:data-image|data-image-url|data-original|data-src|data-url)\s*=\s*["']([^"']+)["']/gi;
-
-  for (const match of html.matchAll(dataImageRegex)) {
-    addCandidate(match[1], {
-      className: "data-image"
-    });
-  }
-
-  return candidates;
-}
-
-// ------------------------------------------------------------
+// ============================================================
 // Candidate deduplication
-// ------------------------------------------------------------
+// ============================================================
 
-function dedupeCandidates(candidates) {
-  const map = new Map();
+function dedupeCandidates(
+  candidates
+) {
+  const map =
+    new Map();
 
-  for (const candidate of candidates) {
-    const key = candidate.url
-      .replace(/[?#].*$/, "")
-      .toLowerCase();
-
-    if (!map.has(key)) {
-      map.set(key, candidate);
+  for (
+    const candidate
+    of candidates
+  ) {
+    if (
+      !candidate?.url
+    ) {
       continue;
     }
 
-    const existing = map.get(key);
+    const normalized =
+      normalizeImageUrl(
+        candidate.url
+      );
 
-    if (candidate.score > existing.score) {
-      map.set(key, candidate);
+    if (!normalized) {
+      continue;
+    }
+
+    const key =
+      normalized
+        .replace(
+          /[?#].*$/,
+          ""
+        )
+        .toLowerCase();
+
+    if (
+      !map.has(key)
+    ) {
+      map.set(
+        key,
+        {
+          ...candidate,
+          url: normalized
+        }
+      );
+
+      continue;
+    }
+
+    const existing =
+      map.get(key);
+
+    if (
+      candidate.score >
+      existing.score
+    ) {
+      map.set(
+        key,
+        {
+          ...candidate,
+          url: normalized
+        }
+      );
     }
   }
 
-  return [...map.values()]
-    .sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
+  return [
+    ...map.values()
+  ].sort(
+    (a, b) => {
+      if (
+        b.score !==
+        a.score
+      ) {
+        return (
+          b.score -
+          a.score
+        );
       }
 
-      return a.order - b.order;
-    });
+      return (
+        a.order -
+        b.order
+      );
+    }
+  );
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Feed candidate extraction
-// ------------------------------------------------------------
+// ============================================================
 
-function extractFeedCandidates(entry, postUrl) {
+function extractFeedCandidates(
+  entry,
+  postUrl
+) {
   const candidates = [];
 
   // ----------------------------------------------------------
-  // Full content
+  // Content
   // ----------------------------------------------------------
 
-  const contentHtml =
-    entry?.content?.$t ||
-    entry?.content?.["$t"] ||
-    "";
+  let contentHtml = "";
+
+  if (
+    typeof entry?.content ===
+    "string"
+  ) {
+    contentHtml =
+      entry.content;
+  } else {
+    contentHtml =
+      entry?.content?.$t ||
+      entry?.content?.["$t"] ||
+      "";
+  }
 
   if (contentHtml) {
     candidates.push(
@@ -585,7 +1216,7 @@ function extractFeedCandidates(entry, postUrl) {
         contentHtml,
         postUrl,
         "feed-content",
-        100
+        120
       )
     );
   }
@@ -594,10 +1225,20 @@ function extractFeedCandidates(entry, postUrl) {
   // Summary
   // ----------------------------------------------------------
 
-  const summaryHtml =
-    entry?.summary?.$t ||
-    entry?.summary?.["$t"] ||
-    "";
+  let summaryHtml = "";
+
+  if (
+    typeof entry?.summary ===
+    "string"
+  ) {
+    summaryHtml =
+      entry.summary;
+  } else {
+    summaryHtml =
+      entry?.summary?.$t ||
+      entry?.summary?.["$t"] ||
+      "";
+  }
 
   if (summaryHtml) {
     candidates.push(
@@ -605,13 +1246,13 @@ function extractFeedCandidates(entry, postUrl) {
         summaryHtml,
         postUrl,
         "feed-summary",
-        80
+        90
       )
     );
   }
 
   // ----------------------------------------------------------
-  // media$group.media$content
+  // media$group
   // ----------------------------------------------------------
 
   const mediaGroup =
@@ -621,16 +1262,29 @@ function extractFeedCandidates(entry, postUrl) {
 
   if (mediaGroup) {
     let mediaContent =
-      mediaGroup["media$content"] ||
-      mediaGroup.media$content ||
+      mediaGroup?.[
+        "media$content"
+      ] ||
+      mediaGroup?.media$content ||
       [];
 
-    if (!Array.isArray(mediaContent)) {
-      mediaContent = [mediaContent];
+    if (
+      !Array.isArray(
+        mediaContent
+      )
+    ) {
+      mediaContent = [
+        mediaContent
+      ];
     }
 
-    for (const item of mediaContent) {
-      if (!item) continue;
+    for (
+      const item
+      of mediaContent
+    ) {
+      if (!item) {
+        continue;
+      }
 
       const url =
         item.url ||
@@ -638,15 +1292,38 @@ function extractFeedCandidates(entry, postUrl) {
         item["$t"] ||
         null;
 
-      if (!url) continue;
+      if (!url) {
+        continue;
+      }
+
+      const absolute =
+        absoluteUrl(
+          url,
+          postUrl
+        );
+
+      const normalized =
+        normalizeImageUrl(
+          absolute
+        );
+
+      if (
+        !normalized ||
+        isObviouslyBadImageUrl(
+          normalized,
+          postUrl
+        )
+      ) {
+        continue;
+      }
 
       candidates.push({
-        url: normalizeImageUrl(
-          absoluteUrl(url, postUrl)
-        ),
-        source: "feed-media",
-        order: candidates.length,
-        score: 70
+        url: normalized,
+        source:
+          "feed-media",
+        order:
+          candidates.length,
+        score: 80
       });
     }
   }
@@ -656,7 +1333,9 @@ function extractFeedCandidates(entry, postUrl) {
   // ----------------------------------------------------------
 
   const thumbnail =
-    entry?.["media$thumbnail"] ||
+    entry?.[
+      "media$thumbnail"
+    ] ||
     entry?.media$thumbnail ||
     null;
 
@@ -668,94 +1347,161 @@ function extractFeedCandidates(entry, postUrl) {
       null;
 
     if (thumbnailUrl) {
-      candidates.push({
-        url: normalizeImageUrl(
-          absoluteUrl(thumbnailUrl, postUrl)
-        ),
-        source: "feed-thumbnail",
-        order: candidates.length,
-        score: 50
-      });
+      const absolute =
+        absoluteUrl(
+          thumbnailUrl,
+          postUrl
+        );
+
+      const normalized =
+        normalizeImageUrl(
+          absolute
+        );
+
+      if (
+        normalized &&
+        !isObviouslyBadImageUrl(
+          normalized,
+          postUrl
+        )
+      ) {
+        candidates.push({
+          url: normalized,
+          source:
+            "feed-thumbnail",
+          order:
+            candidates.length,
+          score: 60
+        });
+      }
     }
   }
 
   // ----------------------------------------------------------
-  // Some Blogger feeds expose media directly
+  // Direct media$content
   // ----------------------------------------------------------
 
-  const directMedia =
-    entry?.["media$content"] ||
+  let directMedia =
+    entry?.[
+      "media$content"
+    ] ||
     entry?.media$content ||
     null;
 
   if (directMedia) {
-    let mediaArray = Array.isArray(directMedia)
-      ? directMedia
-      : [directMedia];
+    if (
+      !Array.isArray(
+        directMedia
+      )
+    ) {
+      directMedia = [
+        directMedia
+      ];
+    }
 
-    for (const item of mediaArray) {
+    for (
+      const item
+      of directMedia
+    ) {
       const url =
         item?.url ||
         item?.src ||
         item?.["$t"];
 
-      if (!url) continue;
+      if (!url) {
+        continue;
+      }
+
+      const absolute =
+        absoluteUrl(
+          url,
+          postUrl
+        );
+
+      const normalized =
+        normalizeImageUrl(
+          absolute
+        );
+
+      if (
+        !normalized ||
+        isObviouslyBadImageUrl(
+          normalized,
+          postUrl
+        )
+      ) {
+        continue;
+      }
 
       candidates.push({
-        url: normalizeImageUrl(
-          absoluteUrl(url, postUrl)
-        ),
-        source: "feed-direct-media",
-        order: candidates.length,
-        score: 65
+        url: normalized,
+        source:
+          "feed-direct-media",
+        order:
+          candidates.length,
+        score: 75
       });
     }
   }
 
   return dedupeCandidates(
-    candidates.filter(c => c.url)
+    candidates
   );
 }
 
-// ------------------------------------------------------------
-// Balanced HTML element extraction
-// ------------------------------------------------------------
+// ============================================================
+// Balanced element extraction
+// ============================================================
 
 function extractBalancedElement(
   html,
   openingIndex,
   tagName
 ) {
-  const tagRegex = new RegExp(
-    `<\\/?${tagName}\\b[^>]*>`,
-    "gi"
-  );
+  const tagRegex =
+    new RegExp(
+      `<\\/?${tagName}\\b[^>]*>`,
+      "gi"
+    );
 
-  tagRegex.lastIndex = openingIndex;
+  tagRegex.lastIndex =
+    openingIndex;
 
   let depth = 0;
   let started = false;
 
   let match;
 
-  while ((match = tagRegex.exec(html))) {
-    const tag = match[0];
+  while (
+    (match =
+      tagRegex.exec(html))
+  ) {
+    const tag =
+      match[0];
 
-    const isClosing = /^<\//.test(tag);
-    const isSelfClosing = /\/>$/.test(tag);
+    const isClosing =
+      /^<\//.test(tag);
+
+    const isSelfClosing =
+      /\/>$/.test(tag);
 
     if (!isClosing) {
       depth++;
       started = true;
 
-      if (isSelfClosing) {
+      if (
+        isSelfClosing
+      ) {
         depth--;
       }
     } else {
       depth--;
     }
 
-    if (started && depth === 0) {
+    if (
+      started &&
+      depth === 0
+    ) {
       return html.slice(
         openingIndex,
         tagRegex.lastIndex
@@ -766,25 +1512,34 @@ function extractBalancedElement(
   return null;
 }
 
-// ------------------------------------------------------------
-// Find Blogger post containers
-// ------------------------------------------------------------
+// ============================================================
+// Blogger post containers
+// ============================================================
 
-function findPostContainers(html) {
+function findPostContainers(
+  html
+) {
   const containers = [];
 
   // ----------------------------------------------------------
   // ARTICLE
   // ----------------------------------------------------------
 
-  const articleRegex = /<article\b[^>]*>/gi;
+  const articleRegex =
+    /<article\b[^>]*>/gi;
 
-  for (const match of html.matchAll(articleRegex)) {
-    const block = extractBalancedElement(
-      html,
-      match.index,
-      "article"
-    );
+  for (
+    const match
+    of html.matchAll(
+      articleRegex
+    )
+  ) {
+    const block =
+      extractBalancedElement(
+        html,
+        match.index,
+        "article"
+      );
 
     if (block) {
       containers.push({
@@ -795,46 +1550,79 @@ function findPostContainers(html) {
   }
 
   // ----------------------------------------------------------
-  // DIVs with Blogger post-related classes
+  // Blogger DIV containers
   // ----------------------------------------------------------
 
-  const divOpenRegex = /<div\b[^>]*>/gi;
+  const divRegex =
+    /<div\b[^>]*>/gi;
 
-  for (const match of html.matchAll(divOpenRegex)) {
-    const tag = match[0];
+  for (
+    const match
+    of html.matchAll(
+      divRegex
+    )
+  ) {
+    const tag =
+      match[0];
 
     const className =
-      tag.match(/\bclass\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      "";
+      tag.match(
+        /\bclass\s*=\s*["']([^"']+)["']/i
+      )?.[1] || "";
 
     const id =
-      tag.match(/\bid\s*=\s*["']([^"']+)["']/i)?.[1] ||
-      "";
+      tag.match(
+        /\bid\s*=\s*["']([^"']+)["']/i
+      )?.[1] || "";
 
-    const marker = `${className} ${id}`.toLowerCase();
+    const marker =
+      `${className} ${id}`
+        .toLowerCase();
 
     const isPostContainer =
-      marker.includes("post-body") ||
-      marker.includes("entry-content") ||
-      marker.includes("post hentry") ||
-      marker.includes("post-hentry") ||
-      marker.includes("hentry") ||
-      marker.includes("post-content") ||
-      marker.includes("postbody") ||
-      marker.includes("blog-post");
+      marker.includes(
+        "post-body"
+      ) ||
+      marker.includes(
+        "entry-content"
+      ) ||
+      marker.includes(
+        "post-content"
+      ) ||
+      marker.includes(
+        "postbody"
+      ) ||
+      marker.includes(
+        "post hentry"
+      ) ||
+      marker.includes(
+        "post-hentry"
+      ) ||
+      marker.includes(
+        "blog-post"
+      ) ||
+      marker.includes(
+        "hentry"
+      );
 
-    if (!isPostContainer) continue;
+    if (
+      !isPostContainer
+    ) {
+      continue;
+    }
 
-    const block = extractBalancedElement(
-      html,
-      match.index,
-      "div"
-    );
+    const block =
+      extractBalancedElement(
+        html,
+        match.index,
+        "div"
+      );
 
     if (block) {
       containers.push({
         html: block,
-        type: "blogger-container"
+        type:
+          "blogger-container"
       });
     }
   }
@@ -842,136 +1630,208 @@ function findPostContainers(html) {
   return containers;
 }
 
-// ------------------------------------------------------------
-// Title-scoped page candidates
-// ------------------------------------------------------------
+// ============================================================
+// Extract page candidates
+// ============================================================
 
 function extractPageCandidates(
   html,
   postUrl,
   title
 ) {
+  if (!html) {
+    return [];
+  }
+
   const allCandidates = [];
 
-  if (!html) {
-    return allCandidates;
-  }
-
   // ==========================================================
-  // 1. Blogger CDN URL 직접 탐색
-  //
-  // Blogger 페이지에서는 실제 본문 이미지가
-  // blogger.googleusercontent.com/img/... 형태로 존재하는
-  // 경우가 많다.
-  //
-  // 이것은 현재 게시물 페이지 HTML 안에서만 검색하므로
-  // 다른 게시물의 이미지를 빌려오는 문제가 없다.
-  // ==========================================================
-
-  const bloggerImages =
-    extractBloggerImageUrls(
-      html,
-      postUrl
-    );
-
-  for (const candidate of bloggerImages) {
-    candidate.score += 40;
-  }
-
-  allCandidates.push(
-    ...bloggerImages
-  );
-
-  // ==========================================================
-  // 2. Blogger post container 탐색
+  // 1. Find title-specific containers FIRST
   // ==========================================================
 
   const containers =
-    findPostContainers(html);
+    findPostContainers(
+      html
+    );
 
   const normalizedTitle =
     normalizeText(title);
 
-  const titleContainers = [];
+  const titleContainers =
+    [];
 
-  for (const container of containers) {
+  for (
+    const container
+    of containers
+  ) {
     const text =
       normalizeText(
-        stripHtml(container.html)
+        stripHtml(
+          container.html
+        )
       );
 
+    if (!text) {
+      continue;
+    }
+
     if (
-      text.includes(normalizedTitle) ||
-      normalizedTitle.includes(
-        text.slice(0, 150)
+      text.includes(
+        normalizedTitle
       )
     ) {
-      titleContainers.push(container);
+      titleContainers.push(
+        container
+      );
+
+      continue;
+    }
+
+    const titleWords =
+      normalizedTitle
+        .split(/\s+/)
+        .filter(
+          word =>
+            word.length > 3
+        );
+
+    let matched =
+      0;
+
+    for (
+      const word
+      of titleWords
+    ) {
+      if (
+        text.includes(word)
+      ) {
+        matched++;
+      }
+    }
+
+    if (
+      titleWords.length >= 3 &&
+      matched >=
+        Math.ceil(
+          titleWords.length *
+          0.65
+        )
+    ) {
+      titleContainers.push(
+        container
+      );
     }
   }
 
   // ==========================================================
-  // 3. 제목과 연결되는 post container 우선
+  // 2. Extract images ONLY from title-specific containers
   // ==========================================================
 
-  for (const container of titleContainers) {
+  for (
+    const container
+    of titleContainers
+  ) {
     const candidates =
       extractImagesFromHtml(
         container.html,
         postUrl,
         "post-body",
-        120
+        140
       );
 
     allCandidates.push(
       ...candidates
     );
+
+    const bloggerCandidates =
+      extractBloggerImageUrls(
+        container.html,
+        postUrl
+      );
+
+    for (
+      const candidate
+      of bloggerCandidates
+    ) {
+      candidate.score += 50;
+    }
+
+    allCandidates.push(
+      ...bloggerCandidates
+    );
   }
 
   // ==========================================================
-  // 4. Blogger post container fallback
+  // 3. If title containers failed, use post-body containers
   // ==========================================================
 
-  if (allCandidates.length === 0) {
-    for (const container of containers) {
+  if (
+    allCandidates.length === 0
+  ) {
+    for (
+      const container
+      of containers
+    ) {
       const candidates =
         extractImagesFromHtml(
           container.html,
           postUrl,
           "post-container",
-          90
+          100
         );
 
       allCandidates.push(
         ...candidates
       );
+
+      const bloggerCandidates =
+        extractBloggerImageUrls(
+          container.html,
+          postUrl
+        );
+
+      for (
+        const candidate
+        of bloggerCandidates
+      ) {
+        candidate.score += 30;
+      }
+
+      allCandidates.push(
+        ...bloggerCandidates
+      );
     }
   }
 
   // ==========================================================
-  // 5. 제목 주변 HTML 탐색
+  // 4. Search around exact title
   // ==========================================================
 
-  if (allCandidates.length === 0) {
-    const normalizedHtml =
+  if (
+    allCandidates.length === 0 &&
+    normalizedTitle
+  ) {
+    const rawText =
       normalizeText(html);
 
     const titleIndex =
-      normalizedHtml.indexOf(
+      rawText.indexOf(
         normalizedTitle
       );
 
-    if (titleIndex >= 0) {
+    if (
+      titleIndex >= 0
+    ) {
       const start =
         Math.max(
           0,
-          titleIndex - 5000
+          titleIndex - 10000
         );
 
       const end =
         Math.min(
           html.length,
-          titleIndex + 150000
+          titleIndex + 120000
         );
 
       const windowHtml =
@@ -980,20 +1840,16 @@ function extractPageCandidates(
           end
         );
 
-      const candidates =
-        extractImagesFromHtml(
+      allCandidates.push(
+        ...extractImagesFromHtml(
           windowHtml,
           postUrl,
           "post-title-window",
-          60
-        );
-
-      allCandidates.push(
-        ...candidates
+          80
+        )
       );
 
-      // Blogger 이미지 URL도 다시 검색
-      const windowBloggerImages =
+      const bloggerCandidates =
         extractBloggerImageUrls(
           windowHtml,
           postUrl
@@ -1001,72 +1857,72 @@ function extractPageCandidates(
 
       for (
         const candidate
-        of windowBloggerImages
+        of bloggerCandidates
       ) {
-        candidate.score += 30;
+        candidate.score += 40;
       }
 
       allCandidates.push(
-        ...windowBloggerImages
+        ...bloggerCandidates
       );
     }
   }
 
   // ==========================================================
-  // 6. 마지막 fallback
-  //
-  // 중요:
-  // 이 fallback 역시 "현재 게시물 URL"의 HTML만 검사한다.
-  //
-  // 다른 게시물의 후보를 가져오는 구조가 아니다.
+  // 5. Direct Blogger CDN extraction from THIS post page
   // ==========================================================
 
-  if (allCandidates.length === 0) {
-    const candidates =
-      extractImagesFromHtml(
+  const directCandidates =
+    extractBloggerImageUrls(
+      html,
+      postUrl
+    );
+
+  for (
+    const candidate
+    of directCandidates
+  ) {
+    candidate.score +=
+      titleContainers.length > 0
+        ? 10
+        : 0;
+  }
+
+  allCandidates.push(
+    ...directCandidates
+  );
+
+  // ==========================================================
+  // 6. Generic page fallback
+  // ==========================================================
+
+  if (
+    allCandidates.length === 0
+  ) {
+    allCandidates.push(
+      ...extractImagesFromHtml(
         html,
         postUrl,
         "post-page",
         20
-      );
-
-    allCandidates.push(
-      ...candidates
+      )
     );
   }
 
   // ==========================================================
-  // 7. Blogger 이미지 URL 재탐색
-  //
-  // HTML 구조가 비표준이어도 CDN URL 자체가 있으면
-  // 마지막으로 확보한다.
+  // 7. Final hard filtering
   // ==========================================================
 
-  if (allCandidates.length === 0) {
-    const candidates =
-      extractBloggerImageUrls(
-        html,
-        postUrl
-      );
-
-    allCandidates.push(
-      ...candidates
-    );
-  }
-
-  // ==========================================================
-  // 8. 최종 후보 정리
-  // ==========================================================
-
-  const cleaned =
-    dedupeCandidates(
-      allCandidates
-    ).filter(candidate => {
-      if (!candidate?.url) {
+  return dedupeCandidates(
+    allCandidates
+  ).filter(
+    candidate => {
+      if (
+        !candidate?.url
+      ) {
         return false;
       }
 
-      // 현재 게시물 페이지 URL이면 제거
       if (
         isObviouslyBadImageUrl(
           candidate.url,
@@ -1076,28 +1932,46 @@ function extractPageCandidates(
         return false;
       }
 
-      return true;
-    });
+      if (
+        samePageUrl(
+          candidate.url,
+          postUrl
+        )
+      ) {
+        return false;
+      }
 
-  return cleaned;
+      return true;
+    }
+  );
 }
 
-// ------------------------------------------------------------
-// Fetch helper
-// ------------------------------------------------------------
+// ============================================================
+// Fetch text
+// ============================================================
 
-async function fetchText(url) {
-  const response = await fetch(url, {
-    redirect: "follow",
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
-      "Accept":
-        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language":
-        "en-US,en;q=0.9"
-    }
-  });
+async function fetchText(
+  url
+) {
+  const response =
+    await fetch(
+      url,
+      {
+        redirect:
+          "follow",
+
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+
+          "Accept":
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+
+          "Accept-Language":
+            "en-US,en;q=0.9"
+        }
+      }
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -1108,29 +1982,60 @@ async function fetchText(url) {
   return await response.text();
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Download image
-// ------------------------------------------------------------
+// ============================================================
 
 async function downloadImage(
   url,
   outputFile,
   referer
 ) {
-  const response = await fetch(url, {
-    redirect: "follow",
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
-      "Accept":
-        "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-      "Referer": referer || BLOG_URL
-    }
-  });
+  const response =
+    await fetch(
+      url,
+      {
+        redirect:
+          "follow",
+
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+
+          "Accept":
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+
+          "Referer":
+            referer ||
+            BLOG_URL
+        }
+      }
+    );
 
   if (!response.ok) {
     throw new Error(
       `HTTP ${response.status} ${response.statusText}`
+    );
+  }
+
+  const contentType =
+    response.headers.get(
+      "content-type"
+    ) || "";
+
+  if (
+    /text\/html/i.test(
+      contentType
+    ) ||
+    /application\/json/i.test(
+      contentType
+    ) ||
+    /application\/xml/i.test(
+      contentType
+    )
+  ) {
+    throw new Error(
+      `URL returned non-image content-type: ${contentType}`
     );
   }
 
@@ -1139,7 +2044,9 @@ async function downloadImage(
       await response.arrayBuffer()
     );
 
-  if (buffer.length < 1000) {
+  if (
+    buffer.length < 1000
+  ) {
     throw new Error(
       `Downloaded file too small: ${buffer.length} bytes`
     );
@@ -1153,57 +2060,110 @@ async function downloadImage(
   return buffer.length;
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // ImageMagick helpers
-// ------------------------------------------------------------
+// ============================================================
 
-function runImageMagick(args, options = {}) {
+function runImageMagick(
+  args,
+  options = {}
+) {
   return execFileSync(
     IMAGE_MAGICK,
     args,
     {
-      stdio: options.stdio || "pipe"
+      stdio:
+        options.stdio ||
+        "pipe"
     }
   );
 }
 
-function identifyImage(file) {
+function identifyImage(
+  file
+) {
   try {
     const output =
-      runImageMagick([
-        "identify",
-        "-format",
-        "%w %h %m",
-        file
-      ], {
-        stdio: "pipe"
-      }).toString("utf8").trim();
+      runImageMagick(
+        [
+          "identify",
+          "-format",
+          "%w %h %m",
+          file
+        ],
+        {
+          stdio: "pipe"
+        }
+      )
+        .toString("utf8")
+        .trim();
 
-    const [width, height, format] =
-      output.split(/\s+/);
+    const [
+      width,
+      height,
+      format
+    ] =
+      output.split(
+        /\s+/
+      );
+
+    if (
+      !width ||
+      !height ||
+      !format
+    ) {
+      return null;
+    }
 
     return {
-      width: Number(width),
-      height: Number(height),
+      width:
+        Number(width),
+
+      height:
+        Number(height),
+
       format
     };
   } catch {
     try {
       const output =
-        runImageMagick([
-          "-format",
-          "%w %h %m",
-          file
-        ], {
-          stdio: "pipe"
-        }).toString("utf8").trim();
+        runImageMagick(
+          [
+            "-format",
+            "%w %h %m",
+            file
+          ],
+          {
+            stdio: "pipe"
+          }
+        )
+          .toString("utf8")
+          .trim();
 
-      const [width, height, format] =
-        output.split(/\s+/);
+      const [
+        width,
+        height,
+        format
+      ] =
+        output.split(
+          /\s+/
+        );
+
+      if (
+        !width ||
+        !height ||
+        !format
+      ) {
+        return null;
+      }
 
       return {
-        width: Number(width),
-        height: Number(height),
+        width:
+          Number(width),
+
+        height:
+          Number(height),
+
         format
       };
     } catch {
@@ -1212,34 +2172,47 @@ function identifyImage(file) {
   }
 }
 
-// ------------------------------------------------------------
-// Convert to stable JPG
-// ------------------------------------------------------------
+// ============================================================
+// Convert to JPG
+// ============================================================
 
 function convertToJpeg(
   inputFile,
   outputFile
 ) {
   try {
-    runImageMagick([
-      inputFile,
-      "-auto-orient",
-      "-strip",
-      "-background",
-      "white",
-      "-alpha",
-      "remove",
-      "-alpha",
-      "off",
-      "-quality",
-      "90",
-      outputFile
-    ], {
-      stdio: "ignore"
-    });
+    runImageMagick(
+      [
+        inputFile,
+
+        "-auto-orient",
+
+        "-strip",
+
+        "-background",
+        "white",
+
+        "-alpha",
+        "remove",
+
+        "-alpha",
+        "off",
+
+        "-quality",
+        "90",
+
+        outputFile
+      ],
+      {
+        stdio:
+          "ignore"
+      }
+    );
 
     return true;
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       "ImageMagick conversion failed:",
       error.message
@@ -1249,33 +2222,32 @@ function convertToJpeg(
   }
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // SHA-256
-// ------------------------------------------------------------
+// ============================================================
 
-function sha256File(file) {
+function sha256File(
+  file
+) {
   const hash =
-    crypto.createHash("sha256");
+    crypto.createHash(
+      "sha256"
+    );
 
   hash.update(
-    fs.readFileSync(file)
+    fs.readFileSync(
+      file
+    )
   );
 
-  return hash.digest("hex");
+  return hash.digest(
+    "hex"
+  );
 }
 
-// ------------------------------------------------------------
-// Pixel fingerprint
-//
-// This intentionally does NOT compare only file bytes.
-// Two visually identical images can have different:
-// - JPEG quality
-// - EXIF metadata
-// - dimensions
-// - compression
-//
-// Therefore we compare normalized grayscale pixels.
-// ------------------------------------------------------------
+// ============================================================
+// Grayscale pixels
+// ============================================================
 
 function getGrayPixels(
   file,
@@ -1284,34 +2256,52 @@ function getGrayPixels(
 ) {
   try {
     const buffer =
-      runImageMagick([
-        file,
-        "-auto-orient",
-        "-resize",
-        `${width}x${height}!`,
-        "-colorspace",
-        "Gray",
-        "-depth",
-        "8",
-        "gray:-"
-      ], {
-        stdio: "pipe"
-      });
+      runImageMagick(
+        [
+          file,
+
+          "-auto-orient",
+
+          "-resize",
+          `${width}x${height}!`,
+
+          "-colorspace",
+          "Gray",
+
+          "-depth",
+          "8",
+
+          "gray:-"
+        ],
+        {
+          stdio: "pipe"
+        }
+      );
 
     const expected =
       width * height;
 
-    if (buffer.length < expected) {
+    if (
+      buffer.length <
+      expected
+    ) {
       return null;
     }
 
     return Buffer.from(
-      buffer.subarray(0, expected)
+      buffer.subarray(
+        0,
+        expected
+      )
     );
   } catch {
     return null;
   }
 }
+
+// ============================================================
+// Block hash
+// ============================================================
 
 function averageBlockHash(
   pixels,
@@ -1321,59 +2311,93 @@ function averageBlockHash(
 ) {
   const values = [];
 
-  for (let by = 0; by < blocks; by++) {
-    for (let bx = 0; bx < blocks; bx++) {
+  for (
+    let by = 0;
+    by < blocks;
+    by++
+  ) {
+    for (
+      let bx = 0;
+      bx < blocks;
+      bx++
+    ) {
       const x0 =
         Math.floor(
-          bx * width / blocks
+          bx *
+          width /
+          blocks
         );
 
       const x1 =
         Math.max(
           x0 + 1,
           Math.floor(
-            (bx + 1) * width / blocks
+            (bx + 1) *
+            width /
+            blocks
           )
         );
 
       const y0 =
         Math.floor(
-          by * height / blocks
+          by *
+          height /
+          blocks
         );
 
       const y1 =
         Math.max(
           y0 + 1,
           Math.floor(
-            (by + 1) * height / blocks
+            (by + 1) *
+            height /
+            blocks
           )
         );
 
       let sum = 0;
       let count = 0;
 
-      for (let y = y0; y < y1; y++) {
-        for (let x = x0; x < x1; x++) {
+      for (
+        let y = y0;
+        y < y1;
+        y++
+      ) {
+        for (
+          let x = x0;
+          x < x1;
+          x++
+        ) {
           sum +=
-            pixels[y * width + x];
+            pixels[
+              y * width + x
+            ];
 
           count++;
         }
       }
 
       values.push(
-        Math.round(sum / count)
+        Math.round(
+          sum / count
+        )
       );
     }
   }
 
   return values
-    .map(v =>
-      Math.floor(v / 16)
-        .toString(16)
+    .map(
+      value =>
+        Math.floor(
+          value / 16
+        ).toString(16)
     )
     .join("");
 }
+
+// ============================================================
+// aHash
+// ============================================================
 
 function aHash(
   pixels,
@@ -1381,31 +2405,60 @@ function aHash(
   height
 ) {
   const size = 8;
-
   const values = [];
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
+  for (
+    let y = 0;
+    y < size;
+    y++
+  ) {
+    for (
+      let x = 0;
+      x < size;
+      x++
+    ) {
       const px =
         pixels[
-          Math.floor(y * height / size) * width +
-          Math.floor(x * width / size)
+          Math.floor(
+            y *
+            height /
+            size
+          ) *
+            width +
+          Math.floor(
+            x *
+            width /
+            size
+          )
         ];
 
-      values.push(px);
+      values.push(
+        px
+      );
     }
   }
 
   const average =
     values.reduce(
-      (a, b) => a + b,
+      (a, b) =>
+        a + b,
       0
-    ) / values.length;
+    ) /
+    values.length;
 
   return values
-    .map(v => v >= average ? "1" : "0")
+    .map(
+      value =>
+        value >= average
+          ? "1"
+          : "0"
+    )
     .join("");
 }
+
+// ============================================================
+// dHash
+// ============================================================
 
 function dHash(
   pixels,
@@ -1417,22 +2470,50 @@ function dHash(
 
   const bits = [];
 
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w - 1; x++) {
+  for (
+    let y = 0;
+    y < h;
+    y++
+  ) {
+    for (
+      let x = 0;
+      x < w - 1;
+      x++
+    ) {
       const left =
         pixels[
-          Math.floor(y * height / h) * width +
-          Math.floor(x * width / w)
+          Math.floor(
+            y *
+            height /
+            h
+          ) *
+            width +
+          Math.floor(
+            x *
+            width /
+            w
+          )
         ];
 
       const right =
         pixels[
-          Math.floor(y * height / h) * width +
-          Math.floor((x + 1) * width / w)
+          Math.floor(
+            y *
+            height /
+            h
+          ) *
+            width +
+          Math.floor(
+            (x + 1) *
+            width /
+            w
+          )
         ];
 
       bits.push(
-        left < right ? "1" : "0"
+        left < right
+          ? "1"
+          : "0"
       );
     }
   }
@@ -1440,15 +2521,33 @@ function dHash(
   return bits.join("");
 }
 
-function hammingDistance(a, b) {
-  if (!a || !b || a.length !== b.length) {
+// ============================================================
+// Hamming distance
+// ============================================================
+
+function hammingDistance(
+  a,
+  b
+) {
+  if (
+    !a ||
+    !b ||
+    a.length !==
+      b.length
+  ) {
     return Number.MAX_SAFE_INTEGER;
   }
 
   let distance = 0;
 
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) {
+  for (
+    let i = 0;
+    i < a.length;
+    i++
+  ) {
+    if (
+      a[i] !== b[i]
+    ) {
       distance++;
     }
   }
@@ -1456,23 +2555,38 @@ function hammingDistance(a, b) {
   return distance;
 }
 
-function fingerprintImage(file) {
+// ============================================================
+// Fingerprint
+// ============================================================
+
+function fingerprintImage(
+  file
+) {
   const pixels =
-    getGrayPixels(file, 64, 64);
+    getGrayPixels(
+      file,
+      64,
+      64
+    );
 
   if (!pixels) {
     return null;
   }
 
   const hashPixels =
-    getGrayPixels(file, 32, 32);
+    getGrayPixels(
+      file,
+      32,
+      32
+    );
 
   if (!hashPixels) {
     return null;
   }
 
   return {
-    sha256: sha256File(file),
+    sha256:
+      sha256File(file),
 
     aHash:
       aHash(
@@ -1498,9 +2612,9 @@ function fingerprintImage(file) {
   };
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Visual duplicate detection
-// ------------------------------------------------------------
+// ============================================================
 
 function areVisualDuplicates(
   a,
@@ -1510,11 +2624,12 @@ function areVisualDuplicates(
     return false;
   }
 
-  // Exact file duplicate
+  // Exact duplicate
   if (
     a.sha256 &&
     b.sha256 &&
-    a.sha256 === b.sha256
+    a.sha256 ===
+      b.sha256
   ) {
     return true;
   }
@@ -1531,9 +2646,6 @@ function areVisualDuplicates(
       b.dHash
     );
 
-  // 64-bit hashes
-  //
-  // <= 4 means extremely similar.
   if (
     aDistance <= 4 &&
     dDistance <= 4
@@ -1541,11 +2653,11 @@ function areVisualDuplicates(
     return true;
   }
 
-  // 256-cell block hash
   if (
     a.blockHash &&
     b.blockHash &&
-    a.blockHash === b.blockHash
+    a.blockHash ===
+      b.blockHash
   ) {
     return true;
   }
@@ -1553,16 +2665,18 @@ function areVisualDuplicates(
   return false;
 }
 
-// ------------------------------------------------------------
-// Temporary file
-// ------------------------------------------------------------
+// ============================================================
+// Temporary files
+// ============================================================
 
 function tempFile(
   prefix,
   extension = ".bin"
 ) {
   const random =
-    crypto.randomBytes(8).toString("hex");
+    crypto
+      .randomBytes(8)
+      .toString("hex");
 
   return path.join(
     OUTPUT_DIR,
@@ -1570,9 +2684,9 @@ function tempFile(
   );
 }
 
-// ------------------------------------------------------------
-// Candidate download + validation
-// ------------------------------------------------------------
+// ============================================================
+// Candidate evaluation
+// ============================================================
 
 async function evaluateCandidate(
   candidate,
@@ -1611,17 +2725,12 @@ async function evaluateCandidate(
       `    Downloaded: ${bytes} bytes`
     );
 
+    // IMPORTANT:
+    // Validate downloaded bytes immediately.
     const inputInfo =
-      identifyImage(tempInput);
-    
-    if (!inputInfo) {
-      throw new Error(
-        "Downloaded URL is not a valid image"
+      identifyImage(
+        tempInput
       );
-    }
-
-    const inputInfo =
-      identifyImage(tempInput);
 
     if (!inputInfo) {
       throw new Error(
@@ -1654,7 +2763,9 @@ async function evaluateCandidate(
     }
 
     const outputInfo =
-      identifyImage(tempOutput);
+      identifyImage(
+        tempOutput
+      );
 
     if (!outputInfo) {
       throw new Error(
@@ -1663,16 +2774,22 @@ async function evaluateCandidate(
     }
 
     const outputSize =
-      fs.statSync(tempOutput).size;
+      fs.statSync(
+        tempOutput
+      ).size;
 
-    if (outputSize < 5000) {
+    if (
+      outputSize < 5000
+    ) {
       throw new Error(
         `Converted image too small: ${outputSize} bytes`
       );
     }
 
     const fingerprint =
-      fingerprintImage(tempOutput);
+      fingerprintImage(
+        tempOutput
+      );
 
     if (!fingerprint) {
       throw new Error(
@@ -1685,33 +2802,39 @@ async function evaluateCandidate(
       tempInput,
       tempOutput,
       fingerprint,
-      width: outputInfo.width,
-      height: outputInfo.height,
-      size: outputSize
+      width:
+        outputInfo.width,
+      height:
+        outputInfo.height,
+      size:
+        outputSize
     };
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.log(
       `    Rejected: ${error.message}`
     );
 
     try {
-      fs.unlinkSync(tempInput);
+      fs.unlinkSync(
+        tempInput
+      );
     } catch {}
 
     try {
-      fs.unlinkSync(tempOutput);
+      fs.unlinkSync(
+        tempOutput
+      );
     } catch {}
 
     return null;
   }
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Select image for ONE post
-//
-// Important:
-// We never pass candidates from another post here.
-// ------------------------------------------------------------
+// ============================================================
 
 async function selectImageForPost(
   post,
@@ -1721,45 +2844,65 @@ async function selectImageForPost(
   usedFingerprints
 ) {
   console.log("");
+
   console.log(
     `Selecting image for Post ${postIndex}: ${post.title}`
   );
 
-  // ----------------------------------------------------------
-  // Merge ONLY this post's candidates
-  // ----------------------------------------------------------
+  // ==========================================================
+  // ONLY this post's candidates
+  // ==========================================================
 
   const candidates =
     dedupeCandidates([
       ...feedCandidates,
       ...pageCandidates
-    ]);
+    ]).filter(
+      candidate =>
+        !isObviouslyBadImageUrl(
+          candidate.url,
+          post.url
+        )
+    );
 
   console.log(
     ` Image candidates belonging to this post: ${candidates.length}`
   );
 
-  if (candidates.length === 0) {
+  if (
+    candidates.length === 0
+  ) {
     throw new Error(
       `No usable image candidate found for Post ${postIndex}: ${post.title}`
     );
   }
 
   console.log(
-    ` Selection scope: THIS POST ONLY`
+    " Selection scope: THIS POST ONLY"
   );
 
-  for (let i = 0; i < candidates.length; i++) {
+  for (
+    let i = 0;
+    i < candidates.length;
+    i++
+  ) {
     console.log(
       `  Candidate ${i + 1}: ${candidates[i].source} | score=${candidates[i].score.toFixed(1)}`
     );
+
+    console.log(
+      `    ${candidates[i].url}`
+    );
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // Try candidates in ranked order
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  for (const candidate of candidates) {
+  for (
+    const candidate
+    of candidates
+  ) {
     const result =
       await evaluateCandidate(
         candidate,
@@ -1771,17 +2914,17 @@ async function selectImageForPost(
       continue;
     }
 
-    // --------------------------------------------------------
-    // Cross-post duplicate detection
-    //
-    // If duplicate:
-    // - DO NOT use another post's image
-    // - simply try next candidate belonging to THIS post
-    // --------------------------------------------------------
+    // ========================================================
+    // Cross-post duplicate check
+    // ========================================================
 
-    let duplicate = false;
+    let duplicate =
+      false;
 
-    for (const previous of usedFingerprints) {
+    for (
+      const previous
+      of usedFingerprints
+    ) {
       if (
         areVisualDuplicates(
           result.fingerprint,
@@ -1800,13 +2943,20 @@ async function selectImageForPost(
 
     if (duplicate) {
       try {
-        fs.unlinkSync(result.tempInput);
+        fs.unlinkSync(
+          result.tempInput
+        );
       } catch {}
 
       try {
-        fs.unlinkSync(result.tempOutput);
+        fs.unlinkSync(
+          result.tempOutput
+        );
       } catch {}
 
+      // IMPORTANT:
+      // Do NOT borrow another post's image.
+      // Try the next candidate belonging to this post.
       continue;
     }
 
@@ -1818,25 +2968,36 @@ async function selectImageForPost(
   );
 }
 
-// ------------------------------------------------------------
-// Extract post metadata
-// ------------------------------------------------------------
+// ============================================================
+// Post metadata
+// ============================================================
 
-function getPostUrl(entry) {
+function getPostUrl(
+  entry
+) {
   const links =
-    Array.isArray(entry?.link)
+    Array.isArray(
+      entry?.link
+    )
       ? entry.link
       : [];
 
   const alternate =
     links.find(
-      link => link?.rel === "alternate"
+      link =>
+        link?.rel ===
+        "alternate"
     );
 
-  return alternate?.href || null;
+  return (
+    alternate?.href ||
+    null
+  );
 }
 
-function getPostTitle(entry) {
+function getPostTitle(
+  entry
+) {
   return (
     entry?.title?.$t ||
     entry?.title?.["$t"] ||
@@ -1845,7 +3006,9 @@ function getPostTitle(entry) {
   ).trim();
 }
 
-function getPostDate(entry) {
+function getPostDate(
+  entry
+) {
   return (
     entry?.published?.$t ||
     entry?.published?.["$t"] ||
@@ -1855,44 +3018,85 @@ function getPostDate(entry) {
   );
 }
 
-function getCategories(entry) {
-  if (!Array.isArray(entry?.category)) {
+function getCategories(
+  entry
+) {
+  if (
+    !Array.isArray(
+      entry?.category
+    )
+  ) {
     return [];
   }
 
   return entry.category
-    .map(item => item?.term)
+    .map(
+      item =>
+        item?.term
+    )
     .filter(Boolean);
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Excerpt
-// ------------------------------------------------------------
+// ============================================================
 
-function createExcerpt(entry) {
-  const html =
-    entry?.summary?.$t ||
-    entry?.summary?.["$t"] ||
-    entry?.content?.$t ||
-    entry?.content?.["$t"] ||
-    "";
+function createExcerpt(
+  entry
+) {
+  let html = "";
+
+  if (
+    typeof entry?.summary ===
+    "string"
+  ) {
+    html =
+      entry.summary;
+  } else {
+    html =
+      entry?.summary?.$t ||
+      entry?.summary?.["$t"] ||
+      "";
+  }
+
+  if (!html) {
+    if (
+      typeof entry?.content ===
+      "string"
+    ) {
+      html =
+        entry.content;
+    } else {
+      html =
+        entry?.content?.$t ||
+        entry?.content?.["$t"] ||
+        "";
+    }
+  }
 
   const text =
     stripHtml(html);
 
-  if (text.length <= 240) {
+  if (
+    text.length <= 240
+  ) {
     return text;
   }
 
   return (
-    text.slice(0, 237).trimEnd() +
+    text
+      .slice(
+        0,
+        237
+      )
+      .trimEnd() +
     "..."
   );
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Blog analysis
-// ------------------------------------------------------------
+// ============================================================
 
 function buildAnalysis(
   siteTitle,
@@ -1900,21 +3104,28 @@ function buildAnalysis(
   posts
 ) {
   const titles =
-    posts.map(p => p.title);
+    posts.map(
+      p => p.title
+    );
 
   const excerpts =
-    posts.map(p => p.excerpt);
+    posts.map(
+      p => p.excerpt
+    );
 
   const combined =
-    [...titles, ...excerpts]
+    [
+      ...titles,
+      ...excerpts
+    ]
       .join(" ")
       .toLowerCase();
 
   const topics = [];
 
   const topicKeywords = [
-    ["S&P 500", "S&P 500"],
-    ["NASDAQ", "NASDAQ"],
+    ["s&p 500", "S&P 500"],
+    ["nasdaq", "NASDAQ"],
     ["stock market", "Stock Market"],
     ["stocks", "Stocks"],
     ["federal reserve", "Federal Reserve"],
@@ -1934,14 +3145,28 @@ function buildAnalysis(
     ["safe-haven", "Safe-Haven Assets"]
   ];
 
-  for (const [needle, label] of topicKeywords) {
-    if (combined.includes(needle)) {
-      topics.push(label);
+  for (
+    const [
+      needle,
+      label
+    ]
+    of topicKeywords
+  ) {
+    if (
+      combined.includes(
+        needle
+      )
+    ) {
+      topics.push(
+        label
+      );
     }
   }
 
   return {
-    identity: siteTitle || "Financial Market Blog",
+    identity:
+      siteTitle ||
+      "Financial Market Blog",
 
     topics,
 
@@ -1956,21 +3181,34 @@ function buildAnalysis(
   };
 }
 
-// ------------------------------------------------------------
+// ============================================================
 // Main
-// ------------------------------------------------------------
+// ============================================================
 
 async function main() {
-  console.log("========================================");
-  console.log("BLOG ANALYZER v9");
-  console.log("========================================");
+  console.log(
+    "========================================"
+  );
 
-  console.log(`Blog URL: ${BLOG_URL}`);
-  console.log(`Output: ${OUTPUT_DIR}`);
+  console.log(
+    "BLOG ANALYZER v10.1"
+  );
 
-  // ----------------------------------------------------------
-  // Fetch Blogger feed
-  // ----------------------------------------------------------
+  console.log(
+    "========================================"
+  );
+
+  console.log(
+    `Blog URL: ${BLOG_URL}`
+  );
+
+  console.log(
+    `Output: ${OUTPUT_DIR}`
+  );
+
+  // ==========================================================
+  // Blogger feed
+  // ==========================================================
 
   const feedUrl =
     new URL(
@@ -1979,21 +3217,28 @@ async function main() {
     ).href;
 
   console.log("");
+
   console.log(
     `Fetching Blogger feed: ${feedUrl}`
   );
 
   const feedResponse =
-    await fetch(feedUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
-        "Accept":
-          "application/json,text/plain,*/*"
-      }
-    });
+    await fetch(
+      feedUrl,
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
 
-  if (!feedResponse.ok) {
+          "Accept":
+            "application/json,text/plain,*/*"
+        }
+      }
+    );
+
+  if (
+    !feedResponse.ok
+  ) {
     throw new Error(
       `Feed HTTP ${feedResponse.status} ${feedResponse.statusText}`
     );
@@ -2003,11 +3248,15 @@ async function main() {
     await feedResponse.json();
 
   const entries =
-    Array.isArray(feed?.feed?.entry)
+    Array.isArray(
+      feed?.feed?.entry
+    )
       ? feed.feed.entry
       : [];
 
-  if (entries.length === 0) {
+  if (
+    entries.length === 0
+  ) {
     throw new Error(
       "No Blogger posts were found."
     );
@@ -2016,9 +3265,9 @@ async function main() {
   const selectedEntries =
     entries.slice(0, 5);
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // Site metadata
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const siteTitle =
     feed?.feed?.title?.$t ||
@@ -2030,9 +3279,9 @@ async function main() {
     feed?.feed?.subtitle?.["$t"] ||
     "";
 
-  // ----------------------------------------------------------
-  // Page-level metadata
-  // ----------------------------------------------------------
+  // ==========================================================
+  // Homepage metadata
+  // ==========================================================
 
   let pageHeading = "";
   let ogImage = "";
@@ -2040,49 +3289,63 @@ async function main() {
 
   try {
     const homeHtml =
-      await fetchText(BLOG_URL);
+      await fetchText(
+        BLOG_URL
+      );
 
-    pageHeading =
+    const h1Match =
       homeHtml.match(
         /<h1\b[^>]*>([\s\S]*?)<\/h1>/i
-      )?.[1]
-        ? stripHtml(
-            homeHtml.match(
-              /<h1\b[^>]*>([\s\S]*?)<\/h1>/i
-            )[1]
-          )
-        : "";
+      );
 
-    ogImage =
+    if (h1Match) {
+      pageHeading =
+        stripHtml(
+          h1Match[1]
+        );
+    }
+
+    const ogMatch =
       homeHtml.match(
         /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
-      )?.[1] ||
+      ) ||
       homeHtml.match(
         /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i
-      )?.[1] ||
-      "";
+      );
 
-    language =
+    if (ogMatch) {
+      ogImage =
+        ogMatch[1];
+    }
+
+    const languageMatch =
       homeHtml.match(
         /<html[^>]+lang=["']([^"']+)["']/i
-      )?.[1] ||
-      "en";
-  } catch (error) {
+      );
+
+    if (languageMatch) {
+      language =
+        languageMatch[1];
+    }
+  } catch (
+    error
+  ) {
     console.log(
       `Home page metadata warning: ${error.message}`
     );
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // Process posts
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const posts = [];
   const usedFingerprints = [];
 
   for (
     let index = 0;
-    index < selectedEntries.length;
+    index <
+      selectedEntries.length;
     index++
   ) {
     const entry =
@@ -2092,18 +3355,26 @@ async function main() {
       index + 1;
 
     const title =
-      getPostTitle(entry);
+      getPostTitle(
+        entry
+      );
 
     const postUrl =
-      getPostUrl(entry);
+      getPostUrl(
+        entry
+      );
 
-    if (!title || !postUrl) {
+    if (
+      !title ||
+      !postUrl
+    ) {
       throw new Error(
         `Post ${postIndex} has missing title or URL.`
       );
     }
 
     console.log("");
+
     console.log(
       `Post ${postIndex}: ${title}`
     );
@@ -2112,9 +3383,9 @@ async function main() {
       ` URL: ${postUrl}`
     );
 
-    // --------------------------------------------------------
+    // ========================================================
     // Feed candidates
-    // --------------------------------------------------------
+    // ========================================================
 
     const feedCandidates =
       extractFeedCandidates(
@@ -2126,34 +3397,44 @@ async function main() {
       ` Feed image candidates: ${feedCandidates.length}`
     );
 
-    for (const candidate of feedCandidates.slice(0, 10)) {
+    for (
+      const candidate
+      of feedCandidates.slice(
+        0,
+        10
+      )
+    ) {
       console.log(
         `  Feed: ${candidate.source} | ${candidate.url}`
       );
     }
 
-    // --------------------------------------------------------
-    // Actual post page
-    // --------------------------------------------------------
+    // ========================================================
+    // Fetch actual post page
+    // ========================================================
 
     let postHtml = "";
 
     try {
       postHtml =
-        await fetchText(postUrl);
+        await fetchText(
+          postUrl
+        );
 
       console.log(
         ` Article page fetched: ${postHtml.length} bytes`
       );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.log(
         ` Article page fetch warning: ${error.message}`
       );
     }
 
-    // --------------------------------------------------------
+    // ========================================================
     // Page-local candidates
-    // --------------------------------------------------------
+    // ========================================================
 
     const pageCandidates =
       postHtml
@@ -2169,16 +3450,20 @@ async function main() {
     );
 
     for (
-      const candidate of pageCandidates.slice(0, 10)
+      const candidate
+      of pageCandidates.slice(
+        0,
+        10
+      )
     ) {
       console.log(
         `  Page: ${candidate.source} | score=${candidate.score.toFixed(1)} | ${candidate.url}`
       );
     }
 
-    // --------------------------------------------------------
+    // ========================================================
     // Select image
-    // --------------------------------------------------------
+    // ========================================================
 
     const selected =
       await selectImageForPost(
@@ -2192,9 +3477,9 @@ async function main() {
         usedFingerprints
       );
 
-    // --------------------------------------------------------
+    // ========================================================
     // Save final image
-    // --------------------------------------------------------
+    // ========================================================
 
     const finalImagePath =
       path.join(
@@ -2207,7 +3492,6 @@ async function main() {
       finalImagePath
     );
 
-    // Cleanup temporary files
     try {
       fs.unlinkSync(
         selected.tempInput
@@ -2225,15 +3509,17 @@ async function main() {
         finalImagePath
       ).size;
 
-    if (finalSize < 5000) {
+    if (
+      finalSize < 5000
+    ) {
       throw new Error(
         `Final image too small: ${finalSize} bytes`
       );
     }
 
-    // --------------------------------------------------------
+    // ========================================================
     // Record fingerprint
-    // --------------------------------------------------------
+    // ========================================================
 
     usedFingerprints.push({
       postIndex,
@@ -2241,16 +3527,14 @@ async function main() {
         selected.fingerprint
     });
 
-    const imageSource =
-      selected.candidate.source;
-
     console.log("");
+
     console.log(
       ` SELECTED IMAGE FOR POST ${postIndex}`
     );
 
     console.log(
-      `   Source: ${imageSource}`
+      `   Source: ${selected.candidate.source}`
     );
 
     console.log(
@@ -2265,74 +3549,96 @@ async function main() {
       `   File: ${finalImagePath}`
     );
 
-    // --------------------------------------------------------
-    // Build post object
-    // --------------------------------------------------------
+    // ========================================================
+    // Post JSON
+    // ========================================================
 
     const published =
-      getPostDate(entry);
+      getPostDate(
+        entry
+      );
 
     posts.push({
-      index: postIndex,
+      index:
+        postIndex,
 
       title,
 
-      url: postUrl,
+      url:
+        postUrl,
 
       published,
 
       date:
         published
-          ? published.slice(0, 10)
+          ? published.slice(
+              0,
+              10
+            )
           : "",
 
       excerpt:
-        createExcerpt(entry),
+        createExcerpt(
+          entry
+        ),
 
       categories:
-        getCategories(entry),
+        getCategories(
+          entry
+        ),
 
       localImage:
         `blog/images/post-${postIndex}.jpg`,
 
-      imageSource,
+      imageSource:
+        selected.candidate.source,
 
       imageUrl:
         selected.candidate.url
     });
 
-    await sleep(200);
+    await sleep(
+      200
+    );
   }
 
-  // ----------------------------------------------------------
-  // Final duplicate verification
-  // ----------------------------------------------------------
+  // ==========================================================
+  // Final duplicate validation
+  // ==========================================================
 
   console.log("");
+
   console.log(
     "========================================"
   );
+
   console.log(
     "FINAL IMAGE DUPLICATE VALIDATION"
   );
+
   console.log(
     "========================================"
   );
 
   for (
     let i = 0;
-    i < usedFingerprints.length;
+    i <
+      usedFingerprints.length;
     i++
   ) {
     for (
       let j = i + 1;
-      j < usedFingerprints.length;
+      j <
+        usedFingerprints.length;
       j++
     ) {
       if (
         areVisualDuplicates(
-          usedFingerprints[i].fingerprint,
-          usedFingerprints[j].fingerprint
+          usedFingerprints[i]
+            .fingerprint,
+
+          usedFingerprints[j]
+            .fingerprint
         )
       ) {
         throw new Error(
@@ -2350,11 +3656,14 @@ async function main() {
     "Duplicate detection: SHA-256 + aHash + dHash + blockHash"
   );
 
-  // ----------------------------------------------------------
-  // Validate image files
-  // ----------------------------------------------------------
+  // ==========================================================
+  // Validate saved images
+  // ==========================================================
 
-  for (const post of posts) {
+  for (
+    const post
+    of posts
+  ) {
     const imagePath =
       path.resolve(
         OUTPUT_DIR,
@@ -2362,23 +3671,33 @@ async function main() {
         post.localImage
       );
 
-    if (!fs.existsSync(imagePath)) {
+    if (
+      !fs.existsSync(
+        imagePath
+      )
+    ) {
       throw new Error(
         `Missing image file: ${imagePath}`
       );
     }
 
     const size =
-      fs.statSync(imagePath).size;
+      fs.statSync(
+        imagePath
+      ).size;
 
-    if (size < 5000) {
+    if (
+      size < 5000
+    ) {
       throw new Error(
         `Image file too small: ${imagePath}`
       );
     }
 
     const info =
-      identifyImage(imagePath);
+      identifyImage(
+        imagePath
+      );
 
     if (!info) {
       throw new Error(
@@ -2396,12 +3715,12 @@ async function main() {
     }
   }
 
-  // ----------------------------------------------------------
-  // Build final JSON
-  // ----------------------------------------------------------
+  // ==========================================================
+  // blog.json
+  // ==========================================================
 
   const blogJson = {
-    version: 9,
+    version: 10,
 
     capturedAt:
       new Date().toISOString(),
@@ -2410,7 +3729,9 @@ async function main() {
       BLOG_URL,
 
     hostname:
-      new URL(BLOG_URL).hostname,
+      new URL(
+        BLOG_URL
+      ).hostname,
 
     siteTitle,
 
@@ -2443,10 +3764,6 @@ async function main() {
     posts
   };
 
-  // ----------------------------------------------------------
-  // Save blog.json
-  // ----------------------------------------------------------
-
   const jsonPath =
     path.join(
       OUTPUT_DIR,
@@ -2463,17 +3780,18 @@ async function main() {
     "utf8"
   );
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // Final summary
-  // ----------------------------------------------------------
+  // ==========================================================
 
   console.log("");
+
   console.log(
     "========================================"
   );
 
   console.log(
-    "BLOG ANALYZER v9 COMPLETE"
+    "BLOG ANALYZER v10.1 COMPLETE"
   );
 
   console.log(
@@ -2498,7 +3816,10 @@ async function main() {
 
   console.log("");
 
-  for (const post of posts) {
+  for (
+    const post
+    of posts
+  ) {
     console.log(
       `${post.index}. ${post.title}`
     );
@@ -2510,28 +3831,51 @@ async function main() {
     console.log(
       `   Source: ${post.imageSource}`
     );
+
+    console.log(
+      `   URL: ${post.imageUrl}`
+    );
   }
 
   console.log("");
+
   console.log(
     "All image validation checks passed."
   );
 }
 
-main().catch(error => {
-  console.error("");
-  console.error(
-    "========================================"
-  );
-  console.error(
-    "BLOG ANALYZER v9 FAILED"
-  );
-  console.error(
-    "========================================"
-  );
-  console.error(
-    error?.stack || error?.message || error
-  );
+// ============================================================
+// Execute
+// ============================================================
 
-  process.exit(1);
-});
+main().catch(
+  error => {
+    console.error("");
+
+    console.error(
+      "========================================"
+    );
+
+    console.error(
+      "BLOG ANALYZER v10.1 FAILED"
+    );
+
+    console.error(
+      "========================================"
+    );
+
+    console.error(
+      `Error: ${error.message}`
+    );
+
+    if (
+      error.stack
+    ) {
+      console.error(
+        error.stack
+      );
+    }
+
+    process.exit(1);
+  }
+);
