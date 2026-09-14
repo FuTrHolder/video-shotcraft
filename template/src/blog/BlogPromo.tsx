@@ -196,13 +196,207 @@ const Base: React.FC =
     </>
   );
 
-const IdentityScene: React.FC<{
-  data: BlogData;
-  analysis: BlogAnalysis;
-}> = ({
+const IdentityScene: React.FC<{ data: BlogData; analysis: BlogAnalysis }> = ({
   data,
   analysis,
 }) => {
+  const f = useCurrentFrame();
+  const o = fade(f, 90);
+  const y = enter(f, 42);
+
+  const topics = (analysis.topics || [])
+    .filter(Boolean)
+    .slice(0, 4);
+
+  const description = safe(
+    data.description,
+    "Market news, financial developments and actionable investment insights."
+  );
+
+  const audience = safe(
+    analysis.audience,
+    "Investors and readers interested in financial markets and stock-market news."
+  );
+
+  const value = safe(
+    analysis.valueProposition,
+    "Fast summaries of market movements, signals, and major financial developments."
+  );
+
+  return (
+    <AbsoluteFill style={{ opacity: o }}>
+      <Base />
+
+      <div
+        style={{
+          position: "absolute",
+          left: 125,
+          right: 125,
+          top: 82,
+          bottom: 70,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          transform: `translateY(${y}px)`,
+        }}
+      >
+        {/* Category */}
+        <div
+          style={{
+            fontSize: 17,
+            letterSpacing: 6,
+            fontWeight: 800,
+            color: C.accent,
+          }}
+        >
+          FINANCIAL MARKETS · INVESTING
+        </div>
+
+        {/* Blog title */}
+        <div
+          style={{
+            marginTop: 20,
+            fontSize: 94,
+            lineHeight: 0.96,
+            fontWeight: 900,
+            letterSpacing: -4,
+            color: C.text,
+          }}
+        >
+          {truncate(data.siteTitle, 42)}
+        </div>
+
+        <div
+          style={{
+            marginTop: 20,
+            width: 110,
+            height: 4,
+            background: C.white,
+          }}
+        />
+
+        {/* Description */}
+        <div
+          style={{
+            marginTop: 22,
+            maxWidth: 1380,
+            fontSize: 28,
+            lineHeight: 1.35,
+            fontWeight: 650,
+            color: C.text,
+          }}
+        >
+          {truncate(description, 145)}
+        </div>
+
+        {/* Value proposition */}
+        <div
+          style={{
+            marginTop: 14,
+            maxWidth: 1280,
+            fontSize: 20,
+            lineHeight: 1.4,
+            color: C.muted,
+          }}
+        >
+          {truncate(value, 125)}
+        </div>
+
+        {/* Topics */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 12,
+            marginTop: 28,
+          }}
+        >
+          {topics.map((topic, i) => {
+            const io = interpolate(
+              f,
+              [12 + i * 6, 24 + i * 6],
+              [0, 1],
+              {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }
+            );
+
+            const iy = interpolate(
+              f,
+              [12 + i * 6, 24 + i * 6],
+              [14, 0],
+              {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }
+            );
+
+            return (
+              <div
+                key={`${topic}-${i}`}
+                style={{
+                  opacity: io,
+                  transform: `translateY(${iy}px)`,
+                  padding: "10px 17px",
+                  border: `1px solid ${C.line}`,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.045)",
+                  color: C.muted,
+                  fontSize: 17,
+                  fontWeight: 750,
+                  letterSpacing: 0.3,
+                }}
+              >
+                {topic.toUpperCase()}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Audience */}
+        <div
+          style={{
+            marginTop: 25,
+            fontSize: 16,
+            letterSpacing: 1.2,
+            color: C.soft,
+          }}
+        >
+          {truncate(audience, 110)}
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const cleanExcerpt = (value?: string) => {
+  const raw = safe(value);
+
+  if (!raw) {
+    return "";
+  }
+
+  return raw
+    // HTML comments
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    // script/style
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    // HTML tags
+    .replace(/<[^>]+>/g, " ")
+    // Common HTML entities
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    // whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
   const f =
     useCurrentFrame();
 
@@ -824,11 +1018,7 @@ const ValueScene: React.FC<{
     34
   );
 
-  const shortValue =
-    truncate(
-      analysis.valueProposition,
-      105
-    );
+  const summary = truncate(cleanExcerpt(post.excerpt), 105);
 
   return (
     <AbsoluteFill

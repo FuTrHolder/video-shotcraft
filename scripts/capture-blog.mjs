@@ -235,14 +235,17 @@ async function main() {
           excerpt:
             normalizeWhitespace(
               stripHtml(
-                entry.summary ||
-                  entry.content ||
-                  ""
+                decodeHtml(
+                  entry.summary ||
+                    entry.content ||
+                    ""
+                )
               )
-            ).slice(
-              0,
-              500
-            ),
+            )
+              .replace(/<[^>]*>/g, " ")
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 500),
 
           categories:
             entry.categories ||
