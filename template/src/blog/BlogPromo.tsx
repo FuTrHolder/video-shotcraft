@@ -913,7 +913,13 @@ const ValueScene: React.FC<{
     34
   );
 
-  const summary = truncate(cleanExcerpt(post.excerpt), 105);
+  const shortValue = truncate(
+    safe(
+      analysis.valueProposition,
+      "Timely ideas, useful context, and a clearer view of what matters."
+    ),
+    105
+  );
 
   return (
     <AbsoluteFill
