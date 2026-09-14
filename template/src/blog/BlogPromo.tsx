@@ -624,11 +624,16 @@ const PostScene: React.FC<{
         ? 56
         : 64;
 
-  const summary =
-    truncate(
-      post.excerpt,
-      92
-    );
+  const cleanedExcerpt = post.excerpt
+    ? post.excerpt
+        .replace(/Photo by .*? on Unsplash/i, "")
+        .replace(/📅[^|]*\|/, "")
+        .replace(/^\s*Wall Street Daily Briefing\s*/i, "")
+        .replace(/\s+/g, " ")
+        .trim()
+    : "";
+
+  const summary = truncate(cleanedExcerpt, 92);
 
   const category =
     safe(
