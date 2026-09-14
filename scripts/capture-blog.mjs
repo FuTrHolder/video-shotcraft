@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * capture-blog.mjs v13.0
+ * capture-blog.mjs v14.0
  *
  * Purpose:
  *   Capture Blogger posts and their article-specific images.
@@ -64,6 +64,9 @@ const MIN_HEIGHT = 150;
 const MAX_POSTS = 5;
 const MAX_FEED_ENTRIES = 10;
 const FETCH_TIMEOUT = 30000;
+const IMAGE_FETCH_TIMEOUT = 60000;
+const IMAGE_MAX_RETRIES = 4;
+const CURL_MAX_BYTES = 50 * 1024 * 1024;
 
 const sleep = (ms) =>
   new Promise((resolve) => setTimeout(resolve, ms));
@@ -248,15 +251,22 @@ async function fetchText(url, options = {}) {
 }
 
 async function fetchBinary(url) {
-  const maxRetries = 2;
+  let lastError = null;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  /*
+   * First try Node/undici.  Images hosted outside Blogger (for example
+   * i.ibb.co) can occasionally fail at the connection layer even when the
+   * same URL is reachable with curl.  We therefore keep curl as a fallback.
+   */
+  for (let attempt = 1; attempt <= IMAGE_MAX_RETRIES; attempt++) {
+    let timer = null;
+
     try {
       const controller = new AbortController();
 
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         controller.abort();
-      }, FETCH_TIMEOUT);
+      }, IMAGE_FETCH_TIMEOUT);
 
       const response = await fetch(url, {
         redirect: "follow",
@@ -265,44 +275,155 @@ async function fetchBinary(url) {
           "User-Agent": USER_AGENT,
           Accept:
             "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-          Referer: BLOG_URL,
+          "Accept-Language": "en-US,en;q=0.9",
+          Connection: "keep-alive",
         },
       });
 
-      clearTimeout(timer);
-
       if (response.ok) {
+        const bytes = Buffer.from(await response.arrayBuffer());
+
+        if (!bytes.length) {
+          throw new Error("HTTP 200 but response body was empty");
+        }
+
+        log(
+          `  Image download succeeded via Node fetch ` +
+            `(attempt ${attempt}/${IMAGE_MAX_RETRIES}, ` +
+            `${bytes.length} bytes, HTTP ${response.status})`
+        );
+
         return {
-          bytes: Buffer.from(await response.arrayBuffer()),
+          bytes,
           contentType:
             response.headers.get("content-type") || "",
           finalUrl: response.url || url,
+          method: "node-fetch",
         };
       }
 
-      if (
-        (response.status === 429 ||
-          response.status === 408 ||
-          response.status >= 500) &&
-        attempt < maxRetries
-      ) {
-        await sleep(1500 * Math.pow(2, attempt));
-        continue;
-      }
-
-      throw new Error(
-        `HTTP ${response.status} ${response.statusText}`
+      const status = response.status;
+      const statusText = response.statusText || "";
+      lastError = new Error(
+        `HTTP ${status} ${statusText}`.trim()
       );
-    } catch (error) {
-      if (attempt >= maxRetries) {
-        throw error;
-      }
 
-      await sleep(1500 * Math.pow(2, attempt));
+      warn(
+        `  Image download attempt ${attempt}/${IMAGE_MAX_RETRIES} ` +
+          `returned HTTP ${status} for ${url}`
+      );
+
+      if (
+        !(
+          status === 408 ||
+          status === 425 ||
+          status === 429 ||
+          status >= 500
+        )
+      ) {
+        break;
+      }
+    } catch (error) {
+      lastError = error;
+
+      warn(
+        `  Image download attempt ${attempt}/${IMAGE_MAX_RETRIES} failed.`
+      );
+      warn(`    URL: ${url}`);
+      warn(`    Error: ${error?.message || error}`);
+      warn(`    Name: ${error?.name || "unknown"}`);
+
+      if (error?.cause) {
+        warn(
+          `    Cause: ${error.cause.code || "unknown"} ` +
+            `${error.cause.message || ""}`.trim()
+        );
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    if (attempt < IMAGE_MAX_RETRIES) {
+      const delay = Math.min(8000, 1000 * 2 ** (attempt - 1));
+      warn(`    Retrying in ${delay}ms...`);
+      await sleep(delay);
     }
   }
 
-  throw new Error(`Unable to download image: ${url}`);
+  /*
+   * Fallback: curl is normally available on GitHub-hosted Ubuntu runners.
+   * This is deliberately a fallback, not the primary path, so the normal
+   * Node implementation remains portable.
+   */
+  try {
+    execFileSync("curl", ["--version"], {
+      stdio: "ignore",
+      timeout: 5000,
+    });
+
+    log("  Node image fetch failed; trying curl fallback...");
+
+    const curlArgs = [
+      "--location",
+      "--fail",
+      "--silent",
+      "--show-error",
+      "--compressed",
+      "--max-time",
+      String(Math.ceil(IMAGE_FETCH_TIMEOUT / 1000)),
+      "--connect-timeout",
+      "20",
+      "--retry",
+      "2",
+      "--retry-delay",
+      "2",
+      "--retry-all-errors",
+      "-A",
+      USER_AGENT,
+      "-H",
+      "Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      url,
+    ];
+
+    const bytes = execFileSync("curl", curlArgs, {
+      encoding: "buffer",
+      maxBuffer: CURL_MAX_BYTES,
+      timeout: IMAGE_FETCH_TIMEOUT + 10000,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    if (!bytes || !bytes.length) {
+      throw new Error("curl returned an empty response body");
+    }
+
+    log(
+      `  Image download succeeded via curl ` +
+        `(${bytes.length} bytes)`
+    );
+
+    return {
+      bytes: Buffer.from(bytes),
+      contentType: "",
+      finalUrl: url,
+      method: "curl",
+    };
+  } catch (error) {
+    const curlMessage =
+      error?.stderr?.toString?.("utf8")?.trim() ||
+      error?.message ||
+      String(error);
+
+    warn(`  curl fallback failed: ${curlMessage}`);
+
+    const detail = lastError
+      ? `${lastError.name || "Error"}: ${lastError.message || lastError}`
+      : "no previous Node fetch error";
+
+    throw new Error(
+      `Unable to download image. Node fetch: ${detail}. ` +
+        `curl: ${curlMessage}`
+    );
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1212,6 +1333,8 @@ function findUnsplashAttributionCandidates(
     return candidates;
   }
 
+  const searchableHtml = decodeHtml(blockHtml);
+
   const attributionRegex =
     /Photo\s+by[\s\S]{0,800}?Unsplash/gi;
 
@@ -1220,7 +1343,7 @@ function findUnsplashAttributionCandidates(
   while (
     (match =
       attributionRegex.exec(
-        blockHtml
+        searchableHtml
       ))
   ) {
     const start =
@@ -1375,87 +1498,116 @@ function findUnsplashAttributionCandidates(
               "article-body",
             reason:
               "unsplash-attribution-source",
-          }
+
+                          association:
+                "article-body",
+              reason:
+                "unsplash-attribution-source",
+            }
         );
       }
 
-      for (
-        const url of
-          extractSrcsetUrls(
-            attrs.srcset
-          )
-      ) {
-        addCandidate(
-          candidates,
-          url,
-          "article-unsplash",
-          1060,
-          {
-            attribute:
-              "srcset",
-            association:
-              "article-body",
-            reason:
-              "unsplash-attribution-source-srcset",
+      if (attrs.srcset) {
+        for (
+          const url of
+            extractSrcsetUrls(
+              attrs.srcset
+            )
+        ) {
+          if (
+            !isLikelyImageUrl(
+              url
+            )
+          ) {
+            continue;
           }
-        );
+
+          addCandidate(
+            candidates,
+            url,
+            "article-unsplash",
+            1060,
+            {
+              attribute:
+                "srcset",
+              association:
+                "article-body",
+              reason:
+                "unsplash-attribution-source-srcset",
+            }
+          );
+        }
       }
     }
 
     /*
-     * Raw Unsplash CDN URLs.
-     *
-     * This is important for Blogger posts where
-     * the visible attribution is present but the
-     * <img> element is malformed or empty.
+     * Look for concrete image URLs in
+     * the local attribution window.
      */
-    const rawUnsplashRegex =
-      /https?:\/\/(?:images\.unsplash\.com|plus\.unsplash\.com)\/[^\s"'<>\\)]+/gi;
+    const concreteUrlRegex =
+      /https?:\/\/[^\s"'<>]+/gi;
 
-    let rawMatch;
+    let urlMatch;
 
     while (
-      (rawMatch =
-        rawUnsplashRegex.exec(
+      (urlMatch =
+        concreteUrlRegex.exec(
           windowHtml
         ))
     ) {
+      let url =
+        urlMatch[0];
+
+      url = url
+        .replace(
+          /[),.;]+$/g,
+          ""
+        )
+        .trim();
+
+      if (
+        !isLikelyImageUrl(
+          url
+        )
+      ) {
+        continue;
+      }
+
       addCandidate(
         candidates,
-        rawMatch[0],
+        url,
         "article-unsplash",
-        1150,
+        1000,
         {
           attribute:
-            "raw-unsplash-url",
+            "nearby-url",
           association:
             "article-body",
           reason:
-            "unsplash-attribution-raw-url",
+            "unsplash-attribution-url",
         }
       );
     }
   }
 
-  return dedupeCandidates(
-    candidates
-  );
+  return candidates;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Feed parsing                                                               */
+/* Feed extraction                                                            */
 /* -------------------------------------------------------------------------- */
 
-function extractTagRaw(
+function extractXmlTag(
   xml,
   tagName
 ) {
-  const escapedTag =
-    escapeRegExp(tagName);
-
   const regex =
     new RegExp(
-      `<${escapedTag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escapedTag}\\s*>`,
+      `<${escapeRegExp(
+        tagName
+      )}\\b[^>]*>([\\s\\S]*?)<\\/${escapeRegExp(
+        tagName
+      )}\\s*>`,
       "i"
     );
 
@@ -1467,21 +1619,69 @@ function extractTagRaw(
     : "";
 }
 
-function extractTagText(
-  xml,
-  tagName
+function extractXmlAttribute(
+  tag,
+  attribute
 ) {
-  const raw =
-    extractTagRaw(
-      xml,
-      tagName
+  const regex =
+    new RegExp(
+      `${escapeRegExp(
+        attribute
+      )}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`,
+      "i"
     );
 
-  return raw
-    ? normalizeWhitespace(
-        stripHtml(raw)
-      )
-    : "";
+  const match =
+    tag.match(regex);
+
+  if (!match) {
+    return "";
+  }
+
+  return decodeEscapedUrl(
+    match[1] ??
+      match[2] ??
+      match[3] ??
+      ""
+  );
+}
+
+function parseFeedLink(
+  linkTag
+) {
+  const href =
+    extractXmlAttribute(
+      linkTag,
+      "href"
+    );
+
+  const rel =
+    extractXmlAttribute(
+      linkTag,
+      "rel"
+    ).toLowerCase();
+
+  if (
+    href &&
+    (!rel || rel === "alternate")
+  ) {
+    return absoluteUrl(
+      href
+    );
+  }
+
+  const text =
+    stripHtml(
+      linkTag
+    );
+
+  if (text) {
+    return absoluteUrl(
+      text
+    );
+  }
+
+  return null;
 }
 
 function extractFeedEntries(
@@ -1489,40 +1689,29 @@ function extractFeedEntries(
 ) {
   const entries = [];
 
-  if (!feedXml) {
-    return entries;
-  }
+  /*
+   * Atom
+   */
+  const atomRegex =
+    /<entry\b[\s\S]*?<\/entry\s*>/gi;
 
-  const isRss =
-    /<rss\b/i.test(feedXml) ||
-    /<channel\b/i.test(feedXml);
-
-  const tagName =
-    isRss
-      ? "item"
-      : "entry";
-
-  const entryRegex =
-    new RegExp(
-      `<${tagName}\\b[\\s\\S]*?<\\/${tagName}\\s*>`,
-      "gi"
-    );
-
-  let entryMatch;
+  let match;
 
   while (
-    (entryMatch =
-      entryRegex.exec(
-        feedXml
-      ))
+    (match =
+      atomRegex.exec(feedXml))
   ) {
-    const entry =
-      entryMatch[0];
+    const entryXml =
+      match[0];
 
     const title =
-      extractTagText(
-        entry,
-        "title"
+      normalizeText(
+        stripHtml(
+          extractXmlTag(
+            entryXml,
+            "title"
+          )
+        )
       );
 
     if (!title) {
@@ -1530,126 +1719,64 @@ function extractFeedEntries(
     }
 
     const published =
-      extractTagText(
-        entry,
-        isRss
-          ? "pubDate"
-          : "published"
-      ) ||
-      extractTagText(
-        entry,
-        "updated"
+      normalizeText(
+        stripHtml(
+          extractXmlTag(
+            entryXml,
+            "published"
+          )
+        )
+      );
+
+    const updated =
+      normalizeText(
+        stripHtml(
+          extractXmlTag(
+            entryXml,
+            "updated"
+          )
+        )
       );
 
     const summary =
-      extractTagRaw(
-        entry,
+      extractXmlTag(
+        entryXml,
         "summary"
-      ) ||
-      extractTagRaw(
-        entry,
-        "description"
       );
 
     const content =
-      extractTagRaw(
-        entry,
+      extractXmlTag(
+        entryXml,
         "content"
-      ) ||
-      extractTagRaw(
-        entry,
-        "content:encoded"
-      ) ||
-      extractTagRaw(
-        entry,
-        "description"
       );
 
-    const links = [];
+    const linkTags =
+      entryXml.match(
+        /<link\b[^>]*>/gi
+      ) || [];
 
-    const linkRegex =
-      /<link\b[^>]*>/gi;
+    let url = null;
 
-    let linkMatch;
-
-    while (
-      (linkMatch =
-        linkRegex.exec(
-          entry
-        ))
+    for (
+      const linkTag of
+        linkTags
     ) {
-      const attrs =
-        parseAttributes(
-          linkMatch[0]
+      const parsed =
+        parseFeedLink(
+          linkTag
         );
 
-      if (!attrs.href) {
-        continue;
+      if (parsed) {
+        url = parsed;
+        break;
       }
-
-      links.push({
-        rel:
-          attrs.rel || "",
-        type:
-          attrs.type || "",
-        href:
-          absoluteUrl(
-            attrs.href
-          ),
-      });
     }
 
-    /*
-     * RSS <link> is text content.
-     */
-    const rssLink =
-      extractTagText(
-        entry,
-        "link"
-      );
-
-    if (
-      rssLink &&
-      !links.some(
-        (link) =>
-          link.href ===
-          absoluteUrl(
-            rssLink
-          )
-      )
-    ) {
-      links.push({
-        rel: "alternate",
-        type: "text/html",
-        href:
-          absoluteUrl(
-            rssLink
-          ),
-      });
+    if (!url) {
+      continue;
     }
 
-    const alternate =
-      links.find(
-        (link) =>
-          String(link.rel)
-            .toLowerCase() ===
-          "alternate"
-      )?.href ||
-      links.find(
-        (link) =>
-          String(link.type)
-            .toLowerCase()
-            .includes(
-              "text/html"
-            )
-      )?.href ||
-      links.find(
-        (link) =>
-          link.href
-      )?.href ||
-      null;
-
-    const categoryMatches = [];
+    const categories = [];
 
     const categoryRegex =
       /<category\b[^>]*>/gi;
@@ -1659,138 +1786,589 @@ function extractFeedEntries(
     while (
       (categoryMatch =
         categoryRegex.exec(
-          entry
+          entryXml
         ))
     ) {
-      const attrs =
-        parseAttributes(
-          categoryMatch[0]
+      const term =
+        extractXmlAttribute(
+          categoryMatch[0],
+          "term"
         );
 
-      if (attrs.term) {
-        categoryMatches.push(
-          attrs.term
+      if (term) {
+        categories.push(
+          normalizeText(term)
         );
       }
     }
 
-    const rssCategoryRegex =
-      /<category\b[^>]*>([\s\S]*?)<\/category\s*>/gi;
-
-    let rssCategoryMatch;
-
-    while (
-      (rssCategoryMatch =
-        rssCategoryRegex.exec(
-          entry
-        ))
-    ) {
-      const category =
-        normalizeWhitespace(
-          stripHtml(
-            rssCategoryMatch[1]
-          )
-        );
-
-      if (
-        category &&
-        !categoryMatches.includes(
-          category
-        )
-      ) {
-        categoryMatches.push(
-          category
-        );
-      }
-    }
+    const imageCandidates = [];
 
     /*
-     * Feed images are extracted ONLY from actual
-     * image references in THIS feed entry.
+     * Decode feed HTML before looking for
+     * embedded images.
      *
-     * Arbitrary href values are never treated
-     * as feed images.
+     * Blogger feeds often entity-encode
+     * the content HTML.
      */
-    const feedCandidates = [
+    const decodedContent =
+      decodeHtml(content);
+
+    const decodedSummary =
+      decodeHtml(summary);
+
+    imageCandidates.push(
       ...extractImageCandidatesFromHtml(
-        content,
+        decodedContent,
         {
           source:
             "feed-content",
         }
-      ),
+      )
+    );
+
+    imageCandidates.push(
       ...extractImageCandidatesFromHtml(
-        summary,
+        decodedSummary,
         {
           source:
-            "feed-summary",
+            "feed-content",
         }
-      ),
-    ];
+      )
+    );
 
-    for (
-      const candidate of
-        feedCandidates
+    /*
+     * Direct Atom media namespace support.
+     *
+     * Examples:
+     *   <media:content url="...">
+     *   <media:thumbnail url="...">
+     */
+    const mediaRegex =
+      /<media:(?:content|thumbnail)\b[^>]*>/gi;
+
+    let mediaMatch;
+
+    while (
+      (mediaMatch =
+        mediaRegex.exec(
+          entryXml
+        ))
     ) {
-      candidate.association =
-        "feed-content";
+      const mediaTag =
+        mediaMatch[0];
+
+      const mediaUrl =
+        extractXmlAttribute(
+          mediaTag,
+          "url"
+        ) ||
+        extractXmlAttribute(
+          mediaTag,
+          "src"
+        ) ||
+        extractXmlAttribute(
+          mediaTag,
+          "href"
+        );
+
+      if (!mediaUrl) {
+        continue;
+      }
+
+      addCandidate(
+        imageCandidates,
+        mediaUrl,
+        "feed-content",
+        900,
+        {
+          attribute:
+            "media:url",
+          association:
+            "feed-entry",
+        }
+      );
     }
 
     entries.push({
-      title:
-        normalizeWhitespace(
-          stripHtml(title)
+      title,
+      url,
+      published:
+        published ||
+        updated ||
+        null,
+      updated:
+        updated ||
+        null,
+      summary:
+        stripHtml(
+          decodedSummary
         ),
-      published,
-      url: alternate,
-      summary,
-      content,
-      categories:
-        categoryMatches,
-      imageCandidates:
-        feedCandidates,
+      content:
+        decodedContent,
+      categories,
+      imageCandidates,
+      raw:
+        entryXml,
     });
+  }
+
+  /*
+   * RSS fallback.
+   */
+  if (!entries.length) {
+    const itemRegex =
+      /<item\b[\s\S]*?<\/item\s*>/gi;
+
+    while (
+      (match =
+        itemRegex.exec(feedXml))
+    ) {
+      const itemXml =
+        match[0];
+
+      const title =
+        normalizeText(
+          stripHtml(
+            extractXmlTag(
+              itemXml,
+              "title"
+            )
+          )
+        );
+
+      if (!title) {
+        continue;
+      }
+
+      const link =
+        absoluteUrl(
+          stripHtml(
+            extractXmlTag(
+              itemXml,
+              "link"
+            )
+          )
+        );
+
+      if (!link) {
+        continue;
+      }
+
+      const pubDate =
+        normalizeText(
+          stripHtml(
+            extractXmlTag(
+              itemXml,
+              "pubDate"
+          )
+        )
+      );
+
+      const description =
+        extractXmlTag(
+          itemXml,
+          "description"
+        );
+
+      const encoded =
+        extractXmlTag(
+          itemXml,
+          "content:encoded"
+        );
+
+      const decodedDescription =
+        decodeHtml(
+          description
+        );
+
+      const decodedEncoded =
+        decodeHtml(
+          encoded
+        );
+
+      const imageCandidates = [];
+
+      imageCandidates.push(
+        ...extractImageCandidatesFromHtml(
+          decodedEncoded,
+          {
+            source:
+              "feed-content",
+          }
+        )
+      );
+
+      imageCandidates.push(
+        ...extractImageCandidatesFromHtml(
+          decodedDescription,
+          {
+            source:
+              "feed-content",
+          }
+        )
+      );
+
+      entries.push({
+        title,
+        url: link,
+        published:
+          pubDate || null,
+        updated: null,
+        summary:
+          stripHtml(
+            decodedDescription
+          ),
+        content:
+          decodedEncoded,
+        categories: [],
+        imageCandidates,
+        raw:
+          itemXml,
+      });
+    }
   }
 
   return entries;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Candidate deduplication                                                    */
+/* Feed URL discovery                                                         */
+/* -------------------------------------------------------------------------- */
+
+function buildFeedUrls(
+  blogUrl
+) {
+  const base =
+    new URL(blogUrl);
+
+  const origin =
+    `${base.protocol}//${base.host}`;
+
+  return [
+    `${origin}/feeds/posts/default?alt=atom&max-results=${MAX_FEED_ENTRIES}`,
+    `${origin}/feeds/posts/default?alt=rss&max-results=${MAX_FEED_ENTRIES}`,
+    `${origin}/feeds/posts/default?max-results=${MAX_FEED_ENTRIES}`,
+  ];
+}
+
+async function fetchFeed() {
+  const feedUrls =
+    buildFeedUrls(
+      BLOG_URL
+    );
+
+  let lastError =
+    null;
+
+  for (
+    const feedUrl of
+      feedUrls
+  ) {
+    try {
+      log(
+        `Fetching feed: ${feedUrl}`
+      );
+
+      const xml =
+        await fetchText(
+          feedUrl
+        );
+
+      if (
+        !/<(?:entry|item)\b/i.test(
+          xml
+        )
+      ) {
+        throw new Error(
+          "Response does not appear to contain feed entries"
+        );
+      }
+
+      const entries =
+        extractFeedEntries(
+          xml
+        );
+
+      if (
+        entries.length
+      ) {
+        log(
+          `Feed entries found: ${entries.length}`
+        );
+
+        return {
+          url: feedUrl,
+          xml,
+          entries,
+        };
+      }
+
+      throw new Error(
+        "Feed parsed successfully but contained no entries"
+      );
+    } catch (error) {
+      lastError =
+        error;
+
+      warn(
+        `Feed failed: ${feedUrl}`
+      );
+
+      warn(
+        `Reason: ${error.message}`
+      );
+    }
+  }
+
+  throw new Error(
+    `Unable to obtain a usable Blogger feed. ` +
+      `${lastError?.message || ""}`
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Article page helpers                                                       */
+/* -------------------------------------------------------------------------- */
+
+function extractPageTitle(
+  html
+) {
+  const titleMatch =
+    html.match(
+      /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i
+    );
+
+  if (!titleMatch) {
+    return "";
+  }
+
+  return normalizeText(
+    stripHtml(
+      titleMatch[1]
+    )
+  );
+}
+
+function extractDescription(
+  html
+) {
+  const metaRegex =
+    /<meta\b[^>]*>/gi;
+
+  let match;
+
+  while (
+    (match =
+      metaRegex.exec(html))
+  ) {
+    const attrs =
+      parseAttributes(
+        match[0]
+      );
+
+    const name = String(
+      attrs.name ||
+        attrs.property ||
+        ""
+    ).toLowerCase();
+
+    if (
+      name ===
+      "description"
+    ) {
+      return normalizeText(
+        attrs.content || ""
+      );
+    }
+  }
+
+  return "";
+}
+
+function extractLanguage(
+  html
+) {
+  const htmlMatch =
+    html.match(
+      /<html\b[^>]*>/i
+    );
+
+  if (!htmlMatch) {
+    return null;
+  }
+
+  const attrs =
+    parseAttributes(
+      htmlMatch[0]
+    );
+
+  return (
+    attrs.lang ||
+    null
+  );
+}
+
+function extractPageHeading(
+  html,
+  title
+) {
+  const heading =
+    findHeadingForTitle(
+      html,
+      title
+    );
+
+  if (heading) {
+    return stripHtml(
+      html.slice(
+        heading.start,
+        heading.end
+      )
+    );
+  }
+
+  const h1 =
+    html.match(
+      /<h1\b[^>]*>[\s\S]*?<\/h1\s*>/i
+    );
+
+  return h1
+    ? normalizeText(
+        stripHtml(h1[0])
+      )
+    : "";
+}
+
+function findPostText(
+  blockHtml
+) {
+  return normalizeWhitespace(
+    stripHtml(
+      blockHtml
+    )
+  );
+}
+
+function makeExcerpt(
+  text,
+  maxLength = 240
+) {
+  const normalized =
+    normalizeWhitespace(
+      text
+    );
+
+  if (
+    normalized.length <=
+    maxLength
+  ) {
+    return normalized;
+  }
+
+  return (
+    normalized
+      .slice(
+        0,
+        maxLength - 1
+      )
+      .trimEnd() +
+    "…"
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Candidate ranking                                                          */
 /* -------------------------------------------------------------------------- */
 
 function dedupeCandidates(
   candidates
 ) {
-  const map = new Map();
+  const seen =
+    new Set();
+
+  const result = [];
 
   for (
     const candidate of
-      candidates || []
+      candidates
   ) {
-    const key =
-      candidate.url;
+    if (
+      !candidate ||
+      !candidate.url
+    ) {
+      continue;
+    }
 
-    const existing =
-      map.get(key);
+    const key =
+      candidate.url
+        .toLowerCase();
 
     if (
-      !existing ||
-      candidate.score >
-        existing.score
+      seen.has(key)
     ) {
-      map.set(
-        key,
-        candidate
-      );
+      continue;
     }
+
+    seen.add(key);
+
+    result.push(
+      candidate
+    );
   }
 
-  return [
-    ...map.values(),
-  ].sort(
+  return result.sort(
     (a, b) =>
-      b.score - a.score
+      (b.score || 0) -
+      (a.score || 0)
+  );
+}
+
+function rankImageCandidates(
+  candidates
+) {
+  const ranked =
+    dedupeCandidates(
+      candidates
+    );
+
+  /*
+   * Association priority is intentionally
+   * stronger than generic extraction score.
+   */
+  const associationWeight = {
+    "article-og":
+      5000,
+    "article-twitter":
+      4800,
+    "article-meta":
+      4600,
+    "article-body":
+      4200,
+    "feed-entry":
+      3800,
+    "": 0,
+  };
+
+  return ranked.sort(
+    (a, b) => {
+      const aScore =
+        (associationWeight[
+          a.association || ""
+        ] || 0) +
+        (a.score || 0);
+
+      const bScore =
+        (associationWeight[
+          b.association || ""
+        ] || 0) +
+        (b.score || 0);
+
+      return (
+        bScore -
+        aScore
+      );
+    }
   );
 }
 
@@ -1798,84 +2376,10 @@ function dedupeCandidates(
 /* Image validation                                                           */
 /* -------------------------------------------------------------------------- */
 
-function detectImageMagick() {
-  let identifyCommand = null;
-  let convertCommand = null;
-
-  try {
-    execFileSync(
-      "magick",
-      ["-version"],
-      {
-        stdio: "ignore",
-      }
-    );
-
-    identifyCommand =
-      "magick";
-
-    convertCommand =
-      "magick";
-  } catch {
-    try {
-      execFileSync(
-        "identify",
-        ["-version"],
-        {
-          stdio: "ignore",
-        }
-      );
-
-      identifyCommand =
-        "identify";
-
-      convertCommand =
-        "convert";
-    } catch {
-      try {
-        execFileSync(
-          "convert",
-          ["-version"],
-          {
-            stdio: "ignore",
-          }
-        );
-
-        identifyCommand =
-          "identify";
-
-        convertCommand =
-          "convert";
-      } catch {
-        throw new Error(
-          "ImageMagick was not found. Install ImageMagick before capture."
-        );
-      }
-    }
-  }
-
-  return {
-    identifyCommand,
-    convertCommand,
-  };
-}
-
-const imageMagick =
-  detectImageMagick();
-
-log(
-  `ImageMagick identify command: ${imageMagick.identifyCommand}`
-);
-
-log(
-  `ImageMagick convert command: ${imageMagick.convertCommand}`
-);
-
-function magicBytesType(buffer) {
-  if (
-    !buffer ||
-    buffer.length < 12
-  ) {
+function detectImageType(
+  bytes
+) {
+  if (!bytes || bytes.length < 12) {
     return null;
   }
 
@@ -1883,9 +2387,9 @@ function magicBytesType(buffer) {
    * JPEG
    */
   if (
-    buffer[0] === 0xff &&
-    buffer[1] === 0xd8 &&
-    buffer[2] === 0xff
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
   ) {
     return "jpeg";
   }
@@ -1894,12 +2398,14 @@ function magicBytesType(buffer) {
    * PNG
    */
   if (
-    buffer[0] === 0x89 &&
-    buffer.toString(
-      "ascii",
-      1,
-      4
-    ) === "PNG"
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
   ) {
     return "png";
   }
@@ -1907,17 +2413,16 @@ function magicBytesType(buffer) {
   /*
    * GIF
    */
+  const gifHeader =
+    bytes
+      .subarray(0, 6)
+      .toString(
+        "ascii"
+      );
+
   if (
-    buffer.toString(
-      "ascii",
-      0,
-      6
-    ) === "GIF87a" ||
-    buffer.toString(
-      "ascii",
-      0,
-      6
-    ) === "GIF89a"
+    gifHeader === "GIF87a" ||
+    gifHeader === "GIF89a"
   ) {
     return "gif";
   }
@@ -1926,16 +2431,16 @@ function magicBytesType(buffer) {
    * WEBP
    */
   if (
-    buffer.toString(
-      "ascii",
-      0,
-      4
-    ) === "RIFF" &&
-    buffer.toString(
-      "ascii",
-      8,
-      12
-    ) === "WEBP"
+    bytes
+      .subarray(0, 4)
+      .toString(
+        "ascii"
+      ) === "RIFF" &&
+    bytes
+      .subarray(8, 12)
+      .toString(
+        "ascii"
+      ) === "WEBP"
   ) {
     return "webp";
   }
@@ -1943,81 +2448,140 @@ function magicBytesType(buffer) {
   /*
    * AVIF / HEIF
    */
-  if (
-    buffer.toString(
-      "ascii",
-      4,
-      8
-    ) === "ftyp"
-  ) {
-    const brand =
-      buffer
-        .toString(
-          "ascii",
-          8,
-          16
-        )
-        .toLowerCase();
+  const box =
+    bytes
+      .subarray(4, 12)
+      .toString(
+        "ascii"
+      );
 
-    if (
-      brand.includes("avif") ||
-      brand.includes("avis") ||
-      brand.includes("heic") ||
-      brand.includes("heix") ||
-      brand.includes("mif1")
-    ) {
-      return "avif";
-    }
+  if (
+    box === "ftypavif" ||
+    box === "ftypavis"
+  ) {
+    return "avif";
+  }
+
+  if (
+    box === "ftypheic" ||
+    box === "ftypheix" ||
+    box === "ftyphevc" ||
+    box === "ftypmif1" ||
+    box === "ftypmsf1"
+  ) {
+    return "heif";
   }
 
   /*
-   * SVG
+   * BMP
    */
-  const beginning =
-    buffer
-      .toString(
-        "utf8",
-        0,
-        Math.min(
-          buffer.length,
-          1000
-        )
-      )
-      .trim()
-      .toLowerCase();
-
   if (
-    beginning.startsWith(
-      "<svg"
-    ) ||
-    (beginning.startsWith(
-      "<?xml"
-    ) &&
-      beginning.includes(
-        "<svg"
-      ))
+    bytes[0] === 0x42 &&
+    bytes[1] === 0x4d
   ) {
-    return "svg";
+    return "bmp";
   }
 
   return null;
 }
 
-function validateImageFile(
+function getImageMagickCommand() {
+  try {
+    execFileSync(
+      "magick",
+      [
+        "-version",
+      ],
+      {
+        stdio:
+          "ignore",
+        timeout:
+          5000,
+      }
+    );
+
+    return "magick";
+  } catch {
+    try {
+      execFileSync(
+        "convert",
+        [
+          "-version",
+        ],
+        {
+          stdio:
+            "ignore",
+          timeout:
+            5000,
+        }
+      );
+
+      return "convert";
+    } catch {
+      return null;
+    }
+  }
+}
+
+function identifyImage(
   filePath
 ) {
-  if (
-    !fs.existsSync(
-      filePath
-    )
-  ) {
-    return {
-      valid: false,
-      reason:
-        "file-not-found",
-    };
+  const command =
+    getImageMagickCommand();
+
+  if (!command) {
+    throw new Error(
+      "ImageMagick is not installed"
+    );
   }
 
+  const output =
+    execFileSync(
+      command,
+      [
+        filePath,
+        "-format",
+        "%m|%w|%h|%b",
+        "info:",
+      ],
+      {
+        encoding:
+          "utf8",
+        timeout:
+          30000,
+        maxBuffer:
+          1024 * 1024,
+      }
+    ).trim();
+
+  const parts =
+    output.split("|");
+
+  if (
+    parts.length <
+    4
+  ) {
+    throw new Error(
+      `Unexpected ImageMagick output: ${output}`
+    );
+  }
+
+  return {
+    format:
+      parts[0],
+    width:
+      Number(parts[1]),
+    height:
+      Number(parts[2]),
+    bytes:
+      parts[3],
+  };
+}
+
+function validateImageFile(
+  filePath,
+  expectedBytes
+) {
   const stat =
     fs.statSync(
       filePath
@@ -2027,153 +2591,100 @@ function validateImageFile(
     stat.size <
     MIN_FILE_SIZE
   ) {
-    return {
-      valid: false,
-      reason:
-        `file-too-small:${stat.size}`,
-    };
+    throw new Error(
+      `Image file too small: ${stat.size} bytes`
+    );
   }
 
-  const buffer =
-    fs.readFileSync(
+  if (
+    expectedBytes &&
+    expectedBytes.length
+  ) {
+    const magic =
+      detectImageType(
+        expectedBytes
+      );
+
+    if (!magic) {
+      throw new Error(
+        "Downloaded data does not have a recognized image signature"
+      );
+    }
+  }
+
+  const info =
+    identifyImage(
       filePath
     );
 
-  const magicType =
-    magicBytesType(
-      buffer
+  if (
+    !Number.isFinite(
+      info.width
+    ) ||
+    !Number.isFinite(
+      info.height
+    )
+  ) {
+    throw new Error(
+      `Invalid image dimensions: ${info.width}x${info.height}`
     );
-
-  if (!magicType) {
-    return {
-      valid: false,
-      reason:
-        "invalid-image-magic-bytes",
-    };
   }
-
-  let identifyArgs;
 
   if (
-    imageMagick.identifyCommand ===
-    "magick"
+    info.width <
+      MIN_WIDTH ||
+    info.height <
+      MIN_HEIGHT
   ) {
-    identifyArgs = [
-      "identify",
-      "-format",
-      "%m|%w|%h",
-      filePath,
-    ];
-  } else {
-    identifyArgs = [
-      "-format",
-      "%m|%w|%h",
-      filePath,
-    ];
+    throw new Error(
+      `Image dimensions too small: ${info.width}x${info.height}`
+    );
   }
 
-  try {
-    const output =
-      execFileSync(
-        imageMagick.identifyCommand,
-        identifyArgs,
-        {
-          encoding:
-            "utf8",
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
-          ],
-        }
-      ).trim();
-
-    const [
-      format,
-      widthText,
-      heightText,
-    ] =
-      output.split("|");
-
-    const width =
-      Number(widthText);
-
-    const height =
-      Number(heightText);
-
-    if (
-      !Number.isFinite(
-        width
-      ) ||
-      !Number.isFinite(
-        height
-      )
-    ) {
-      return {
-        valid: false,
-        reason:
-          "invalid-image-dimensions",
-      };
-    }
-
-    if (
-      width < MIN_WIDTH ||
-      height < MIN_HEIGHT
-    ) {
-      return {
-        valid: false,
-        reason:
-          `image-too-small:${width}x${height}`,
-      };
-    }
-
-    return {
-      valid: true,
-      magicType,
-      format,
-      width,
-      height,
-      size: stat.size,
-    };
-  } catch (error) {
-    return {
-      valid: false,
-      reason:
-        `imagemagick-validation-failed:${error.message}`,
-    };
-  }
+  return {
+    ...info,
+    fileSize:
+      stat.size,
+  };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Perceptual fingerprint                                                     */
+/* Perceptual duplicate helpers                                               */
 /* -------------------------------------------------------------------------- */
 
-function perceptualFingerprint(
+function calculateAverageHash(
   filePath
 ) {
+  const command =
+    getImageMagickCommand();
+
+  if (!command) {
+    return null;
+  }
+
   try {
-    let args;
-
-    args = [
-      filePath,
-      "-resize",
-      "16x16!",
-      "-colorspace",
-      "Gray",
-      "-depth",
-      "8",
-      "txt:-",
-    ];
-
     const output =
       execFileSync(
-        imageMagick.convertCommand,
-        args,
+        command,
+        [
+          filePath,
+          "-colorspace",
+          "Gray",
+          "-resize",
+          "16x16!",
+          "-depth",
+          "8",
+          "txt:-",
+        ],
         {
           encoding:
             "utf8",
+          timeout:
+            30000,
           maxBuffer:
-            10 * 1024 * 1024,
+            5 *
+            1024 *
+            1024,
         }
       );
 
@@ -2181,21 +2692,28 @@ function perceptualFingerprint(
 
     for (
       const line of
-        output.split("\n")
+        output.split(
+          "\n"
+        )
     ) {
       const match =
         line.match(
-          /gray\((\d+)\)/i
+          /:\s*\((\d+),/
         );
 
       if (match) {
         values.push(
-          Number(match[1])
+          Number(
+            match[1]
+          )
         );
       }
     }
 
-    if (!values.length) {
+    if (
+      values.length <
+      100
+    ) {
       return null;
     }
 
@@ -2204,13 +2722,16 @@ function perceptualFingerprint(
         (sum, value) =>
           sum + value,
         0
-      ) / values.length;
+      ) /
+      values.length;
 
     return values
-      .map((value) =>
-        value >= average
-          ? "1"
-          : "0"
+      .map(
+        (value) =>
+          value >=
+          average
+            ? "1"
+            : "0"
       )
       .join("");
   } catch {
@@ -2248,76 +2769,63 @@ function hammingDistance(
   return distance;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Image download + validation                                                */
-/* -------------------------------------------------------------------------- */
-
-async function downloadAndValidateCandidate(
-  candidate,
-  index,
-  usedHashes,
-  usedFingerprints
+function isPerceptualDuplicate(
+  hash,
+  existingHashes
 ) {
+  if (!hash) {
+    return false;
+  }
+
+  for (
+    const existing of
+      existingHashes
+  ) {
+    const distance =
+      hammingDistance(
+        hash,
+        existing
+      );
+
+    /*
+     * 256-bit average hash.
+     * A very small Hamming distance
+     * means the images are visually
+     * near-identical.
+     */
+    if (
+      distance <= 8
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Candidate verification                                                    */
+/* -------------------------------------------------------------------------- */
+
+async function verifyImageCandidate(
+  candidate,
+  context
+) {
+  const {
+    postIndex,
+    title,
+    seenHashes,
+    seenPerceptualHashes,
+  } = context;
+
   log(
-    `  Candidate score=${candidate.score} ` +
-      `source=${candidate.source} ` +
-      `association=${candidate.association || "unknown"}`
+    `  Trying image candidate: ${candidate.url}`
   );
 
-  log(
-    `  ${candidate.url}`
-  );
-
-  const allowedAssociations =
-    new Set([
-      "article-og",
-      "article-twitter",
-      "article-meta",
-      "article-body",
-      "feed-content",
-    ]);
-
-  if (
-    !candidate.association ||
-    !allowedAssociations.has(
-      candidate.association
-    )
-  ) {
-    warn(
-      "  Rejected: image is not article-specific."
-    );
-
-    return null;
-  }
-
-  if (
-    isUnsplashPageUrl(
-      candidate.url
-    )
-  ) {
-    warn(
-      "  Rejected: Unsplash page URL, not image URL."
-    );
-
-    return null;
-  }
-
-  if (
-    !isLikelyImageUrl(
-      candidate.url
-    )
-  ) {
-    warn(
-      "  Rejected: URL does not look like an image."
-    );
-
-    return null;
-  }
-
-  let downloaded;
+  let download;
 
   try {
-    downloaded =
+    download =
       await fetchBinary(
         candidate.url
       );
@@ -2329,206 +2837,196 @@ async function downloadAndValidateCandidate(
     return null;
   }
 
+  const imageType =
+    detectImageType(
+      download.bytes
+    );
+
+  if (!imageType) {
+    warn(
+      "  Rejected: downloaded bytes are not a recognized image"
+    );
+
+    return null;
+  }
+
+  const hash =
+    crypto
+      .createHash(
+        "sha256"
+      )
+      .update(
+        download.bytes
+      )
+      .digest(
+        "hex"
+      );
+
+  if (
+    seenHashes.has(hash)
+  ) {
+    warn(
+      "  Rejected: exact duplicate image"
+    );
+
+    return null;
+  }
+
+  const safeBase =
+    String(
+      title || `post-${postIndex + 1}`
+    )
+      .toLowerCase()
+      .replace(
+        /[^a-z0-9]+/g,
+        "-"
+      )
+      .replace(
+        /^-+|-+$/g,
+        ""
+      )
+      .slice(
+        0,
+        60
+      ) ||
+    `post-${postIndex + 1}`;
+
   const extension =
-    magicBytesType(
-      downloaded.bytes
-    ) || "img";
+    imageType === "jpeg"
+      ? "jpg"
+      : imageType;
 
   const filename =
-    `post-${String(index).padStart(2, "0")}.${extension}`;
+    `${String(
+      postIndex + 1
+    ).padStart(
+      2,
+      "0"
+    )}-${safeBase}.${extension}`;
 
-  const filePath =
+  const outputPath =
     path.join(
       OUTPUT_DIR,
       filename
     );
 
   fs.writeFileSync(
-    filePath,
-    downloaded.bytes
+    outputPath,
+    download.bytes
   );
 
-  const validation =
-    validateImageFile(
-      filePath
-    );
+  let imageInfo;
 
-  if (
-    !validation.valid
-  ) {
-    warn(
-      `  Rejected: ${validation.reason}`
-    );
-
+  try {
+    imageInfo =
+      validateImageFile(
+        outputPath,
+        download.bytes
+      );
+  } catch (error) {
     try {
       fs.unlinkSync(
-        filePath
+        outputPath
       );
     } catch {}
+
+    warn(
+      `  Rejected by image validation: ${error.message}`
+    );
 
     return null;
   }
 
-  const sha256 =
-    crypto
-      .createHash("sha256")
-      .update(
-        downloaded.bytes
-      )
-      .digest("hex");
+  const perceptualHash =
+    calculateAverageHash(
+      outputPath
+    );
 
   if (
-    usedHashes.has(
-      sha256
+    isPerceptualDuplicate(
+      perceptualHash,
+      seenPerceptualHashes
     )
   ) {
-    warn(
-      "  Rejected: exact duplicate image."
-    );
-
     try {
       fs.unlinkSync(
-        filePath
+        outputPath
       );
     } catch {}
+
+    warn(
+      "  Rejected: perceptual duplicate image"
+    );
 
     return null;
   }
 
-  const fingerprint =
-    perceptualFingerprint(
-      filePath
-    );
-
-  if (fingerprint) {
-    for (
-      const previous of
-        usedFingerprints
-    ) {
-      const distance =
-        hammingDistance(
-          fingerprint,
-          previous.fingerprint
-        );
-
-      if (
-        distance <= 8
-      ) {
-        warn(
-          `  Rejected: perceptual duplicate. distance=${distance}`
-        );
-
-        try {
-          fs.unlinkSync(
-            filePath
-          );
-        } catch {}
-
-        return null;
-      }
-    }
-  }
-
-  usedHashes.add(
-    sha256
+  seenHashes.add(
+    hash
   );
 
-  if (fingerprint) {
-    usedFingerprints.push({
-      fingerprint,
-      url: candidate.url,
-    });
+  if (
+    perceptualHash
+  ) {
+    seenPerceptualHashes.add(
+      perceptualHash
+    );
   }
 
   log(
-    `  Accepted: ${validation.width}x${validation.height}, ` +
-      `${validation.size} bytes`
+    `  Verified image: ${filename} ` +
+      `(${imageInfo.width}x${imageInfo.height}, ` +
+      `${imageInfo.fileSize} bytes, ` +
+      `${candidate.source})`
   );
 
   return {
+    filename,
     localImage:
-      path
-        .relative(
-          path.resolve(
-            process.cwd(),
-            "template/public"
-          ),
-          filePath
-        )
-        .split(path.sep)
-        .join("/"),
-
-    imageUrl:
-      candidate.url,
-
-    imageSource:
+      `/blog-assets/${filename}`,
+    source:
       candidate.source,
-
-    imageAssociation:
-      candidate.association,
-
-    imageReason:
-      candidate.reason ||
-      null,
-
-    sha256,
-
-    perceptualFingerprint:
-      fingerprint,
-
+    association:
+      candidate.association ||
+      "",
+    url:
+      candidate.url,
+    finalUrl:
+      download.finalUrl ||
+      candidate.url,
+    method:
+      download.method ||
+      "unknown",
+    type:
+      imageType,
     width:
-      validation.width,
-
+      imageInfo.width,
     height:
-      validation.height,
-
-    bytes:
-      validation.size,
+      imageInfo.height,
+    fileSize:
+      imageInfo.fileSize,
+    sha256:
+      hash,
+    perceptualHash:
+      perceptualHash ||
+      null,
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* Article-specific image resolution                                          */
+/* Article image resolution                                                   */
 /* -------------------------------------------------------------------------- */
 
 async function resolveArticleImage(
   post,
-  feedEntry,
-  index,
-  usedHashes,
-  usedFingerprints
+  articleHtml,
+  exactRegion,
+  context
 ) {
-  log("");
-  log(
-    `Candidate Post ${index}: ${post.title}`
-  );
-  log(
-    `URL: ${post.url}`
-  );
-
-  let articleHtml;
-
-  try {
-    articleHtml =
-      await fetchText(
-        post.url,
-        {
-          maxRetries: 3,
-        }
-      );
-
-    log(
-      `Article page fetched: ${articleHtml.length} bytes`
-    );
-  } catch (error) {
-    throw new Error(
-      `Unable to fetch exact article page: ${error.message}`
-    );
-  }
+  const candidates = [];
 
   /*
-   * STEP 1
-   * Exact article metadata.
+   * 1. Exact article meta images.
    */
   const metaCandidates =
     extractArticleMetaImages(
@@ -2536,80 +3034,29 @@ async function resolveArticleImage(
     );
 
   log(
-    `Article-specific meta image candidates: ${metaCandidates.length}`
+    `  Article-specific meta image candidates: ${metaCandidates.length}`
   );
 
-  for (
-    const candidate of
-      metaCandidates
-  ) {
-    if (
-      !candidate.association
-    ) {
-      candidate.association =
-        candidate.source;
-    }
-  }
-
-  for (
-    const candidate of
-      dedupeCandidates(
-        metaCandidates
-      )
-  ) {
-    const result =
-      await downloadAndValidateCandidate(
-        candidate,
-        index,
-        usedHashes,
-        usedFingerprints
-      );
-
-    if (result) {
-      log(
-        `Selected article-specific image: ${result.imageSource}`
-      );
-
-      return result;
-    }
-  }
+  candidates.push(
+    ...metaCandidates
+  );
 
   /*
-   * STEP 2
-   * Exact post container.
+   * 2. Exact post-body image candidates.
    */
-  const postRegion =
-    findExactPostRegion(
-      articleHtml,
-      post.title
-    );
-
-  if (!postRegion) {
-    warn(
-      "Exact post container: NOT FOUND"
-    );
-  } else {
-    log(
-      `Exact post container: FOUND ` +
-        `(tag=${postRegion.tagName}, ` +
-        `class=${postRegion.className || "none"}, ` +
-        `length=${postRegion.html.length})`
-    );
-  }
-
-  if (postRegion) {
-    /*
-     * STEP 3
-     * Exact body images.
-     */
+  if (exactRegion) {
     const bodyCandidates =
       extractImageCandidatesFromHtml(
-        postRegion.html,
+        exactRegion.html,
         {
           source:
-            "post-body",
+            "article-body",
         }
       );
+
+    log(
+      `  Exact post-body image candidates: ${bodyCandidates.length}`
+    );
 
     for (
       const candidate of
@@ -2619,256 +3066,128 @@ async function resolveArticleImage(
         "article-body";
     }
 
-    log(
-      `Exact post-body image candidates: ${bodyCandidates.length}`
+    candidates.push(
+      ...bodyCandidates
     );
-
-    /*
-     * STEP 4
-     * Unsplash attribution.
-     */
-    const attributionCandidates =
-      findUnsplashAttributionCandidates(
-        postRegion.html
-      );
-
+  } else {
     log(
-      `Unsplash-attribution candidates: ${attributionCandidates.length}`
+      "  Exact post-body image candidates: 0 (no exact region)"
     );
-
-    const combined =
-      dedupeCandidates([
-        ...attributionCandidates,
-        ...bodyCandidates,
-      ]);
-
-    for (
-      const candidate of
-        combined
-    ) {
-      const result =
-        await downloadAndValidateCandidate(
-          candidate,
-          index,
-          usedHashes,
-          usedFingerprints
-        );
-
-      if (result) {
-        log(
-          `Selected article-specific image: ${result.imageSource}`
-        );
-
-        return result;
-      }
-    }
   }
 
   /*
-   * STEP 5
-   * Exact feed-entry images.
+   * 3. Unsplash attribution scoped
+   *    strictly to exact article region.
+   */
+  if (exactRegion) {
+    const unsplashCandidates =
+      findUnsplashAttributionCandidates(
+        exactRegion.html
+      );
+
+    log(
+      `  Unsplash-attribution candidates: ${unsplashCandidates.length}`
+    );
+
+    candidates.push(
+      ...unsplashCandidates
+    );
+  } else {
+    log(
+      "  Unsplash-attribution candidates: 0 (no exact region)"
+    );
+  }
+
+  /*
+   * 4. Exact feed-entry image candidates.
    */
   const feedCandidates =
-    feedEntry?.imageCandidates ||
-    [];
+    Array.isArray(
+      post.imageCandidates
+    )
+      ? post.imageCandidates
+      : [];
+
+  log(
+    `  Exact feed-entry image candidates: ${feedCandidates.length}`
+  );
 
   for (
     const candidate of
       feedCandidates
   ) {
     candidate.association =
-      "feed-content";
+      "feed-entry";
+  }
+
+  candidates.push(
+    ...feedCandidates
+  );
+
+  const ranked =
+    rankImageCandidates(
+      candidates
+    );
+
+  if (!ranked.length) {
+    return null;
   }
 
   log(
-    `Exact feed-entry image candidates: ${feedCandidates.length}`
+    `  Ranked article-specific image candidates: ${ranked.length}`
   );
 
   for (
     const candidate of
-      dedupeCandidates(
-        feedCandidates
-      )
+      ranked
   ) {
-    const result =
-      await downloadAndValidateCandidate(
+    const verified =
+      await verifyImageCandidate(
         candidate,
-        index,
-        usedHashes,
-        usedFingerprints
+        context
       );
 
-    if (result) {
-      log(
-        "Selected article-specific image: feed-content"
-      );
-
-      return result;
-    }
-  }
-
-  /*
-   * No generic fallback.
-   */
-  throw new Error(
-    "No article-specific image could be verified."
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Blog metadata                                                              */
-/* -------------------------------------------------------------------------- */
-
-function extractPageMetadata(
-  html
-) {
-  const title =
-    extractMetaContent(
-      html,
-      "property",
-      "og:title"
-    ) ||
-    extractMetaContent(
-      html,
-      "name",
-      "title"
-    ) ||
-    "";
-
-  const description =
-    extractMetaContent(
-      html,
-      "property",
-      "og:description"
-    ) ||
-    extractMetaContent(
-      html,
-      "name",
-      "description"
-    ) ||
-    "";
-
-  const ogImage =
-    extractMetaContent(
-      html,
-      "property",
-      "og:image"
-    ) || null;
-
-  const language =
-    extractHtmlLang(html) ||
-    "en";
-
-  return {
-    title:
-      normalizeWhitespace(
-        stripHtml(title)
-      ),
-
-    description:
-      normalizeWhitespace(
-        stripHtml(description)
-      ),
-
-    ogImage:
-      absoluteUrl(
-        ogImage
-      ),
-
-    language,
-  };
-}
-
-function extractMetaContent(
-  html,
-  attribute,
-  value
-) {
-  const regex =
-    /<meta\b[^>]*>/gi;
-
-  let match;
-
-  while (
-    (match = regex.exec(html))
-  ) {
-    const attrs =
-      parseAttributes(
-        match[0]
-      );
-
-    if (
-      String(
-        attrs[attribute] || ""
-      ).toLowerCase() ===
-      String(
-        value
-      ).toLowerCase()
-    ) {
-      return (
-        attrs.content ||
-        null
-      );
+    if (verified) {
+      return verified;
     }
   }
 
   return null;
 }
 
-function extractHtmlLang(
-  html
-) {
-  const match =
-    html.match(
-      /<html\b[^>]*\blang=["']([^"']+)["']/i
-    );
+/* -------------------------------------------------------------------------- */
+/* Date helpers                                                               */
+/* -------------------------------------------------------------------------- */
 
-  return match
-    ? match[1]
-    : null;
+function normalizeDate(
+  value
+) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return value;
+  }
+
+  return parsed
+    .toISOString();
 }
 
 /* -------------------------------------------------------------------------- */
-/* Main                                                                       */
+/* Main post capture                                                          */
 /* -------------------------------------------------------------------------- */
 
-async function main() {
-  log("");
-  log(
-    "===================================================="
-  );
-  log(
-    "BLOG ANALYZER v13.0"
-  );
-  log(
-    "===================================================="
-  );
-  log(
-    "Exact article-specific image association"
-  );
-  log(
-    "Nesting-aware post container extraction"
-  );
-  log(
-    "Feed candidate fallback across up to 10 entries"
-  );
-  log(
-    "Skip failed posts and continue until 5 verified posts"
-  );
-  log(
-    "No site-wide image fallback"
-  );
-  log(
-    "Real-image validation after download"
-  );
-  log(
-    "Exact + perceptual duplicate protection"
-  );
-  log(
-    "===================================================="
-  );
-  log("");
-
+async function capturePosts(
+  feedEntries
+) {
   fs.mkdirSync(
     OUTPUT_DIR,
     {
@@ -2877,7 +3196,9 @@ async function main() {
   );
 
   /*
-   * Clean previous captured images.
+   * Remove previous generated assets
+   * so stale images cannot accidentally
+   * be included in a new run.
    */
   for (
     const filename of
@@ -2885,214 +3206,629 @@ async function main() {
         OUTPUT_DIR
       )
   ) {
-    if (
-      /^post-\d+\.(jpg|jpeg|png|gif|webp|avif|svg|bmp)$/i.test(
+    const fullPath =
+      path.join(
+        OUTPUT_DIR,
         filename
+      );
+
+    try {
+      if (
+        fs.statSync(
+          fullPath
+        ).isFile()
+      ) {
+        fs.unlinkSync(
+          fullPath
+        );
+      }
+    } catch {}
+  }
+
+  const verifiedPosts = [];
+
+  const seenHashes =
+    new Set();
+
+  const seenPerceptualHashes =
+    new Set();
+
+  /*
+   * Work through all available feed
+   * candidates until five verified
+   * articles have been obtained.
+   */
+  for (
+    let feedIndex = 0;
+    feedIndex <
+      feedEntries.length &&
+      verifiedPosts.length <
+        MAX_POSTS;
+    feedIndex++
+  ) {
+    const feedPost =
+      feedEntries[
+        feedIndex
+      ];
+
+    const postNumber =
+      verifiedPosts.length +
+      1;
+
+    log("");
+    log(
+      `============================================================`
+    );
+    log(
+      `Feed candidate ${feedIndex + 1}/${feedEntries.length}`
+    );
+    log(
+      `Verified target ${postNumber}/${MAX_POSTS}`
+    );
+    log(
+      `Title: ${feedPost.title}`
+    );
+    log(
+      `URL: ${feedPost.url}`
+    );
+    log(
+      `============================================================`
+    );
+
+    let articleHtml;
+
+    try {
+      log(
+        `Fetching article page: ${feedPost.url}`
+      );
+
+      articleHtml =
+        await fetchText(
+          feedPost.url
+        );
+
+      log(
+        `Article page fetched: ${articleHtml.length} bytes`
+      );
+    } catch (error) {
+      warn(
+        `Article fetch failed: ${error.message}`
+      );
+
+      log(
+        "Skipping feed candidate and continuing..."
+      );
+
+      continue;
+    }
+
+    const exactRegion =
+      findExactPostRegion(
+        articleHtml,
+        feedPost.title
+      );
+
+    if (exactRegion) {
+      log(
+        `Exact post container: FOUND ` +
+          `(tag=${exactRegion.tagName}, ` +
+          `class=${exactRegion.className || "(none)"}, ` +
+          `length=${exactRegion.html.length})`
+      );
+    } else {
+      warn(
+        "Exact post container: NOT FOUND"
+      );
+    }
+
+    const pageTitle =
+      extractPageTitle(
+        articleHtml
+      );
+
+    const pageDescription =
+      extractDescription(
+        articleHtml
+      );
+
+    const pageHeading =
+      extractPageHeading(
+        articleHtml,
+        feedPost.title
+      );
+
+    const language =
+      extractLanguage(
+        articleHtml
+      );
+
+    const bodyText =
+      exactRegion
+        ? findPostText(
+            exactRegion.html
+          )
+        : normalizeWhitespace(
+            stripHtml(
+              articleHtml
+            )
+          );
+
+    const excerpt =
+      makeExcerpt(
+        feedPost.summary ||
+          bodyText ||
+          pageDescription
+      );
+
+    let image;
+
+    try {
+      image =
+        await resolveArticleImage(
+          feedPost,
+          articleHtml,
+          exactRegion,
+          {
+            postIndex:
+              verifiedPosts.length,
+            title:
+              feedPost.title,
+            seenHashes,
+            seenPerceptualHashes,
+          }
+        );
+    } catch (error) {
+      warn(
+        `Image resolution failed: ${error.message}`
+      );
+
+      image = null;
+    }
+
+    if (!image) {
+      warn(
+        "No article-specific image could be verified."
+      );
+
+      log(
+        "Skipping this feed candidate and continuing..."
+      );
+
+      continue;
+    }
+
+    const categories =
+      Array.isArray(
+        feedPost.categories
+      )
+        ? feedPost.categories
+        : [];
+
+    const verifiedPost = {
+      index:
+        verifiedPosts.length + 1,
+      title:
+        feedPost.title,
+      url:
+        feedPost.url,
+      published:
+        normalizeDate(
+          feedPost.published
+        ),
+      date:
+        normalizeDate(
+          feedPost.published ||
+            feedPost.updated
+        ),
+      excerpt,
+      categories,
+      localImage:
+        image.localImage,
+      imageSource:
+        image.source,
+      imageAssociation:
+        image.association,
+      imageUrl:
+        image.url,
+      imageFinalUrl:
+        image.finalUrl,
+      imageDownloadMethod:
+        image.method,
+      imageWidth:
+        image.width,
+      imageHeight:
+        image.height,
+      imageFileSize:
+        image.fileSize,
+      imageSha256:
+        image.sha256,
+      imagePerceptualHash:
+        image.perceptualHash,
+      pageTitle,
+      pageHeading,
+      language:
+        language ||
+        null,
+    };
+
+    verifiedPosts.push(
+      verifiedPost
+    );
+
+    log("");
+    log(
+      `VERIFIED POST ${verifiedPosts.length}/${MAX_POSTS}`
+    );
+    log(
+      `Title: ${verifiedPost.title}`
+    );
+    log(
+      `Image: ${verifiedPost.localImage}`
+    );
+    log(
+      `Source: ${verifiedPost.imageSource}`
+    );
+  }
+
+  if (
+    verifiedPosts.length !==
+    MAX_POSTS
+  ) {
+    throw new Error(
+      `Unable to obtain ${MAX_POSTS} verified ` +
+        `article-specific posts. Only ` +
+        `${verifiedPosts.length} were verified from ` +
+        `${feedEntries.length} feed candidates. ` +
+        `No generic fallback image will be used.`
+    );
+  }
+
+  return verifiedPosts;
+}
+
+/* -------------------------------------------------------------------------- */
+/* JSON output                                                                */
+/* -------------------------------------------------------------------------- */
+
+function writeBlogJson(
+  feed,
+  posts
+) {
+  const output = {
+    version:
+      "14.0",
+    capturedAt:
+      new Date().toISOString(),
+    url:
+      BLOG_URL,
+    hostname:
+      (() => {
+        try {
+          return new URL(
+            BLOG_URL
+          ).hostname;
+        } catch {
+          return "";
+        }
+      })(),
+    siteTitle:
+      posts[0]?.pageTitle ||
+      "",
+    description:
+      "",
+    pageHeading:
+      posts[0]?.pageHeading ||
+      "",
+    ogImage:
+      posts[0]?.imageUrl ||
+      null,
+    language:
+      posts[0]?.language ||
+      null,
+    postCount:
+      posts.length,
+    analysis: {
+      feedUrl:
+        feed.url,
+      feedEntriesChecked:
+        feed.entries.length,
+      verifiedPosts:
+        posts.length,
+      genericFallbackUsed:
+        false,
+      imageAssociationPolicy:
+        "article-specific-only",
+    },
+    posts,
+  };
+
+  fs.mkdirSync(
+    path.dirname(
+      BLOG_JSON
+    ),
+    {
+      recursive: true,
+    }
+  );
+
+  fs.writeFileSync(
+    BLOG_JSON,
+    JSON.stringify(
+      output,
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  log("");
+  log(
+    `blog.json written: ${BLOG_JSON}`
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Final validation                                                           */
+/* -------------------------------------------------------------------------- */
+
+function validateOutput(
+  posts
+) {
+  if (
+    !Array.isArray(
+      posts
+    )
+  ) {
+    throw new Error(
+      "Posts output is not an array"
+    );
+  }
+
+  if (
+    posts.length !==
+    MAX_POSTS
+  ) {
+    throw new Error(
+      `Expected ${MAX_POSTS} posts, got ${posts.length}`
+    );
+  }
+
+  const seenUrls =
+    new Set();
+
+  const seenImages =
+    new Set();
+
+  for (
+    let i = 0;
+    i < posts.length;
+    i++
+  ) {
+    const post =
+      posts[i];
+
+    if (
+      !post.title
+    ) {
+      throw new Error(
+        `Post ${i + 1} has no title`
+      );
+    }
+
+    if (
+      !post.url
+    ) {
+      throw new Error(
+        `Post ${i + 1} has no URL`
+      );
+    }
+
+    if (
+      !post.excerpt
+    ) {
+      throw new Error(
+        `Post ${i + 1} has no excerpt`
+      );
+    }
+
+    if (
+      !post.localImage
+    ) {
+      throw new Error(
+        `Post ${i + 1} has no localImage`
+      );
+    }
+
+    if (
+      seenUrls.has(
+        post.url
       )
     ) {
-      try {
-        fs.unlinkSync(
-          path.join(
-            OUTPUT_DIR,
-            filename
-          )
-        );
-      } catch {}
+      throw new Error(
+        `Duplicate post URL: ${post.url}`
+      );
+    }
+
+    seenUrls.add(
+      post.url
+    );
+
+    if (
+      seenImages.has(
+        post.localImage
+      )
+    ) {
+      throw new Error(
+        `Duplicate local image: ${post.localImage}`
+      );
+    }
+
+    seenImages.add(
+      post.localImage
+    );
+
+    const relative =
+      post.localImage.replace(
+        /^\/blog-assets\//,
+        ""
+      );
+
+    const filePath =
+      path.join(
+        OUTPUT_DIR,
+        relative
+      );
+
+    if (
+      !fs.existsSync(
+        filePath
+      )
+    ) {
+      throw new Error(
+        `Image file missing: ${filePath}`
+      );
+    }
+
+    const stat =
+      fs.statSync(
+        filePath
+      );
+
+    if (
+      stat.size <
+      MIN_FILE_SIZE
+    ) {
+      throw new Error(
+        `Image file too small: ${filePath}`
+      );
+    }
+
+    if (
+      post.imageAssociation ===
+        "generic-fallback" ||
+      post.imageSource ===
+        "generic-fallback"
+    ) {
+      throw new Error(
+        `Generic fallback image detected for post ${i + 1}`
+      );
     }
   }
 
-  /*
-   * ------------------------------------------------------------------------
-   * Feed
-   * ------------------------------------------------------------------------
-   */
-
-  const feedUrl =
-    new URL(
-      `/feeds/posts/default?alt=atom&max-results=${MAX_FEED_ENTRIES}`,
-      BLOG_URL
-    ).href;
-
+  log("");
   log(
-    `Feed URL: ${feedUrl}`
+    "============================================================"
+  );
+  log(
+    "FINAL VALIDATION PASSED"
+  );
+  log(
+    `Verified posts: ${posts.length}/${MAX_POSTS}`
+  );
+  log(
+    "Generic fallback: DISABLED"
+  );
+  log(
+    "All local images: PRESENT"
+  );
+  log(
+    "Duplicate protection: PASSED"
+  );
+  log(
+    "============================================================"
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Main                                                                       */
+/* -------------------------------------------------------------------------- */
+
+async function main() {
+  log(
+    "============================================================"
+  );
+  log(
+    "BLOG ANALYZER v14.0"
+  );
+  log(
+    "============================================================"
+  );
+  log(
+    `Blog URL: ${BLOG_URL}`
+  );
+  log(
+    `Output directory: ${OUTPUT_DIR}`
+  );
+  log(
+    `Blog JSON: ${BLOG_JSON}`
+  );
+  log(
+    `Target verified posts: ${MAX_POSTS}`
+  );
+  log(
+    `Feed candidates: ${MAX_FEED_ENTRIES}`
+  );
+  log(
+    "Generic fallback: DISABLED"
+  );
+  log(
+    "============================================================"
   );
 
-  let feedXml;
+  const feed =
+    await fetchFeed();
 
-  try {
-    feedXml =
-      await fetchText(
-        feedUrl,
-        {
-          maxRetries: 4,
-        }
-      );
-  } catch (error) {
-    throw new Error(
-      `Feed fetch failed: ${error.message}`
-    );
-  }
-
-  const feedEntries =
-    extractFeedEntries(
-      feedXml
-    );
-
-  log(
-    "Feed fetched successfully."
-  );
-
-  log(
-    `Feed entries: ${feedEntries.length}`
-  );
-
-  if (!feedEntries.length) {
-    throw new Error(
-      "No feed entries were found."
-    );
-  }
-
-  /*
-   * ------------------------------------------------------------------------
-   * Blog homepage metadata
-   *
-   * Homepage metadata is allowed for site identity only.
-   * It is NEVER used as a post image.
-   * ------------------------------------------------------------------------
-   */
-
-  let homepageHtml = "";
-
-  try {
-    homepageHtml =
-      await fetchText(
-        BLOG_URL,
-        {
-          maxRetries: 2,
-        }
-      );
-  } catch (error) {
-    warn(
-      `Homepage metadata fetch failed: ${error.message}`
-    );
-  }
-
-  const pageMetadata =
-    extractPageMetadata(
-      homepageHtml
-    );
-
-  /*
-   * ------------------------------------------------------------------------
-   * Build candidate post pool
-   *
-   * IMPORTANT:
-   * Do NOT stop at the first five feed entries.
-   *
-   * Some recent posts may have malformed image markup.
-   * We need enough candidates to obtain exactly five
-   * verified article-specific images.
-   * ------------------------------------------------------------------------
-   */
-
-  const candidatePosts =
-    feedEntries
-      .filter(
-        (entry) =>
-          entry.url
-      )
-      .slice(
+  const posts =
+    await capturePosts(
+      feed.entries.slice(
         0,
         MAX_FEED_ENTRIES
       )
-      .map(
-        (entry) => ({
-          title:
-            entry.title,
+    );
 
-          url:
-            entry.url,
+  validateOutput(
+    posts
+  );
 
-          published:
-            entry.published,
+  writeBlogJson(
+    feed,
+    posts
+  );
 
-          date:
-            entry.published
-              ? entry.published.slice(
-                  0,
-                  10
-                )
-              : null,
+  log("");
+  log(
+    "============================================================"
+  );
+  log(
+    "BLOG ANALYZER v14.0 SUCCESS"
+  );
+  log(
+    "============================================================"
+  );
+}
 
-          excerpt:
-            normalizeWhitespace(
-              stripHtml(
-                entry.summary ||
-                  entry.content ||
-                  ""
-              )
-            ).slice(
-              0,
-              500
-            ),
+main().catch(
+  (error) => {
+    console.error("");
+    console.error(
+      "============================================================"
+    );
+    console.error(
+      "BLOG ANALYZER v14.0 FAILED"
+    );
+    console.error(
+      "============================================================"
+    );
+    console.error(
+      error?.stack ||
+        error?.message ||
+        error
+    );
 
-          categories:
-            entry.categories ||
-            [],
+    process.exit(1);
+  }
+);
 
-          feedEntry:
-            entry,
-        })
-      )
-      .sort(
-        (a, b) => {
-          const aTime =
-            Date.parse(
-              a.published || ""
-            );
-
-          const bTime =
-            Date.parse(
-              b.published || ""
-            );
-
-          if (
-            Number.isFinite(
-              aTime
-            ) &&
-            Number.isFinite(
-              bTime
-            )
-          ) {
-            return (
-              bTime -
-              aTime
-            );
-          }
-
-          if (
-            Number.isFinite(
-              bTime
-            )
-          ) {
-            return 1;
-          }
-
-          if (
-            Number.isFinite(
-              aTime
-            )
-          ) {
-            return -1;
-          }
-
-          return 0;
-        }
-      );
-
-  if (
-    candidatePosts.length <
-    MAX_POSTS
   ) {
     throw new Error(
       `Only ${candidatePosts.length} feed candidates available. ` +
@@ -3532,7 +4268,7 @@ async function main() {
     "===================================================="
   );
   log(
-    "BLOG ANALYZER v13.0 SUCCESS"
+    "BLOG ANALYZER v14.0 SUCCESS"
   );
   log(
     "===================================================="
@@ -3588,7 +4324,502 @@ main().catch(
       "===================================================="
     );
     console.error(
-      "BLOG ANALYZER v13.0 FAILED"
+      "BLOG ANALYZER v14.0 FAILED"
+    );
+    console.error(
+      "===================================================="
+    );
+    console.error(
+      error?.stack ||
+        error?.message ||
+        error
+    );
+    console.error(
+      "===================================================="
+    );
+
+    process.exit(1);
+  }
+);
+
+  ) {
+    throw new Error(
+      `Only ${candidatePosts.length} feed candidates available. ` +
+        `At least ${MAX_POSTS} candidates are required.`
+    );
+  }
+
+  log("");
+  log(
+    `Candidate post pool: ${candidatePosts.length}`
+  );
+
+  /*
+   * ------------------------------------------------------------------------
+   * Capture images
+   * ------------------------------------------------------------------------
+   */
+
+  const usedHashes =
+    new Set();
+
+  const usedFingerprints =
+    [];
+
+  const capturedPosts =
+    [];
+
+  for (
+    const candidate of
+      candidatePosts
+  ) {
+    if (
+      capturedPosts.length >=
+      MAX_POSTS
+    ) {
+      break;
+    }
+
+    const captureIndex =
+      capturedPosts.length +
+      1;
+
+    log("");
+    log(
+      "----------------------------------------------------"
+    );
+    log(
+      `Trying candidate ${captureIndex} / ${MAX_POSTS} target`
+    );
+    log(
+      `Feed title: ${candidate.title}`
+    );
+    log(
+      `Feed date: ${candidate.date || "unknown"}`
+    );
+    log(
+      "----------------------------------------------------"
+    );
+
+    try {
+      const image =
+        await resolveArticleImage(
+          candidate,
+          candidate.feedEntry,
+          captureIndex,
+          usedHashes,
+          usedFingerprints
+        );
+
+      if (
+        !image ||
+        !image.localImage ||
+        !image.imageUrl
+      ) {
+        throw new Error(
+          "No verified image result returned."
+        );
+      }
+
+      const allowedAssociations =
+        new Set([
+          "article-og",
+          "article-twitter",
+          "article-meta",
+          "article-body",
+          "feed-content",
+        ]);
+
+      if (
+        !image.imageAssociation ||
+        !allowedAssociations.has(
+          image.imageAssociation
+        )
+      ) {
+        throw new Error(
+          `Invalid image association "${image.imageAssociation}".`
+        );
+      }
+
+      capturedPosts.push({
+        index:
+          captureIndex,
+
+        title:
+          candidate.title,
+
+        url:
+          candidate.url,
+
+        published:
+          candidate.published,
+
+        date:
+          candidate.date,
+
+        excerpt:
+          candidate.excerpt,
+
+        categories:
+          candidate.categories,
+
+        localImage:
+          image.localImage,
+
+        imageUrl:
+          image.imageUrl,
+
+        imageSource:
+          image.imageSource,
+
+        imageAssociation:
+          image.imageAssociation,
+
+        imageReason:
+          image.imageReason,
+
+        imageStats: {
+          sha256:
+            image.sha256,
+
+          perceptualFingerprint:
+            image.perceptualFingerprint,
+
+          width:
+            image.width,
+
+          height:
+            image.height,
+
+          bytes:
+            image.bytes,
+        },
+      });
+
+      log("");
+      log(
+        `VERIFIED POST ${capturedPosts.length}/${MAX_POSTS}`
+      );
+      log(
+        `Title: ${candidate.title}`
+      );
+      log(
+        `Image: ${image.localImage}`
+      );
+      log(
+        `Association: ${image.imageAssociation}`
+      );
+    } catch (error) {
+      warn("");
+      warn(
+        `SKIPPED candidate: ${candidate.title}`
+      );
+      warn(
+        `Reason: ${error?.message || error}`
+      );
+      warn(
+        "Continuing with the next feed entry..."
+      );
+
+      continue;
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------------------
+   * Final requirement
+   * ------------------------------------------------------------------------
+   */
+
+  if (
+    capturedPosts.length !==
+    MAX_POSTS
+  ) {
+    throw new Error(
+      `Unable to obtain ${MAX_POSTS} verified article-specific posts. ` +
+        `Only ${capturedPosts.length} were verified from ` +
+        `${candidatePosts.length} feed candidates. ` +
+        `No generic fallback image will be used.`
+    );
+  }
+
+  /*
+   * ------------------------------------------------------------------------
+   * Final validation
+   * ------------------------------------------------------------------------
+   */
+
+  const localImages =
+    capturedPosts.map(
+      (post) =>
+        post.localImage
+    );
+
+  const uniqueLocalImages =
+    new Set(
+      localImages
+    );
+
+  if (
+    uniqueLocalImages.size !==
+    capturedPosts.length
+  ) {
+    throw new Error(
+      "Duplicate localImage references detected."
+    );
+  }
+
+  const hashes =
+    capturedPosts.map(
+      (post) =>
+        post.imageStats.sha256
+    );
+
+  if (
+    new Set(hashes).size !==
+    hashes.length
+  ) {
+    throw new Error(
+      "Duplicate image SHA-256 detected."
+    );
+  }
+
+  for (
+    const post of
+      capturedPosts
+  ) {
+    if (
+      !post.imageAssociation
+    ) {
+      throw new Error(
+        `Post ${post.index}: missing imageAssociation.`
+      );
+    }
+
+    if (
+      post.imageSource ===
+        "fallback" ||
+      post.imageAssociation ===
+        "fallback"
+    ) {
+      throw new Error(
+        `Post ${post.index}: forbidden fallback image detected.`
+      );
+    }
+  }
+
+  /*
+   * ------------------------------------------------------------------------
+   * Site analysis
+   * ------------------------------------------------------------------------
+   */
+
+  const analysis = {
+    identity:
+      pageMetadata.title ||
+      "Funds Up",
+
+    topics: [
+      "US stock market",
+      "market news",
+      "technology stocks",
+      "financial markets",
+    ],
+
+    audience:
+      "Investors and readers interested in financial markets and stock-market news.",
+
+    contentStyle:
+      "Concise market-news summaries focused on actionable financial information.",
+
+    valueProposition:
+      "Fast summaries of market movements, signals, and major financial developments.",
+  };
+
+  /*
+   * ------------------------------------------------------------------------
+   * blog.json
+   * ------------------------------------------------------------------------
+   */
+
+  const output = {
+    version: 5,
+
+    capturedAt:
+      new Date().toISOString(),
+
+    url:
+      BLOG_URL,
+
+    hostname:
+      new URL(
+        BLOG_URL
+      ).hostname,
+
+    siteTitle:
+      pageMetadata.title ||
+      "Funds Up",
+
+    description:
+      pageMetadata.description ||
+      "",
+
+    pageHeading:
+      pageMetadata.title ||
+      "Funds Up",
+
+    ogImage:
+      pageMetadata.ogImage,
+
+    language:
+      pageMetadata.language ||
+      "en",
+
+    postCount:
+      capturedPosts.length,
+
+    analysis,
+
+    posts:
+      capturedPosts.map(
+        (post) => ({
+          index:
+            post.index,
+
+          title:
+            post.title,
+
+          url:
+            post.url,
+
+          published:
+            post.published,
+
+          date:
+            post.date,
+
+          excerpt:
+            post.excerpt,
+
+          categories:
+            post.categories,
+
+          localImage:
+            post.localImage,
+
+          imageSource:
+            post.imageSource,
+
+          imageAssociation:
+            post.imageAssociation,
+
+          imageReason:
+            post.imageReason,
+
+          imageUrl:
+            post.imageUrl,
+
+          imageStats:
+            post.imageStats,
+        })
+      ),
+
+    imageStats: {
+      realImages:
+        capturedPosts.length,
+
+      uniqueImages:
+        uniqueLocalImages.size,
+
+      uniqueHashes:
+        new Set(hashes).size,
+
+      articleSpecific:
+        capturedPosts.length,
+    },
+  };
+
+  fs.mkdirSync(
+    path.dirname(
+      BLOG_JSON
+    ),
+    {
+      recursive: true,
+    }
+  );
+
+  fs.writeFileSync(
+    BLOG_JSON,
+    JSON.stringify(
+      output,
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+
+  log("");
+  log(
+    "===================================================="
+  );
+  log(
+    "BLOG ANALYZER v14.0 SUCCESS"
+  );
+  log(
+    "===================================================="
+  );
+
+  for (
+    const post of
+      capturedPosts
+  ) {
+    log(
+      `Post ${post.index}: ${post.title}`
+    );
+
+    log(
+      `  Image: ${post.localImage}`
+    );
+
+    log(
+      `  Source: ${post.imageSource}`
+    );
+
+    log(
+      `  Association: ${post.imageAssociation}`
+    );
+
+    log(
+      `  URL: ${post.imageUrl}`
+    );
+  }
+
+  log("");
+  log(
+    `blog.json: ${BLOG_JSON}`
+  );
+  log(
+    `Images: ${capturedPosts.length}`
+  );
+  log(
+    `Unique images: ${uniqueLocalImages.size}`
+  );
+  log(
+    `Article-specific images: ${capturedPosts.length}`
+  );
+  log(
+    "===================================================="
+  );
+}
+
+main().catch(
+  (error) => {
+    console.error("");
+    console.error(
+      "===================================================="
+    );
+    console.error(
+      "BLOG ANALYZER v14.0 FAILED"
     );
     console.error(
       "===================================================="
