@@ -7,10 +7,13 @@ import {
 
 import {
   extractArticleMetaImages,
-  extractImageCandidatesFromHtml,
   findExactPostRegion,
   findUnsplashAttributionCandidates,
 } from "./article.mjs";
+
+import {
+  extractImageCandidatesFromHtml,
+} from "./candidates.mjs";
 
 import {
   downloadAndValidateCandidate,
@@ -119,8 +122,8 @@ async function resolveArticleImage(
   } else {
     log(
       `Exact post container: FOUND ` +
-        `(tag=${postRegion.tagName}, ` +
-        `class=${postRegion.className || "none"}, ` +
+        `(tag=${postRegion.tag}, ` +
+        `attrs=${postRegion.attrs || "none"}, ` +
         `length=${postRegion.html.length})`
     );
   }

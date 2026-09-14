@@ -9,11 +9,17 @@ if (!BLOG_URL) {
 
 export const OUTPUT_DIR =
   process.env.OUTPUT_DIR ||
-  path.resolve(process.cwd(), "template/public/blog-assets");
+  path.resolve(
+    process.cwd(),
+    "template/public/blog/images"
+  );
 
 export const BLOG_JSON =
   process.env.BLOG_JSON ||
-  path.resolve(process.cwd(), "template/public/blog.json");
+  path.resolve(
+    process.cwd(),
+    "template/public/blog/blog.json"
+  );
 
 export const USER_AGENT =
   process.env.USER_AGENT ||
