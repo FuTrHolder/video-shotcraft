@@ -16,65 +16,80 @@ import {
 /* -------------------------------------------------------------------------- */
 
 function detectImageMagick() {
-  let identifyCommand = null;
-  let convertCommand = null;
+  /*
+   * Prefer the classic ImageMagick commands:
+   *
+   *   identify
+   *   convert
+   *
+   * GitHub Ubuntu runners may expose ImageMagick 6 where
+   * "magick identify ..." is interpreted incorrectly.
+   */
 
   try {
     execFileSync(
-      "magick",
+      "identify",
       ["-version"],
       {
         stdio: "ignore",
       }
     );
 
-    identifyCommand =
-      "magick";
+    execFileSync(
+      "convert",
+      ["-version"],
+      {
+        stdio: "ignore",
+      }
+    );
 
-    convertCommand =
-      "magick";
+    return {
+      identifyCommand: "identify",
+      convertCommand: "convert",
+    };
   } catch {
+    /*
+     * Fallback for ImageMagick 7 environments where
+     * the "magick" executable is available.
+     */
+
     try {
       execFileSync(
-        "identify",
+        "magick",
         ["-version"],
         {
           stdio: "ignore",
         }
       );
 
-      identifyCommand =
-        "identify";
+      /*
+       * IMPORTANT:
+       *
+       * Do not assume that "magick identify" works.
+       * Verify it explicitly.
+       */
 
-      convertCommand =
-        "convert";
+      execFileSync(
+        "magick",
+        [
+          "identify",
+          "-version",
+        ],
+        {
+          stdio: "ignore",
+        }
+      );
+
+      return {
+        identifyCommand: "magick-identify",
+        convertCommand: "magick",
+      };
     } catch {
-      try {
-        execFileSync(
-          "convert",
-          ["-version"],
-          {
-            stdio: "ignore",
-          }
-        );
-
-        identifyCommand =
-          "identify";
-
-        convertCommand =
-          "convert";
-      } catch {
-        throw new Error(
-          "ImageMagick was not found. Install ImageMagick before capture."
-        );
-      }
+      throw new Error(
+        "ImageMagick was not found or its identify command could not be executed."
+      );
     }
   }
-
-  return {
-    identifyCommand,
-    convertCommand,
-  };
 }
 
 const imageMagick =
@@ -103,6 +118,7 @@ function magicBytesType(buffer) {
   /*
    * JPEG
    */
+
   if (
     buffer[0] === 0xff &&
     buffer[1] === 0xd8 &&
@@ -114,6 +130,7 @@ function magicBytesType(buffer) {
   /*
    * PNG
    */
+
   if (
     buffer[0] === 0x89 &&
     buffer.toString(
@@ -128,6 +145,7 @@ function magicBytesType(buffer) {
   /*
    * GIF
    */
+
   if (
     buffer.toString(
       "ascii",
@@ -146,6 +164,7 @@ function magicBytesType(buffer) {
   /*
    * WEBP
    */
+
   if (
     buffer.toString(
       "ascii",
@@ -164,6 +183,7 @@ function magicBytesType(buffer) {
   /*
    * AVIF / HEIF
    */
+
   if (
     buffer.toString(
       "ascii",
@@ -194,6 +214,7 @@ function magicBytesType(buffer) {
   /*
    * SVG
    */
+
   const beginning =
     buffer
       .toString(
@@ -279,42 +300,62 @@ function validateImageFile(
     };
   }
 
-  let identifyArgs;
-
-  if (
-    imageMagick.identifyCommand ===
-    "magick"
-  ) {
-    identifyArgs = [
-      "identify",
-      "-format",
-      "%m|%w|%h",
-      filePath,
-    ];
-  } else {
-    identifyArgs = [
-      "-format",
-      "%m|%w|%h",
-      filePath,
-    ];
-  }
+  let output;
 
   try {
-    const output =
-      execFileSync(
-        imageMagick.identifyCommand,
-        identifyArgs,
-        {
-          encoding:
-            "utf8",
+    if (
+      imageMagick.identifyCommand ===
+      "identify"
+    ) {
+      /*
+       * ImageMagick 6 / standard identify
+       */
 
-          stdio: [
-            "ignore",
-            "pipe",
-            "pipe",
+      output =
+        execFileSync(
+          "identify",
+          [
+            "-format",
+            "%m|%w|%h",
+            filePath,
           ],
-        }
-      ).trim();
+          {
+            encoding:
+              "utf8",
+
+            stdio: [
+              "ignore",
+              "pipe",
+              "pipe",
+            ],
+          }
+        ).trim();
+    } else {
+      /*
+       * ImageMagick 7
+       */
+
+      output =
+        execFileSync(
+          "magick",
+          [
+            "identify",
+            "-format",
+            "%m|%w|%h",
+            filePath,
+          ],
+          {
+            encoding:
+              "utf8",
+
+            stdio: [
+              "ignore",
+              "pipe",
+              "pipe",
+            ],
+          }
+        ).trim();
+    }
 
     const [
       format,
@@ -397,18 +438,38 @@ function perceptualFingerprint(
       "txt:-",
     ];
 
-    const output =
-      execFileSync(
-        imageMagick.convertCommand,
-        args,
-        {
-          encoding:
-            "utf8",
+    let output;
 
-          maxBuffer:
-            10 * 1024 * 1024,
-        }
-      );
+    if (
+      imageMagick.convertCommand ===
+      "convert"
+    ) {
+      output =
+        execFileSync(
+          "convert",
+          args,
+          {
+            encoding:
+              "utf8",
+
+            maxBuffer:
+              10 * 1024 * 1024,
+          }
+        );
+    } else {
+      output =
+        execFileSync(
+          "magick",
+          args,
+          {
+            encoding:
+              "utf8",
+
+            maxBuffer:
+              10 * 1024 * 1024,
+          }
+        );
+    }
 
     const values = [];
 
@@ -423,7 +484,9 @@ function perceptualFingerprint(
 
       if (match) {
         values.push(
-          Number(match[1])
+          Number(
+            match[1]
+          )
         );
       }
     }
