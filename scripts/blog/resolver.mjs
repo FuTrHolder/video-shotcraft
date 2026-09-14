@@ -6,12 +6,12 @@ import {
 } from "./feed.mjs";
 
 import {
-  extractArticleMetaImages,
   findExactPostRegion,
   findUnsplashAttributionCandidates,
 } from "./article.mjs";
 
 import {
+  extractArticleMetaImages,
   extractImageCandidatesFromHtml,
 } from "./candidates.mjs";
 
