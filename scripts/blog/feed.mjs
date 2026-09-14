@@ -13,12 +13,6 @@ import {
 } from "./html.mjs";
 
 import {
-  absoluteUrl,
-  isLikelyImageUrl,
-  normalizeBloggerImageUrl,
-} from "./image-url.mjs";
-
-import {
   addCandidate,
   extractImageCandidatesFromHtml,
 } from "./candidates.mjs";
