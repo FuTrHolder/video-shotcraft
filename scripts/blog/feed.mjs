@@ -5,6 +5,7 @@ import {
   decodeHtml,
   decodeEscapedUrl,
   escapeRegExp,
+  absoluteUrl,
 } from "./utils.mjs";
 
 import {
