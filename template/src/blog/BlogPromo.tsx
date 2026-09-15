@@ -161,6 +161,144 @@ const imageSource = (
       )
     : undefined;
 
+/*
+ * Final defensive excerpt cleaner.
+ *
+ * The capture pipeline already cleans the excerpt,
+ * but this protects the video renderer from:
+ * - HTML tags
+ * - escaped HTML
+ * - comments
+ * - script/style blocks
+ * - Blogger metadata
+ * - Unsplash attribution
+ */
+const cleanExcerpt = (
+  value?: string
+) => {
+  let text = safe(value);
+
+  if (!text) {
+    return "";
+  }
+
+  text = text
+    // HTML comments
+    .replace(
+      /<!--[\s\S]*?-->/g,
+      " "
+    )
+
+    // script/style
+    .replace(
+      /<script[\s\S]*?<\/script>/gi,
+      " "
+    )
+    .replace(
+      /<style[\s\S]*?<\/style>/gi,
+      " "
+    )
+
+    // Common escaped HTML
+    .replace(
+      /&nbsp;/gi,
+      " "
+    )
+    .replace(
+      /&quot;/gi,
+      '"'
+    )
+    .replace(
+      /&#39;/gi,
+      "'"
+    )
+    .replace(
+      /&lt;/gi,
+      "<"
+    )
+    .replace(
+      /&gt;/gi,
+      ">"
+    )
+
+    // HTML tags
+    .replace(
+      /<[^>]+>/g,
+      " "
+    )
+
+    // Common HTML entities
+    .replace(
+      /&amp;/gi,
+      "&"
+    )
+
+    // Unsplash attribution
+    .replace(
+      /Photo\s+by\s+.*?(?:on\s+)?Unsplash/gi,
+      " "
+    )
+
+    // Blog metadata
+    .replace(
+      /📅[^|]*\|/g,
+      " "
+    )
+
+    .replace(
+      /^Wall Street Daily Briefing\s*/i,
+      " "
+    )
+
+    // Whitespace
+    .replace(
+      /\s+/g,
+      " "
+    )
+    .trim();
+
+  return text;
+};
+
+const formatDate = (
+  post: BlogPost
+) => {
+  const raw = safe(
+    post.date ||
+      post.published
+  );
+
+  if (!raw) {
+    return "";
+  }
+
+  const parsed =
+    new Date(raw);
+
+  if (
+    Number.isNaN(
+      parsed.getTime()
+    )
+  ) {
+    return raw;
+  }
+
+  return parsed
+    .toLocaleDateString(
+      "en-US",
+      {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      }
+    )
+    .toUpperCase();
+};
+
+/* ============================================================
+ * COMMON BACKGROUND
+ * ============================================================ */
+
 const Base: React.FC =
   () => (
     <>
@@ -196,212 +334,16 @@ const Base: React.FC =
     </>
   );
 
-const IdentityScene: React.FC<{ data: BlogData; analysis: BlogAnalysis }> = ({
-  data,
-  analysis,
-}) => {
-  const f = useCurrentFrame();
-  const o = fade(f, 90);
-  const y = enter(f, 42);
+/* ============================================================
+ * SCENE 1 — BLOG IDENTITY
+ * 0–3 sec
+ * ============================================================ */
 
-  const topics = (analysis.topics || [])
-    .filter(Boolean)
-    .slice(0, 4);
-
-  const description = safe(
-    data.description,
-    "Market news, financial developments and actionable investment insights."
-  );
-
-  const audience = safe(
-    analysis.audience,
-    "Investors and readers interested in financial markets and stock-market news."
-  );
-
-  const value = safe(
-    analysis.valueProposition,
-    "Fast summaries of market movements, signals, and major financial developments."
-  );
-
-  return (
-    <AbsoluteFill style={{ opacity: o }}>
-      <Base />
-
-      <div
-        style={{
-          position: "absolute",
-          left: 125,
-          right: 125,
-          top: 82,
-          bottom: 70,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          transform: `translateY(${y}px)`,
-        }}
-      >
-        {/* Category */}
-        <div
-          style={{
-            fontSize: 17,
-            letterSpacing: 6,
-            fontWeight: 800,
-            color: C.accent,
-          }}
-        >
-          FINANCIAL MARKETS · INVESTING
-        </div>
-
-        {/* Blog title */}
-        <div
-          style={{
-            marginTop: 20,
-            fontSize: 94,
-            lineHeight: 0.96,
-            fontWeight: 900,
-            letterSpacing: -4,
-            color: C.text,
-          }}
-        >
-          {truncate(data.siteTitle, 42)}
-        </div>
-
-        <div
-          style={{
-            marginTop: 20,
-            width: 110,
-            height: 4,
-            background: C.white,
-          }}
-        />
-
-        {/* Description */}
-        <div
-          style={{
-            marginTop: 22,
-            maxWidth: 1380,
-            fontSize: 28,
-            lineHeight: 1.35,
-            fontWeight: 650,
-            color: C.text,
-          }}
-        >
-          {truncate(description, 145)}
-        </div>
-
-        {/* Value proposition */}
-        <div
-          style={{
-            marginTop: 14,
-            maxWidth: 1280,
-            fontSize: 20,
-            lineHeight: 1.4,
-            color: C.muted,
-          }}
-        >
-          {truncate(value, 125)}
-        </div>
-
-        {/* Topics */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            marginTop: 28,
-          }}
-        >
-          {topics.map((topic, i) => {
-            const io = interpolate(
-              f,
-              [12 + i * 6, 24 + i * 6],
-              [0, 1],
-              {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }
-            );
-
-            const iy = interpolate(
-              f,
-              [12 + i * 6, 24 + i * 6],
-              [14, 0],
-              {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }
-            );
-
-            return (
-              <div
-                key={`${topic}-${i}`}
-                style={{
-                  opacity: io,
-                  transform: `translateY(${iy}px)`,
-                  padding: "10px 17px",
-                  border: `1px solid ${C.line}`,
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.045)",
-                  color: C.muted,
-                  fontSize: 17,
-                  fontWeight: 750,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {topic.toUpperCase()}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Audience */}
-        <div
-          style={{
-            marginTop: 25,
-            fontSize: 16,
-            letterSpacing: 1.2,
-            color: C.soft,
-          }}
-        >
-          {truncate(audience, 110)}
-        </div>
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-const cleanExcerpt = (value?: string) => {
-  const raw = safe(value);
-
-  if (!raw) {
-    return "";
-  }
-
-  return raw
-    // HTML comments
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    // script/style
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    // HTML tags
-    .replace(/<[^>]+>/g, " ")
-    // Common HTML entities
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    // whitespace
-    .replace(/\s+/g, " ")
-    .trim();
-};
-
-const TopicsScene: React.FC<{
-  topics: string[];
+const IdentityScene: React.FC<{
+  data: BlogData;
   analysis: BlogAnalysis;
 }> = ({
-  topics,
+  data,
   analysis,
 }) => {
   const f =
@@ -409,13 +351,35 @@ const TopicsScene: React.FC<{
 
   const o = fade(
     f,
-    90
+    90,
+    12,
+    12
   );
 
   const y = enter(
     f,
-    40
+    38,
+    18
   );
+
+  const topics = (
+    analysis.topics ||
+    []
+  )
+    .filter(Boolean)
+    .slice(0, 4);
+
+  const description =
+    safe(
+      data.description,
+      "Market news, financial developments and investment insights."
+    );
+
+  const value =
+    safe(
+      analysis.valueProposition,
+      "Fast summaries of market movements, signals, and major financial developments."
+    );
 
   return (
     <AbsoluteFill
@@ -431,22 +395,219 @@ const TopicsScene: React.FC<{
             "absolute",
           left: 130,
           right: 130,
-          top: 110,
+          top: 85,
+          bottom: 70,
+          display: "flex",
+          flexDirection:
+            "column",
+          justifyContent:
+            "center",
+          transform:
+            `translateY(${y}px)`,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 18,
+            letterSpacing: 6,
+            fontWeight: 850,
+            color: C.accent,
+          }}
+        >
+          FINANCIAL MARKETS · INVESTING
+        </div>
+
+        <div
+          style={{
+            marginTop: 18,
+            fontSize: 108,
+            lineHeight: 0.94,
+            fontWeight: 900,
+            letterSpacing: -5,
+            color: C.text,
+          }}
+        >
+          {truncate(
+            data.siteTitle,
+            32
+          )}
+        </div>
+
+        <div
+          style={{
+            marginTop: 22,
+            width: 130,
+            height: 4,
+            background:
+              C.white,
+          }}
+        />
+
+        <div
+          style={{
+            marginTop: 24,
+            maxWidth: 1450,
+            fontSize: 34,
+            lineHeight: 1.25,
+            fontWeight: 700,
+            color: C.text,
+          }}
+        >
+          {truncate(
+            description,
+            125
+          )}
+        </div>
+
+        <div
+          style={{
+            marginTop: 12,
+            maxWidth: 1300,
+            fontSize: 21,
+            lineHeight: 1.35,
+            color: C.muted,
+          }}
+        >
+          {truncate(
+            value,
+            120
+          )}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            marginTop: 25,
+          }}
+        >
+          {topics.map(
+            (
+              topic,
+              i
+            ) => {
+              const io =
+                interpolate(
+                  f,
+                  [
+                    14 +
+                      i * 5,
+                    26 +
+                      i * 5,
+                  ],
+                  [0, 1],
+                  {
+                    extrapolateLeft:
+                      "clamp",
+                    extrapolateRight:
+                      "clamp",
+                  }
+                );
+
+              return (
+                <div
+                  key={`${topic}-${i}`}
+                  style={{
+                    opacity: io,
+                    padding:
+                      "9px 16px",
+                    border:
+                      `1px solid ${C.line}`,
+                    borderRadius:
+                      999,
+                    background:
+                      "rgba(255,255,255,0.04)",
+                    color:
+                      C.muted,
+                    fontSize: 16,
+                    fontWeight: 750,
+                    letterSpacing:
+                      0.5,
+                  }}
+                >
+                  {topic.toUpperCase()}
+                </div>
+              );
+            }
+          )}
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/* ============================================================
+ * SCENE 2 — TOPICS
+ * 3–6 sec
+ * ============================================================ */
+
+const TopicsScene: React.FC<{
+  topics: string[];
+  analysis: BlogAnalysis;
+}> = ({
+  topics,
+  analysis,
+}) => {
+  const f =
+    useCurrentFrame();
+
+  const o = fade(
+    f,
+    90,
+    12,
+    12
+  );
+
+  const y = enter(
+    f,
+    34,
+    18
+  );
+
+  const contentStyle =
+    safe(
+      analysis.contentStyle,
+      "Focused market coverage and concise financial analysis."
+    );
+
+  const audience =
+    safe(
+      analysis.audience,
+      "For investors and readers following financial markets."
+    );
+
+  return (
+    <AbsoluteFill
+      style={{
+        opacity: o,
+      }}
+    >
+      <Base />
+
+      <div
+        style={{
+          position:
+            "absolute",
+          left: 135,
+          right: 135,
+          top: 100,
           bottom: 100,
           display: "flex",
           flexDirection:
             "column",
           justifyContent:
             "center",
-          transform: `translateY(${y}px)`,
+          transform:
+            `translateY(${y}px)`,
         }}
       >
         <div
           style={{
-            fontSize: 17,
+            fontSize: 18,
             letterSpacing: 6,
             color: C.accent,
-            fontWeight: 800,
+            fontWeight: 850,
           }}
         >
           WHAT YOU'LL FIND
@@ -454,47 +615,53 @@ const TopicsScene: React.FC<{
 
         <div
           style={{
-            marginTop: 20,
-            fontSize: 68,
+            marginTop: 18,
+            fontSize: 72,
+            lineHeight: 1,
             fontWeight: 900,
             letterSpacing: -2,
           }}
         >
-          Focused fields.
+          Focused market coverage.
         </div>
 
         <div
           style={{
-            marginTop: 14,
+            marginTop: 16,
+            maxWidth: 1280,
             color: C.muted,
-            fontSize: 24,
+            fontSize: 25,
+            lineHeight: 1.35,
           }}
         >
           {truncate(
-            analysis.contentStyle,
-            88
+            contentStyle,
+            105
           )}
         </div>
 
         <div
           style={{
             display: "flex",
-            flexWrap:
-              "wrap",
-            gap: 16,
-            marginTop: 48,
+            flexWrap: "wrap",
+            gap: 14,
+            marginTop: 42,
+            maxWidth: 1500,
           }}
         >
           {topics.map(
-            (topic, i) => {
+            (
+              topic,
+              i
+            ) => {
               const io =
                 interpolate(
                   f,
                   [
-                    10 +
-                      i * 7,
-                    24 +
-                      i * 7,
+                    8 +
+                      i * 6,
+                    22 +
+                      i * 6,
                   ],
                   [0, 1],
                   {
@@ -509,10 +676,10 @@ const TopicsScene: React.FC<{
                 interpolate(
                   f,
                   [
-                    10 +
-                      i * 7,
-                    24 +
-                      i * 7,
+                    8 +
+                      i * 6,
+                    22 +
+                      i * 6,
                   ],
                   [18, 0],
                   {
@@ -525,18 +692,23 @@ const TopicsScene: React.FC<{
 
               return (
                 <div
-                  key={topic}
+                  key={`${topic}-${i}`}
                   style={{
                     opacity: io,
-                    transform: `translateY(${iy}px)`,
+                    transform:
+                      `translateY(${iy}px)`,
                     padding:
-                      "18px 26px",
-                    border: `1px solid ${C.line}`,
-                    borderRadius: 999,
+                      "15px 22px",
+                    border:
+                      `1px solid ${C.line}`,
+                    borderRadius:
+                      999,
                     background:
                       "rgba(255,255,255,0.045)",
-                    fontSize: 24,
-                    fontWeight: 750,
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color:
+                      C.text,
                   }}
                 >
                   {topic}
@@ -548,20 +720,33 @@ const TopicsScene: React.FC<{
 
         <div
           style={{
-            marginTop: 38,
-            fontSize: 19,
+            marginTop: 34,
+            fontSize: 18,
             color: C.soft,
+            maxWidth: 1200,
           }}
         >
           {truncate(
-            analysis.audience,
-            105
+            audience,
+            115
           )}
         </div>
       </div>
     </AbsoluteFill>
   );
 };
+
+/* ============================================================
+ * SCENE 3 — POST
+ * 6–18 sec
+ *
+ * Image: 1110 × 580
+ * Text: 590 wide
+ *
+ * The image remains the visual hero.
+ * The text panel focuses on category, summary and date,
+ * avoiding unnecessary duplication of a thumbnail headline.
+ * ============================================================ */
 
 const PostScene: React.FC<{
   post: BlogPost;
@@ -578,8 +763,8 @@ const PostScene: React.FC<{
   const o = fade(
     f,
     72,
-    10,
-    10
+    9,
+    9
   );
 
   const reverse =
@@ -594,8 +779,8 @@ const PostScene: React.FC<{
       [0, 18],
       [
         reverse
-          ? -28
-          : 28,
+          ? -24
+          : 24,
         0,
       ],
       {
@@ -609,36 +794,25 @@ const PostScene: React.FC<{
   const textY =
     enter(
       f,
-      26,
-      16
+      24,
+      15
     );
-
-  const titleLength =
-    safe(post.title)
-      .length;
-
-  const titleSize =
-    titleLength > 100
-      ? 48
-      : titleLength > 72
-        ? 56
-        : 64;
-
-  const cleanedExcerpt = post.excerpt
-    ? post.excerpt
-        .replace(/Photo by .*? on Unsplash/i, "")
-        .replace(/📅[^|]*\|/, "")
-        .replace(/^\s*Wall Street Daily Briefing\s*/i, "")
-        .replace(/\s+/g, " ")
-        .trim()
-    : "";
-
-  const summary = truncate(cleanedExcerpt, 92);
 
   const category =
     safe(
       post.categories?.[0]
     );
+
+  const summary =
+    truncate(
+      cleanExcerpt(
+        post.excerpt
+      ),
+      132
+    );
+
+  const date =
+    formatDate(post);
 
   const progress =
     ((index + 1) /
@@ -648,240 +822,286 @@ const PostScene: React.FC<{
       )) *
     100;
 
-  const imagePanel = (
-    <div
-      style={{
-        position:
-          "absolute",
-        ...(reverse
-          ? { right: 90 }
-          : { left: 90 }),
-        top: 105,
-        width: 1110,
-        height: 820,
-        borderRadius: 26,
-        overflow: "hidden",
-        background:
-          C.panel,
-        border: `1px solid ${C.line}`,
-        boxShadow:
-          "0 28px 70px rgba(0,0,0,0.42)",
-        transform: `translateX(${imageX}px)`,
-      }}
-    >
-      {image ? (
-        <Img
-          src={image}
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit:
-              "contain",
-            display:
-              "block",
-            background:
-              "#0b0f15",
-          }}
-        />
-      ) : (
+  /*
+   * Instead of rendering the full title again,
+   * show a compact contextual label.
+   *
+   * This avoids visual duplication because the generated
+   * editorial thumbnails already commonly contain their
+   * headline.
+   */
+  const articleLabel =
+    `ARTICLE ${String(
+      index + 1
+    ).padStart(
+      2,
+      "0"
+    )}`;
+
+  const imagePanel =
+    (
+      <div
+        style={{
+          position:
+            "absolute",
+
+          ...(reverse
+            ? { right: 90 }
+            : { left: 90 }),
+
+          top: 250,
+
+          width: 1110,
+          height: 580,
+
+          borderRadius: 24,
+          overflow:
+            "hidden",
+
+          background:
+            C.panel,
+
+          border:
+            `1px solid ${C.line}`,
+
+          boxShadow:
+            "0 28px 70px rgba(0,0,0,0.42)",
+
+          transform:
+            `translateX(${imageX}px)`,
+        }}
+      >
+        {image ? (
+          <Img
+            src={image}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit:
+                "cover",
+              objectPosition:
+                "center",
+              display:
+                "block",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+              padding: 70,
+              textAlign:
+                "center",
+              fontSize: 38,
+              fontWeight: 850,
+              color:
+                C.muted,
+            }}
+          >
+            IMAGE UNAVAILABLE
+          </div>
+        )}
+
         <div
           style={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems:
-              "center",
-            justifyContent:
-              "center",
-            padding: 70,
-            textAlign:
-              "center",
-            fontSize: 42,
+            position:
+              "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.30) 100%)",
+            pointerEvents:
+              "none",
+          }}
+        />
+
+        <div
+          style={{
+            position:
+              "absolute",
+            left: 24,
+            top: 22,
+            padding:
+              "8px 13px",
+            borderRadius:
+              999,
+            background:
+              "rgba(7,9,13,0.72)",
+            border:
+              "1px solid rgba(255,255,255,0.15)",
+            color:
+              "rgba(255,255,255,0.88)",
+            fontSize: 13,
+            letterSpacing: 3,
             fontWeight: 850,
           }}
         >
-          IMAGE UNAVAILABLE
+          {String(
+            index + 1
+          ).padStart(
+            2,
+            "0"
+          )}{" "}
+          /{" "}
+          {String(
+            total
+          ).padStart(
+            2,
+            "0"
+          )}
         </div>
-      )}
+      </div>
+    );
 
+  const textPanel =
+    (
       <div
         style={{
           position:
             "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0) 62%, rgba(0,0,0,0.20) 100%)",
-          pointerEvents:
-            "none",
-        }}
-      />
 
-      <div
-        style={{
-          position:
-            "absolute",
-          left: 26,
-          top: 24,
-          padding:
-            "8px 12px",
-          borderRadius: 999,
-          background:
-            "rgba(7,9,13,0.70)",
-          border:
-            "1px solid rgba(255,255,255,0.14)",
-          color:
-            "rgba(255,255,255,0.82)",
-          fontSize: 13,
-          letterSpacing: 3,
-          fontWeight: 800,
+          ...(reverse
+            ? { left: 90 }
+            : { right: 90 }),
+
+          top: 180,
+
+          width: 590,
+          height: 700,
+
+          display:
+            "flex",
+          flexDirection:
+            "column",
+          justifyContent:
+            "center",
+
+          transform:
+            `translateY(${textY}px)`,
         }}
       >
-        {String(
-          index + 1
-        ).padStart(
-          2,
-          "0"
-        )}{" "}
-        /{" "}
-        {String(
-          total
-        ).padStart(
-          2,
-          "0"
-        )}
-      </div>
-    </div>
-  );
-
-  const textPanel = (
-    <div
-      style={{
-        position:
-          "absolute",
-        ...(reverse
-          ? { left: 90 }
-          : { right: 90 }),
-        top: 135,
-        width: 590,
-        minHeight: 700,
-        display: "flex",
-        flexDirection:
-          "column",
-        justifyContent:
-          "center",
-        transform: `translateY(${textY}px)`,
-      }}
-    >
-      <div
-        style={{
-          width: 52,
-          height: 3,
-          background:
-            C.accent,
-          marginBottom: 24,
-        }}
-      />
-
-      {category && (
         <div
           style={{
-            fontSize: 15,
-            letterSpacing: 4,
-            fontWeight: 800,
-            color:
-              C.accent,
+            display:
+              "flex",
+            alignItems:
+              "center",
+            gap: 14,
           }}
         >
-          {truncate(
-            category,
-            28
-          ).toUpperCase()}
+          <div
+            style={{
+              width: 44,
+              height: 3,
+              background:
+                C.accent,
+            }}
+          />
+
+          <div
+            style={{
+              fontSize: 14,
+              letterSpacing: 3.5,
+              fontWeight: 850,
+              color:
+                C.accent,
+            }}
+          >
+            {articleLabel}
+          </div>
         </div>
-      )}
 
-      <div
-        style={{
-          marginTop:
-            category
-              ? 18
-              : 0,
-          fontSize:
-            titleSize,
-          lineHeight: 1.04,
-          fontWeight: 900,
-          letterSpacing:
-            -1.8,
-          color:
-            C.text,
-          maxHeight: 196,
-          overflow:
-            "hidden",
-          display:
-            "-webkit-box",
-          WebkitBoxOrient:
-            "vertical",
-          WebkitLineClamp: 3,
-        }}
-      >
-        {post.title}
-      </div>
+        {category && (
+          <div
+            style={{
+              marginTop: 22,
+              fontSize: 14,
+              letterSpacing: 4,
+              fontWeight: 850,
+              color:
+                C.soft,
+            }}
+          >
+            {truncate(
+              category,
+              28
+            ).toUpperCase()}
+          </div>
+        )}
 
-      {summary && (
         <div
           style={{
-            marginTop: 20,
-            fontSize: 19,
-            lineHeight: 1.35,
+            marginTop: 18,
+            fontSize: 38,
+            lineHeight: 1.12,
+            fontWeight: 850,
+            color:
+              C.text,
+          }}
+        >
+          {summary ||
+            "Latest market developments and financial insights."}
+        </div>
+
+        {date && (
+          <div
+            style={{
+              marginTop: 24,
+              fontSize: 14,
+              letterSpacing: 2.5,
+              fontWeight: 750,
+              color:
+                C.soft,
+            }}
+          >
+            {date}
+          </div>
+        )}
+
+        <div
+          style={{
+            marginTop: 25,
+            fontSize: 15,
+            letterSpacing: 3,
+            fontWeight: 850,
             color:
               C.muted,
-            maxWidth: 560,
-            maxHeight: 28,
-            overflow:
-              "hidden",
-            display:
-              "-webkit-box",
-            WebkitBoxOrient:
-              "vertical",
-            WebkitLineClamp: 1,
           }}
         >
-          {summary}
+          READ ARTICLE →
         </div>
-      )}
 
-      <div
-        style={{
-          marginTop: 24,
-          fontSize: 14,
-          letterSpacing: 3,
-          fontWeight: 800,
-          color:
-            C.soft,
-        }}
-      >
-        READ ARTICLE →
-      </div>
-
-      <div
-        style={{
-          marginTop: 24,
-          width: 560,
-          height: 3,
-          background:
-            C.line,
-        }}
-      >
         <div
           style={{
-            width: `${progress}%`,
-            height: "100%",
+            marginTop: 28,
+            width: 560,
+            height: 3,
             background:
-              C.accent,
+              C.line,
           }}
-        />
+        >
+          <div
+            style={{
+              width:
+                `${clamp(
+                  progress,
+                  0,
+                  100
+                )}%`,
+              height: "100%",
+              background:
+                C.accent,
+            }}
+          />
+        </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <AbsoluteFill
@@ -890,11 +1110,18 @@ const PostScene: React.FC<{
       }}
     >
       <Base />
+
       {textPanel}
+
       {imagePanel}
     </AbsoluteFill>
   );
 };
+
+/* ============================================================
+ * SCENE 4 — VALUE PROPOSITION
+ * 18–21 sec
+ * ============================================================ */
 
 const ValueScene: React.FC<{
   data: BlogData;
@@ -910,21 +1137,26 @@ const ValueScene: React.FC<{
 
   const o = fade(
     f,
-    90
+    90,
+    12,
+    12
   );
 
-  const y = enter(
-    f,
-    34
-  );
+  const y =
+    enter(
+      f,
+      30,
+      18
+    );
 
-  const shortValue = truncate(
-    safe(
-      analysis.valueProposition,
-      "Timely ideas, useful context, and a clearer view of what matters."
-    ),
-    105
-  );
+  const value =
+    truncate(
+      safe(
+        analysis.valueProposition,
+        "Timely ideas, useful context, and a clearer view of what matters."
+      ),
+      135
+    );
 
   return (
     <AbsoluteFill
@@ -942,20 +1174,25 @@ const ValueScene: React.FC<{
           right: 150,
           top: 100,
           bottom: 100,
-          display: "flex",
+
+          display:
+            "flex",
           flexDirection:
             "column",
           justifyContent:
             "center",
-          transform: `translateY(${y}px)`,
+
+          transform:
+            `translateY(${y}px)`,
         }}
       >
         <div
           style={{
-            fontSize: 17,
+            fontSize: 18,
             letterSpacing: 6,
-            color: C.accent,
-            fontWeight: 800,
+            color:
+              C.accent,
+            fontWeight: 850,
           }}
         >
           WHY FOLLOW{" "}
@@ -967,14 +1204,16 @@ const ValueScene: React.FC<{
         <div
           style={{
             marginTop: 24,
-            fontSize: 62,
-            lineHeight: 1.06,
-            fontWeight: 900,
             maxWidth: 1450,
+            fontSize: 60,
+            lineHeight: 1.08,
+            fontWeight: 900,
+            letterSpacing: -1.5,
+            color:
+              C.text,
           }}
         >
-          {shortValue ||
-            "Timely ideas, useful context, and a clearer view of what matters."}
+          {value}
         </div>
 
         <div
@@ -982,33 +1221,34 @@ const ValueScene: React.FC<{
             display:
               "flex",
             gap: 12,
-            marginTop: 40,
+            marginTop: 38,
+            flexWrap:
+              "wrap",
           }}
         >
           {topics
             .slice(0, 3)
             .map(
               (
-                topic
+                topic,
+                i
               ) => (
                 <div
-                  key={
-                    topic
-                  }
+                  key={`${topic}-${i}`}
                   style={{
                     padding:
-                      "12px 18px",
-                    border: `1px solid ${C.line}`,
-                    borderRadius: 999,
+                      "11px 17px",
+                    border:
+                      `1px solid ${C.line}`,
+                    borderRadius:
+                      999,
                     color:
                       C.muted,
-                    fontSize: 17,
-                    fontWeight: 700,
+                    fontSize: 16,
+                    fontWeight: 750,
                   }}
                 >
-                  {
-                    topic
-                  }
+                  {topic}
                 </div>
               )
             )}
@@ -1017,6 +1257,11 @@ const ValueScene: React.FC<{
     </AbsoluteFill>
   );
 };
+
+/* ============================================================
+ * SCENE 5 — CTA
+ * 21–24 sec
+ * ============================================================ */
 
 const CtaScene: React.FC<{
   data: BlogData;
@@ -1062,22 +1307,30 @@ const CtaScene: React.FC<{
       ? topics.join(
           "  ·  "
         )
-      : "INSIGHTS  ·  ANALYSIS  ·  TRENDS";
+      : "MARKETS  ·  ANALYSIS  ·  INSIGHTS";
 
-  const host = safe(
-    data.hostname,
+  const host =
     safe(
-      data.url
-    )
-      .replace(
-        /^https?:\/\//,
-        ""
-      )
-      .replace(
-        /\/.*$/,
-        ""
-      )
-  );
+      data.hostname,
+      safe(data.url)
+        .replace(
+          /^https?:\/\//,
+          ""
+        )
+        .replace(
+          /\/.*$/,
+          ""
+        )
+    );
+
+  const value =
+    truncate(
+      safe(
+        analysis?.valueProposition,
+        "Stay informed with concise market insights and financial developments."
+      ),
+      110
+    );
 
   return (
     <AbsoluteFill
@@ -1092,16 +1345,21 @@ const CtaScene: React.FC<{
           position:
             "absolute",
           inset: 0,
-          display: "flex",
+
+          display:
+            "flex",
           flexDirection:
             "column",
           alignItems:
             "center",
           justifyContent:
             "center",
+
           textAlign:
             "center",
-          transform: `scale(${scale})`,
+
+          transform:
+            `scale(${scale})`,
         }}
       >
         <div
@@ -1119,27 +1377,42 @@ const CtaScene: React.FC<{
         <div
           style={{
             marginTop: 20,
-            fontSize: 92,
-            lineHeight: 0.98,
+            fontSize: 96,
+            lineHeight: 0.95,
             fontWeight: 900,
             letterSpacing: -4,
+            color:
+              C.text,
           }}
         >
           {truncate(
             data.siteTitle,
-            42
+            36
           )}
         </div>
 
         <div
           style={{
-            marginTop: 24,
+            marginTop: 22,
+            maxWidth: 1100,
             fontSize: 25,
-            fontWeight: 750,
+            lineHeight: 1.3,
+            color:
+              C.muted,
+            fontWeight: 650,
+          }}
+        >
+          {value}
+        </div>
+
+        <div
+          style={{
+            marginTop: 25,
+            fontSize: 17,
+            fontWeight: 800,
+            letterSpacing: 2.5,
             color:
               C.text,
-            letterSpacing:
-              1.2,
           }}
         >
           {topicLine}
@@ -1147,18 +1420,19 @@ const CtaScene: React.FC<{
 
         <div
           style={{
-            marginTop: 34,
+            marginTop: 32,
             padding:
-              "18px 34px",
-            borderRadius: 999,
+              "17px 34px",
+            borderRadius:
+              999,
             background:
               C.white,
             color:
               C.bg,
-            fontSize: 22,
+            fontSize: 21,
             fontWeight: 900,
             letterSpacing:
-              0.5,
+              0.8,
           }}
         >
           VISIT{" "}
@@ -1171,6 +1445,10 @@ const CtaScene: React.FC<{
     </AbsoluteFill>
   );
 };
+
+/* ============================================================
+ * MAIN
+ * ============================================================ */
 
 export const BlogPromo: React.FC =
   () => {
@@ -1233,6 +1511,9 @@ export const BlogPromo: React.FC =
               color:
                 C.muted,
               fontSize: 22,
+              maxWidth: 1200,
+              textAlign:
+                "center",
             }}
           >
             {error}
@@ -1263,23 +1544,33 @@ export const BlogPromo: React.FC =
       );
     }
 
-    const posts = (
-      data.posts || []
-    ).slice(0, 5);
+    const posts =
+      (
+        data.posts ||
+        []
+      ).slice(
+        0,
+        5
+      );
 
     const analysis =
-      data.analysis || {};
+      data.analysis ||
+      {};
 
-    const topics = (
-      analysis.topics ||
-      [
-        "Insights",
-        "Analysis",
-        "Trends",
-      ]
-    )
-      .filter(Boolean)
-      .slice(0, 4);
+    const topics =
+      (
+        analysis.topics ||
+        [
+          "Markets",
+          "Analysis",
+          "Insights",
+        ]
+      )
+        .filter(Boolean)
+        .slice(
+          0,
+          4
+        );
 
     return (
       <AbsoluteFill
@@ -1294,6 +1585,7 @@ export const BlogPromo: React.FC =
             "hidden",
         }}
       >
+        {/* 0–3 sec */}
         <Sequence
           from={0}
           durationInFrames={90}
@@ -1306,6 +1598,7 @@ export const BlogPromo: React.FC =
           />
         </Sequence>
 
+        {/* 3–6 sec */}
         <Sequence
           from={90}
           durationInFrames={90}
@@ -1320,6 +1613,7 @@ export const BlogPromo: React.FC =
           />
         </Sequence>
 
+        {/* 6–18 sec */}
         {posts.map(
           (
             post,
@@ -1355,6 +1649,7 @@ export const BlogPromo: React.FC =
           )
         )}
 
+        {/* 18–21 sec */}
         <Sequence
           from={540}
           durationInFrames={90}
@@ -1370,6 +1665,7 @@ export const BlogPromo: React.FC =
           />
         </Sequence>
 
+        {/* 21–24 sec */}
         <Sequence
           from={630}
           durationInFrames={90}
